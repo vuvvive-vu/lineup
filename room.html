@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Комната — lineUP</title>
+<link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+<header class="topbar">
+  <a href="/" class="logo"><i>L</i> lineUP</a>
+  <div class="nav-right">
+    <span id="roomTitleTop" style="color:#fff;font-weight:700;font-size:14px;"></span>
+    <span id="roomCodeTop" class="badge"></span>
+    <button class="btn-ghost" onclick="location.href='/'">Выйти</button>
+  </div>
+</header>
+
+<div class="room-layout">
+  <div class="player-wrap">
+    <div class="player" id="player">
+      <div class="player-placeholder" id="placeholder">Загрузка плеера...</div>
+      <!-- iframe injected -->
+      <div id="guestOverlay" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);border:1px solid #232323;border-radius:999px;padding:6px 12px;z-index:5;font-size:11px;color:#9a9a9a;pointer-events:none;white-space:nowrap;">Управление у хоста 👑</div>
+      <button id="unmuteBtn" style="display:none;position:absolute;bottom:12px;right:12px;z-index:6;background:#fff;color:#000;border:none;padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);">🔊 Включить звук</button>
+    </div>
+  </div>
+
+  <div class="room-bottom">
+    <div class="chat">
+      <div class="chat-head">
+        <h4>Чат</h4>
+        <span class="online" id="online">0 в комнате</span>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="typing" id="typing" style="display:none;"></div>
+      <div class="chat-input">
+        <input id="chatInput" placeholder="Написать сообщение..." maxlength="500"/>
+        <button id="sendBtn">Отправить</button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="side-card">
+        <h4>Пригласи друзей</h4>
+        <p>Скопируй код или ссылку — по ней друзья зайдут прямо в эту комнату.</p>
+        <div class="code-box">
+          <code id="codeBox">------</code>
+          <button class="icon-btn" id="copyCode">Копировать</button>
+        </div>
+        <div class="link-row">
+          <input id="linkBox" readonly />
+          <button class="icon-btn" id="copyLink">Копировать</button>
+        </div>
+      </div>
+
+      <div class="side-card" id="participantsCard">
+        <h4>Участники <span id="pCount" style="color:var(--muted);font-weight:600;font-size:12px;"></span></h4>
+        <div id="participantsList" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;"></div>
+        <div id="hostHint" style="margin-top:12px;padding:10px 12px;background:#000;border:1px solid var(--border);border-radius:12px;font-size:12px;color:var(--muted);text-align:center;"></div>
+      </div>
+
+      <div class="side-card">
+        <h4>О комнате</h4>
+        <p id="roomInfo">—</p>
+        <div class="room-meta" style="margin-top:10px;">
+          <span class="badge" id="platformBadge"></span>
+          <span class="badge" id="hostBadge"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- PROFILE MODAL -->
+  <div id="profileModal" class="modal-bg">
+    <div class="modal profile-modal">
+      <div class="modal-head">
+        <h3>Профиль</h3>
+        <button class="x" data-close="profileModal">✕</button>
+      </div>
+      <div class="profile-ava-wrap">
+        <div class="profile-ava-large" id="pAvaLarge">😎</div>
+        <div style="font-size:12px;color:var(--muted);">Выбери аватар или загрузи фото</div>
+        <div class="ava-grid" id="avaGrid">
+          <button data-ava="😎">😎</button><button data-ava="🦊">🦊</button><button data-ava="🐱">🐱</button><button data-ava="🚀">🚀</button><button data-ava="👑">👑</button><button data-ava="🎬">🎬</button><button data-ava="🍿">🍿</button><button data-ava="❤️">❤️</button>
+          <button data-ava="😈">😈</button><button data-ava="👾">👾</button><button data-ava="🌙">🌙</button><button data-ava="🔥">🔥</button><button data-ava="⚡">⚡</button><button data-ava="💀">💀</button><button data-ava="🌸">🌸</button><button data-ava="🍓">🍓</button>
+        </div>
+        <button class="btn-ghost" id="uploadAvaBtn" style="margin-top:10px;font-size:12px;padding:8px 16px;">📷 Загрузить фото</button>
+        <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">до 2MB • PNG, JPG, WEBP</div>
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <input id="pUsername" placeholder="твой ник" maxlength="20" />
+      </div>
+      <div class="field">
+        <label>Описание</label>
+        <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3"></textarea>
+        <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px;"><span id="bioCount">0</span>/120</div>
+      </div>
+      <div id="pError" class="error"></div>
+      <button id="pSave" class="btn-primary">Сохранить</button>
+      <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;">Выйти из аккаунта</button>
+    </div>
+  </div>
+
+  <!-- VIEW PROFILE MODAL (read-only) -->
+  <div id="viewProfileModal" class="modal-bg">
+    <div class="modal profile-modal" style="max-width:360px;">
+      <div class="modal-head">
+        <h3>Профиль</h3>
+        <button class="x" data-close="viewProfileModal">✕</button>
+      </div>
+      <div class="profile-ava-wrap">
+        <div class="profile-ava-large" id="vAvaLarge">😎</div>
+        <div id="vUsername" style="font-weight:800;font-size:18px;letter-spacing:-0.02em;"></div>
+        <div id="vBio" style="font-size:13px;color:#8a8a8a;text-align:center;max-width:280px;line-height:1.5;white-space:pre-wrap;word-break:break-word;"></div>
+      </div>
+      <button class="btn-ghost" style="width:100%;margin-top:14px;" data-close="viewProfileModal">Закрыть</button>
+    </div>
+  </div>
+
+<script src="/room.js"></script>
