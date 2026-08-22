@@ -261,6 +261,12 @@ wss.on('connection', (ws, req) => {
         const u=users.find(x=>x.username===ws.username);
         broadcast(code, { type: 'chat', ...chatMsg, avatar: u?.avatar||'😎' });
       }
+      if (msg.type === 'reaction') {
+        const mid=(msg.messageId||'').toString().slice(0,64);
+        const emoji=(msg.emoji||'❤️').toString().slice(0,4);
+        if(!mid) return;
+        broadcast(code, { type: 'reaction', messageId: mid, emoji, from: ws.username }, null);
+      }
       if (msg.type === 'typing') {
         broadcast(code, { type: 'typing', username: ws.username, isTyping: !!msg.isTyping }, ws);
       }

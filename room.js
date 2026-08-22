@@ -75,12 +75,14 @@ function updateHostUI(){
   const isHost=me===host;
   guestOverlay.style.display=isHost?'none':'block';
   guestOverlay.title=isHost?'':'Только хост управляет плеером';
-  if(isHost){
-    hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
-    hostHint.classList.remove('guest');
-  } else {
-    hostHint.textContent=`Управляет хост 👑 ${host} — у тебя тот же момент что и у него`;
-    hostHint.classList.add('guest');
+  if(hostHint){
+    if(isHost){
+      hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
+      hostHint.classList.remove('guest');
+    } else {
+      hostHint.textContent=`Управляет хост 👑 ${host} — у тебя тот же момент что и у него`;
+      hostHint.classList.add('guest');
+    }
   }
 }
 const unmuteBtn=document.getElementById('unmuteBtn');
@@ -129,17 +131,65 @@ function renderParticipants(users,h){
 function addMessage({username,text,ts,avatar},isMe){
   if(typingUsers[username]){ delete typingUsers[username]; renderTyping(); }
   const ava=avatar||getAvatarFor(username, '😎');
+  const mid=`${username}-${ts}`;
   const d=document.createElement('div');
   d.className='msg'+(isMe?' me':'');
+  d.dataset.id=mid;
   const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`:escapeHtml(ava);
   const avaEl=`<div class="msg-avatar" data-user="${escapeHtml(username)}" title="${escapeHtml(username)}">${avaInner}</div>`;
-  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble">${escapeHtml(text)}</div></div>`;
-  // click on avatar -> view profile
+  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${escapeHtml(text)}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
   const avaDom=d.querySelector('.msg-avatar');
   if(avaDom) avaDom.onclick=()=> openViewProfile(username);
+  // double click / double tap -> heart
+  const bubble=d.querySelector('.bubble');
+  let lastTap=0;
+  function handleHeart(){
+    sendReaction(mid, '❤️');
+    addReactionUI(mid, '❤️', me);
+  }
+  bubble.addEventListener('dblclick', handleHeart);
+  bubble.addEventListener('touchend', (e)=>{
+    const now=Date.now();
+    if(now-lastTap<400){ e.preventDefault(); handleHeart(); }
+    lastTap=now;
+  });
   messagesEl.appendChild(d);
   messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+const messageReactions={};
+function addReactionUI(messageId, emoji, from){
+  const cont=document.getElementById(`react-${messageId}`);
+  if(!cont) return;
+  if(!messageReactions[messageId]) messageReactions[messageId]={};
+  const key=emoji;
+  if(messageReactions[messageId][from]) return; // already reacted
+  messageReactions[messageId][from]=emoji;
+  // count
+  const counts={};
+  Object.values(messageReactions[messageId]).forEach(e=> counts[e]=(counts[e]||0)+1);
+  cont.innerHTML='';
+  Object.entries(counts).forEach(([e,c])=>{
+    const pill=document.createElement('span');
+    pill.style.cssText='display:inline-flex;align-items:center;gap:3px;background:#1a1a1a;border:1px solid #232323;border-radius:999px;padding:2px 7px;font-size:12px;animation: pop .2s ease;';
+    pill.textContent=c>1?`${e} ${c}`:e;
+    cont.appendChild(pill);
+  });
+  cont.style.display='flex';
+  // heart burst animation
+  const bubble=document.querySelector(`.bubble[data-id="${messageId}"]`);
+  if(bubble){
+    const heart=document.createElement('span');
+    heart.textContent='❤️';
+    heart.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
+    bubble.style.position='relative';
+    bubble.appendChild(heart);
+    setTimeout(()=> heart.remove(), 600);
+  }
+}
+function sendReaction(messageId, emoji){
+  if(!ws||ws.readyState!==1) return;
+  ws.send(JSON.stringify({type:'reaction', messageId, emoji}));
 }
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function sys(t){
@@ -366,6 +416,9 @@ function connect(){
     if(data.type==='user_leave'){
       sys(`${data.username} вышел`);
       if(typingUsers[data.username]){ delete typingUsers[data.username]; renderTyping(); }
+    }
+    if(data.type==='reaction'){
+      addReactionUI(data.messageId, data.emoji, data.from);
     }
     if(data.type==='typing'){
       if(data.username===me) return; // not visible to author
