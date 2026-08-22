@@ -27,10 +27,12 @@
       <div class="field">
         <label>Username</label>
         <input id="username" placeholder="например, anomalyco" autocomplete="username" />
+        <div id="usernameStatus" style="font-size:11px;min-height:16px;margin-top:4px;"></div>
       </div>
       <div class="field">
         <label>Пароль</label>
-        <input id="password" type="password" placeholder="минимум 4 символа" autocomplete="current-password" />
+        <input id="password" type="password" placeholder="минимум 8 символов и цифра" autocomplete="current-password" />
+        <div id="passwordHint" style="font-size:11px;min-height:16px;margin-top:4px;color:var(--muted);"></div>
       </div>
       <button id="authBtn" class="btn-primary">Войти</button>
       <div class="hint">Регистрируясь, ты создаешь уникальный username. Пароль хранится в зашифрованном виде.</div>

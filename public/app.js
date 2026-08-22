@@ -17,9 +17,83 @@ function setMode(m){
   $('#authTitle').textContent = m==='login' ? 'Вход' : 'Регистрация';
   $('#authDesc').textContent = m==='login' ? 'С возвращением. Войди и продолжи просмотр.' : 'Создай уникальный username и придумай пароль.';
   authBtn.textContent = m==='login' ? 'Войти' : 'Зарегистрироваться';
+  // clear live hints when switching modes, show hint for reg if needed
+  usernameStatus.textContent=''; usernameStatus.className='';
+  if(m==='reg' && !passwordEl.value){
+    passwordHint.textContent='Минимум 8 символов и хотя бы одна цифра';
+    passwordHint.className='';
+  } else if(m==='login'){
+    passwordHint.textContent=''; passwordHint.className='';
+  }
+  usernameEl.classList.remove('input-ok','input-err');
+  // re-validate if fields already filled
+  if(usernameEl.value) validateUsername();
+  if(passwordEl.value) validatePassword();
+  else if(m==='reg') passwordEl.classList.remove('input-ok','input-err');
+  hideError(authError);
 }
-tabLogin.onclick = ()=> setMode('login');
-tabReg.onclick = ()=> setMode('reg');
+tabLogin.onclick = ()=> { setMode('login'); };
+tabReg.onclick = ()=> { setMode('reg'); };
+
+// live validation (only for registration)
+const usernameStatus=$('#usernameStatus');
+const passwordHint=$('#passwordHint');
+let userCheckTimer=null;
+let lastUsernameChecked='';
+function validatePassword(){
+  if(mode!=='reg'){
+    passwordHint.textContent=''; passwordHint.className='';
+    passwordEl.classList.remove('input-ok','input-err');
+    return true;
+  }
+  const p=passwordEl.value;
+  const hint=passwordHint;
+  if(!p){ hint.textContent='Минимум 8 символов и хотя бы одна цифра'; hint.className=''; passwordEl.classList.remove('input-ok','input-err'); return false; }
+  const okLen=p.length>=8;
+  const okDigit=/\d/.test(p);
+  if(okLen && okDigit){ hint.textContent='✓ Пароль подходит'; hint.className='ok'; passwordEl.classList.add('input-ok'); passwordEl.classList.remove('input-err'); return true; }
+  else {
+    let msg=[];
+    if(!okLen) msg.push('минимум 8 символов');
+    if(!okDigit) msg.push('хотя бы одна цифра');
+    hint.textContent='Нужно: '+msg.join(', ');
+    hint.className='err';
+    passwordEl.classList.add('input-err'); passwordEl.classList.remove('input-ok');
+    return false;
+  }
+}
+function validateUsername(){
+  if(mode!=='reg'){
+    usernameStatus.textContent=''; usernameStatus.className='';
+    usernameEl.classList.remove('input-ok','input-err');
+    return;
+  }
+  const u=usernameEl.value.trim();
+  if(!u){ usernameStatus.textContent=''; usernameStatus.className=''; usernameEl.classList.remove('input-ok','input-err'); return; }
+  if(u.length<3){ usernameStatus.textContent='Минимум 3 символа'; usernameStatus.className='taken'; usernameEl.classList.add('input-err'); usernameEl.classList.remove('input-ok'); return; }
+  if(!/^[a-zA-Z0-9_]+$/.test(u)){ usernameStatus.textContent='Только буквы, цифры и _'; usernameStatus.className='taken'; usernameEl.classList.add('input-err'); return; }
+  usernameStatus.textContent='Проверка...'; usernameStatus.className='checking';
+  clearTimeout(userCheckTimer);
+  userCheckTimer=setTimeout(async()=>{
+    if(u!==usernameEl.value.trim()) return;
+    if(mode!=='reg') return;
+    lastUsernameChecked=u;
+    try{
+      const r=await fetch(`/api/check-username?username=${encodeURIComponent(u)}`);
+      const j=await r.json();
+      if(usernameEl.value.trim()!==u || mode!=='reg') return;
+      if(j.available){
+        usernameStatus.textContent='свободен'; usernameStatus.className='free';
+        usernameEl.classList.add('input-ok'); usernameEl.classList.remove('input-err');
+      } else {
+        usernameStatus.textContent='занят'; usernameStatus.className='taken';
+        usernameEl.classList.add('input-err'); usernameEl.classList.remove('input-ok');
+      }
+    }catch{ usernameStatus.textContent=''; }
+  },350);
+}
+usernameEl.addEventListener('input', validateUsername);
+passwordEl.addEventListener('input', validatePassword);
 
 function showError(el, msg){
   el.textContent = msg;
@@ -76,6 +150,11 @@ authBtn.onclick = async ()=>{
   const username = usernameEl.value.trim();
   const password = passwordEl.value;
   if(!username || !password) return showError(authError,'Заполни username и пароль');
+  if(mode==='reg'){
+    if(!validatePassword()) return showError(authError, 'Пароль: минимум 8 символов и цифра');
+    if(usernameStatus.classList.contains('taken')) return showError(authError, 'Username уже занят');
+    if(!/^[a-zA-Z0-9_]+$/.test(username)) return showError(authError, 'Username только буквы, цифры и _');
+  }
   authBtn.disabled = true;
   try{
     const url = mode==='login' ? '/api/login' : '/api/register';

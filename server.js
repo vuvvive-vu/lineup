@@ -103,11 +103,20 @@ function parseToken(token) {
 }
 
 // API
+app.get('/api/check-username', (req, res) => {
+  const username = (req.query.username || '').trim();
+  if (!username || username.length < 3) return res.json({ available: false, reason: 'too_short' });
+  const taken = users.some(u => u.username.toLowerCase() === username.toLowerCase());
+  res.json({ available: !taken });
+});
+
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Заполните все поля' });
   if (username.length < 3) return res.status(400).json({ error: 'Username минимум 3 символа' });
-  if (password.length < 4) return res.status(400).json({ error: 'Пароль минимум 4 символа' });
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) return res.status(400).json({ error: 'Username только буквы, цифры и _' });
+  if (password.length < 8) return res.status(400).json({ error: 'Пароль минимум 8 символов' });
+  if (!/\d/.test(password)) return res.status(400).json({ error: 'Пароль должен содержать хотя бы одну цифру' });
   if (users.find(u => u.username.toLowerCase() === username.toLowerCase()))
     return res.status(400).json({ error: 'Username уже занят' });
   const hash = await bcrypt.hash(password, 8);
