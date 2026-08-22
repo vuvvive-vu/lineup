@@ -75,13 +75,29 @@ function updateHostUI(){
   const isHost=me===host;
   guestOverlay.style.display=isHost?'none':'block';
   guestOverlay.title=isHost?'':'Только хост управляет плеером';
-  if(isHost){
-    hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
-    hostHint.classList.remove('guest');
-  } else {
-    hostHint.textContent=`Управляет хост 👑 ${host} — у тебя тот же момент что и у него`;
-    hostHint.classList.add('guest');
+  if(hostHint){
+    if(isHost){
+      hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
+      hostHint.classList.remove('guest');
+    } else {
+      hostHint.textContent=`Управляет хост 👑 ${host} — у тебя тот же момент что и у него`;
+      hostHint.classList.add('guest');
+    }
   }
+}
+const unmuteBtn=document.getElementById('unmuteBtn');
+if(unmuteBtn){
+  // показывать кнопку звука всем (мобильный автоплей без звука)
+  setTimeout(()=>{ unmuteBtn.style.display='block'; }, 900);
+  unmuteBtn.onclick=()=>{
+    try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
+    try{ if(ytPlayer){ ytPlayer.unMute(); try{ytPlayer.setVolume(100);}catch{} } }catch{}
+    try{ iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
+    try{ iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
+    try{ iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+    unmuteBtn.style.display='none';
+    sys('🔊 Звук включён');
+  };
 }
 let presenceAvatars={};
 function getAvatarFor(name, fallback){ return presenceAvatars[name] || fallback || '😎'; }
@@ -115,17 +131,88 @@ function renderParticipants(users,h){
 function addMessage({username,text,ts,avatar},isMe){
   if(typingUsers[username]){ delete typingUsers[username]; renderTyping(); }
   const ava=avatar||getAvatarFor(username, '😎');
+  const mid=`${username}-${ts}`;
   const d=document.createElement('div');
   d.className='msg'+(isMe?' me':'');
+  d.dataset.id=mid;
   const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`:escapeHtml(ava);
   const avaEl=`<div class="msg-avatar" data-user="${escapeHtml(username)}" title="${escapeHtml(username)}">${avaInner}</div>`;
-  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble">${escapeHtml(text)}</div></div>`;
-  // click on avatar -> view profile
+  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${escapeHtml(text)}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
   const avaDom=d.querySelector('.msg-avatar');
   if(avaDom) avaDom.onclick=()=> openViewProfile(username);
+  // double click / double tap -> heart
+  const bubble=d.querySelector('.bubble');
+  let lastTap=0;
+  function handleHeart(){
+    sendReaction(mid, '❤️');
+    addReactionUI(mid, '❤️', me);
+  }
+  bubble.addEventListener('dblclick', handleHeart);
+  bubble.addEventListener('touchend', (e)=>{
+    const now=Date.now();
+    if(now-lastTap<400){ e.preventDefault(); handleHeart(); }
+    lastTap=now;
+  });
   messagesEl.appendChild(d);
   messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+const messageReactions={};
+function addReactionUI(messageId, emoji, from){
+  const cont=document.getElementById(`react-${messageId}`);
+  if(!cont) return;
+  if(!messageReactions[messageId]) messageReactions[messageId]={};
+  const already=messageReactions[messageId][from]===emoji;
+  if(already){
+    delete messageReactions[messageId][from];
+  } else {
+    messageReactions[messageId][from]=emoji;
+  }
+  const entries=Object.entries(messageReactions[messageId]);
+  if(entries.length===0){
+    cont.style.display='none';
+    cont.innerHTML='';
+    return;
+  }
+  // group by emoji
+  const counts={};
+  const who={};
+  entries.forEach(([user,e])=>{
+    counts[e]=(counts[e]||0)+1;
+    if(!who[e]) who[e]=[];
+    who[e].push(user);
+  });
+  cont.innerHTML='';
+  Object.entries(counts).forEach(([e,c])=>{
+    const pill=document.createElement('span');
+    pill.className='reaction-pill'+(Object.values(messageReactions[messageId]).includes(e) && messageReactions[messageId][me]===e ? ' mine' : '');
+    pill.title=who[e].join(', ');
+    pill.textContent=c>1?`${e} ${c}`:e;
+    pill.onclick=()=>{
+      // toggle own reaction by clicking pill
+      if(messageReactions[messageId][me]===e){
+        sendReaction(messageId, e);
+        addReactionUI(messageId, e, me);
+      }
+    };
+    cont.appendChild(pill);
+  });
+  cont.style.display='flex';
+  if(!already){
+    const bubble=document.querySelector(`.bubble[data-id="${messageId}"]`);
+    if(bubble){
+      const heart=document.createElement('span');
+      heart.textContent='❤️';
+      heart.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
+      bubble.style.position='relative';
+      bubble.appendChild(heart);
+      setTimeout(()=> heart.remove(), 600);
+    }
+  }
+}
+function sendReaction(messageId, emoji){
+  if(!ws||ws.readyState!==1) return;
+  ws.send(JSON.stringify({type:'reaction', messageId, emoji}));
 }
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function sys(t){
@@ -352,6 +439,10 @@ function connect(){
     if(data.type==='user_leave'){
       sys(`${data.username} вышел`);
       if(typingUsers[data.username]){ delete typingUsers[data.username]; renderTyping(); }
+    }
+    if(data.type==='reaction'){
+      if(data.from===me) return;
+      addReactionUI(data.messageId, data.emoji, data.from);
     }
     if(data.type==='typing'){
       if(data.username===me) return; // not visible to author
