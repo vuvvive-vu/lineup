@@ -189,6 +189,21 @@ app.put('/api/me', (req, res) => {
   res.json({ username: user.username, avatar: user.avatar, bio: user.bio, token: newToken });
 });
 
+function isValidVideoUrl(platform, url){
+  url=url.trim();
+  try{
+    if(platform==='vk'){
+      return /^(https?:\/\/)?(m\.)?(vk\.com|vk\.ru|vkvideo\.ru)\/video-?\d+_\d+/.test(url) || /video_ext\.php\?.*oid=-?\d+.*id=\d+/.test(url);
+    }
+    if(platform==='rutube'){
+      return /^(https?:\/\/)?(www\.)?rutube\.ru\/(video|play\/embed)\/[a-f0-9]+/i.test(url);
+    }
+    if(platform==='youtube'){
+      return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
+    }
+  }catch{ return false; }
+  return false;
+}
 app.post('/api/rooms', (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = parseToken(token);
@@ -197,6 +212,10 @@ app.post('/api/rooms', (req, res) => {
   if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
   platform = platform.toLowerCase();
   if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
+  if (!isValidVideoUrl(platform, videoUrl)) {
+    const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
+    return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
+  }
   const embedUrl = toEmbedUrl(platform, videoUrl);
   let code;
   do { code = genCode(); } while (rooms[code]);

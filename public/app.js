@@ -190,6 +190,31 @@ const hints = {
 };
 const labels = { vk:'Ссылка на видео VK', rutube:'Ссылка на RuTube', youtube:'Ссылка на YouTube' };
 const placeholders = { vk:'https://vk.com/video-123_456', rutube:'https://rutube.ru/video/xxx', youtube:'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+function isValidVideoUrlClient(plat, url){
+  url=url.trim();
+  if(plat==='vk') return /^(https?:\/\/)?(m\.)?(vk\.com|vk\.ru|vkvideo\.ru)\/video-?\d+_\d+/.test(url) || /video_ext\.php\?.*oid=-?\d+.*id=\d+/.test(url);
+  if(plat==='rutube') return /^(https?:\/\/)?(www\.)?rutube\.ru\/(video|play\/embed)\/[a-f0-9]+/i.test(url);
+  if(plat==='youtube') return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
+  return false;
+}
+const videoUrlStatus=$('#videoUrlStatus');
+function validateVideoUrl(){
+  const url=videoUrl.value.trim();
+  if(!url){ videoUrlStatus.textContent=''; videoUrlStatus.style.color=''; videoUrl.classList.remove('input-ok','input-err'); return false; }
+  if(isValidVideoUrlClient(platform, url)){
+    videoUrlStatus.textContent='✓ Ссылка корректна';
+    videoUrlStatus.style.color='#34c759';
+    videoUrl.classList.add('input-ok'); videoUrl.classList.remove('input-err');
+    return true;
+  } else {
+    const ex={vk:'Пример: https://vk.com/video-123456_789', rutube:'Пример: https://rutube.ru/video/...', youtube:'Пример: https://youtu.be/...'};
+    videoUrlStatus.textContent=`Неверный формат для ${platform.toUpperCase()}. ${ex[platform]}`;
+    videoUrlStatus.style.color='#ff3b30';
+    videoUrl.classList.add('input-err'); videoUrl.classList.remove('input-ok');
+    return false;
+  }
+}
+videoUrl.addEventListener('input', validateVideoUrl);
 platBtns.forEach(b=> b.onclick = ()=>{
   platBtns.forEach(x=> x.classList.remove('active'));
   b.classList.add('active');
@@ -197,6 +222,7 @@ platBtns.forEach(b=> b.onclick = ()=>{
   linkLabel.textContent = labels[platform];
   videoUrl.placeholder = placeholders[platform];
   hint.textContent = hints[platform];
+  validateVideoUrl();
 });
 
 // create room
@@ -206,6 +232,11 @@ $('#createBtn').onclick = async ()=>{
   const url = videoUrl.value.trim();
   const title = $('#roomTitle').value.trim();
   if(!url) return showError(err,'Вставь ссылку на видео');
+  if(!isValidVideoUrlClient(platform, url)){
+    validateVideoUrl();
+    const ex={ vk:'https://vk.com/video-123456_789', rutube:'https://rutube.ru/video/...', youtube:'https://youtu.be/...'};
+    return showError(err, `Неверная ссылка для ${platform.toUpperCase()}. Вставь правильную: ${ex[platform]}`);
+  }
   $('#createBtn').disabled=true;
   try{
     const r = await fetch('/api/rooms', {
