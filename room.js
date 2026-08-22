@@ -162,29 +162,52 @@ function addReactionUI(messageId, emoji, from){
   const cont=document.getElementById(`react-${messageId}`);
   if(!cont) return;
   if(!messageReactions[messageId]) messageReactions[messageId]={};
-  const key=emoji;
-  if(messageReactions[messageId][from]) return; // already reacted
-  messageReactions[messageId][from]=emoji;
-  // count
+  const already=messageReactions[messageId][from]===emoji;
+  if(already){
+    delete messageReactions[messageId][from];
+  } else {
+    messageReactions[messageId][from]=emoji;
+  }
+  const entries=Object.entries(messageReactions[messageId]);
+  if(entries.length===0){
+    cont.style.display='none';
+    cont.innerHTML='';
+    return;
+  }
+  // group by emoji
   const counts={};
-  Object.values(messageReactions[messageId]).forEach(e=> counts[e]=(counts[e]||0)+1);
+  const who={};
+  entries.forEach(([user,e])=>{
+    counts[e]=(counts[e]||0)+1;
+    if(!who[e]) who[e]=[];
+    who[e].push(user);
+  });
   cont.innerHTML='';
   Object.entries(counts).forEach(([e,c])=>{
     const pill=document.createElement('span');
-    pill.style.cssText='display:inline-flex;align-items:center;gap:3px;background:#1a1a1a;border:1px solid #232323;border-radius:999px;padding:2px 7px;font-size:12px;animation: pop .2s ease;';
+    pill.className='reaction-pill'+(Object.values(messageReactions[messageId]).includes(e) && messageReactions[messageId][me]===e ? ' mine' : '');
+    pill.title=who[e].join(', ');
     pill.textContent=c>1?`${e} ${c}`:e;
+    pill.onclick=()=>{
+      // toggle own reaction by clicking pill
+      if(messageReactions[messageId][me]===e){
+        sendReaction(messageId, e);
+        addReactionUI(messageId, e, me);
+      }
+    };
     cont.appendChild(pill);
   });
   cont.style.display='flex';
-  // heart burst animation
-  const bubble=document.querySelector(`.bubble[data-id="${messageId}"]`);
-  if(bubble){
-    const heart=document.createElement('span');
-    heart.textContent='❤️';
-    heart.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
-    bubble.style.position='relative';
-    bubble.appendChild(heart);
-    setTimeout(()=> heart.remove(), 600);
+  if(!already){
+    const bubble=document.querySelector(`.bubble[data-id="${messageId}"]`);
+    if(bubble){
+      const heart=document.createElement('span');
+      heart.textContent='❤️';
+      heart.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
+      bubble.style.position='relative';
+      bubble.appendChild(heart);
+      setTimeout(()=> heart.remove(), 600);
+    }
   }
 }
 function sendReaction(messageId, emoji){
@@ -418,6 +441,7 @@ function connect(){
       if(typingUsers[data.username]){ delete typingUsers[data.username]; renderTyping(); }
     }
     if(data.type==='reaction'){
+      if(data.from===me) return;
       addReactionUI(data.messageId, data.emoji, data.from);
     }
     if(data.type==='typing'){
