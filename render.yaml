@@ -8,4 +8,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false
     healthCheckPath: /

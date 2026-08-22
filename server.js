@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
+const db = require('./db');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -16,7 +18,7 @@ app.use(express.json({ limit: '3mb' }));
 app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// storage
+// storage (rooms stay file-based, users hybrid DB/file)
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -32,16 +34,18 @@ function saveJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-let users = loadJson(USERS_FILE, []); // { id, username, passwordHash, avatar, bio }
+let users = loadJson(USERS_FILE, []); // fallback file cache when DB off
 let rooms = loadJson(ROOMS_FILE, {}); // code -> { code, title, platform, videoUrl, embedUrl, host, createdAt, messages: [] }
-// migrate old users
+// migrate old users file
 users = users.map(u => ({
   avatar: u.avatar || '😎',
   bio: u.bio || '',
   ...u
 }));
-// ensure new fields saved
 saveJson(USERS_FILE, users);
+
+// init DB if DATABASE_URL present (async, non-blocking for file mode)
+db.initDb().catch(e=> console.error('DB init error', e));
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -94,19 +98,33 @@ function toEmbedUrl(platform, url) {
 function makeToken(username) {
   return Buffer.from(username + ':' + Date.now()).toString('base64');
 }
-function parseToken(token) {
+async function parseToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
     const username = decoded.split(':')[0];
+    if (db.isEnabled()) {
+      return await db.getUserByUsername(username);
+    }
     return users.find(u => u.username === username) || null;
   } catch { return null; }
 }
+async function findUserByUsername(username){
+  if (db.isEnabled()) return await db.getUserByUsername(username);
+  return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+}
+async function isUsernameTaken(username){
+  if (db.isEnabled()) {
+    const avail = await db.checkUsernameAvailable(username);
+    return !avail;
+  }
+  return users.some(u => u.username.toLowerCase() === username.toLowerCase());
+}
 
 // API
-app.get('/api/check-username', (req, res) => {
+app.get('/api/check-username', async (req, res) => {
   const username = (req.query.username || '').trim();
   if (!username || username.length < 3) return res.json({ available: false, reason: 'too_short' });
-  const taken = users.some(u => u.username.toLowerCase() === username.toLowerCase());
+  const taken = await isUsernameTaken(username);
   res.json({ available: !taken });
 });
 
@@ -117,19 +135,22 @@ app.post('/api/register', async (req, res) => {
   if (!/^[a-zA-Z0-9_]+$/.test(username)) return res.status(400).json({ error: 'Username только буквы, цифры и _' });
   if (password.length < 8) return res.status(400).json({ error: 'Пароль минимум 8 символов' });
   if (!/\d/.test(password)) return res.status(400).json({ error: 'Пароль должен содержать хотя бы одну цифру' });
-  if (users.find(u => u.username.toLowerCase() === username.toLowerCase()))
-    return res.status(400).json({ error: 'Username уже занят' });
+  if (await isUsernameTaken(username)) return res.status(400).json({ error: 'Username уже занят' });
   const hash = await bcrypt.hash(password, 8);
   const user = { id: Date.now().toString(), username, passwordHash: hash, avatar: '😎', bio: '' };
-  users.push(user);
-  saveJson(USERS_FILE, users);
+  if (db.isEnabled()) {
+    await db.createUser(user);
+  } else {
+    users.push(user);
+    saveJson(USERS_FILE, users);
+  }
   const token = makeToken(username);
   res.json({ token, username, avatar: user.avatar, bio: user.bio });
 });
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  const user = await findUserByUsername(username);
   if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(400).json({ error: 'Неверный пароль' });
@@ -137,22 +158,22 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
 
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
 
-app.get('/api/users/:username', (req, res) => {
-  const u = users.find(x => x.username.toLowerCase() === req.params.username.toLowerCase());
+app.get('/api/users/:username', async (req, res) => {
+  const u = await findUserByUsername(req.params.username);
   if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
   res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
 });
 
-app.put('/api/me', (req, res) => {
+app.put('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   let { username, avatar, bio } = req.body;
   username = (username||'').trim();
@@ -160,15 +181,22 @@ app.put('/api/me', (req, res) => {
   bio = (bio||'').trim();
   if (username && username.toLowerCase() !== user.username.toLowerCase()) {
     if (username.length < 3) return res.status(400).json({ error: 'Username минимум 3 символа' });
-    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Username уже занят' });
-    // update rooms host and messages references
+    if (await isUsernameTaken(username)) return res.status(400).json({ error: 'Username уже занят' });
     const oldName = user.username;
     for (const code in rooms) {
       if (rooms[code].host === oldName) rooms[code].host = username;
       rooms[code].messages.forEach(m => { if (m.username === oldName) m.username = username; });
     }
     saveJson(ROOMS_FILE, rooms);
-    user.username = username;
+    if (db.isEnabled()) {
+      await db.updateUser(oldName, { username });
+      // refetch to get updated user
+      const updated = await db.getUserByUsername(username);
+      Object.assign(user, updated);
+    } else {
+      user.username = username;
+      saveJson(USERS_FILE, users);
+    }
   }
   if (avatar) {
     const isDataUrl = avatar.startsWith('data:image/');
@@ -178,15 +206,20 @@ app.put('/api/me', (req, res) => {
     } else {
       if ([...avatar].length > 4) return res.status(400).json({ error: 'Аватар слишком длинный' });
     }
-    user.avatar = avatar;
+    if (db.isEnabled()) await db.updateUser(user.username, { avatar });
+    else user.avatar = avatar;
   }
   if (bio !== undefined) {
     if (bio.length > 120) return res.status(400).json({ error: 'Описание максимум 120 символов' });
-    user.bio = bio;
+    if (db.isEnabled()) await db.updateUser(user.username, { bio });
+    else user.bio = bio;
   }
-  saveJson(USERS_FILE, users);
-  const newToken = makeToken(user.username);
-  res.json({ username: user.username, avatar: user.avatar, bio: user.bio, token: newToken });
+  if (!db.isEnabled()) saveJson(USERS_FILE, users);
+  // refetch final user if DB
+  let finalUser = user;
+  if (db.isEnabled()) finalUser = await db.getUserByUsername(user.username) || user;
+  const newToken = makeToken(finalUser.username);
+  res.json({ username: finalUser.username, avatar: finalUser.avatar, bio: finalUser.bio, token: newToken });
 });
 
 function isValidVideoUrl(platform, url){
@@ -204,9 +237,9 @@ function isValidVideoUrl(platform, url){
   }catch{ return false; }
   return false;
 }
-app.post('/api/rooms', (req, res) => {
+app.post('/api/rooms', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
   let { platform, videoUrl, title } = req.body;
   if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
@@ -243,11 +276,11 @@ app.get('/api/rooms/:code', (req, res) => {
 // WebSocket
 const roomClients = new Map(); // code -> Set(ws)
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const code = (url.searchParams.get('code')||'').toUpperCase();
   const token = url.searchParams.get('token')||'';
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!code || !rooms[code]) {
     ws.close(1008, 'Room not found');
     return;
@@ -257,26 +290,34 @@ wss.on('connection', (ws, req) => {
     return;
   }
   ws.username = user.username;
+  ws.avatar = user.avatar || '😎';
   ws.code = code;
 
   if (!roomClients.has(code)) roomClients.set(code, new Set());
   roomClients.get(code).add(ws);
 
   // enrich messages with avatar
-  const enriched = rooms[code].messages.slice(-100).map(m=>{
-    const u=users.find(x=>x.username===m.username);
-    return {...m, avatar: u?.avatar || '😎'};
-  });
+  const enriched = await Promise.all(rooms[code].messages.slice(-100).map(async m=>{
+    let ava='😎';
+    if (db.isEnabled()) {
+      const u=await db.getUserByUsername(m.username);
+      ava=u?.avatar || '😎';
+    } else {
+      const u=users.find(x=>x.username===m.username);
+      ava=u?.avatar || '😎';
+    }
+    return {...m, avatar: ava};
+  }));
   // send history
   ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched }));
-  broadcast(code, { type: 'user_join', username: ws.username, avatar: user.avatar || '😎', count: roomClients.get(code).size }, ws);
-  const presenceUsers=[...roomClients.get(code)].map(c=>{
-    const u=users.find(x=>x.username===c.username);
-    return {username:c.username, avatar:u?.avatar||'😎'};
-  });
+  broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
+  const presenceUsers=await Promise.all([...roomClients.get(code)].map(async c=>{
+    // c is ws with username/avatar
+    return {username:c.username, avatar:c.avatar||'😎'};
+  }));
   broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
 
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     try {
       const msg = JSON.parse(data);
       if (msg.type === 'chat') {
@@ -286,8 +327,7 @@ wss.on('connection', (ws, req) => {
         rooms[code].messages.push(chatMsg);
         if (rooms[code].messages.length>200) rooms[code].messages.shift();
         saveJson(ROOMS_FILE, rooms);
-        const u=users.find(x=>x.username===ws.username);
-        broadcast(code, { type: 'chat', ...chatMsg, avatar: u?.avatar||'😎' });
+        broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar||'😎' });
       }
       if (msg.type === 'reaction') {
         const mid=(msg.messageId||'').toString().slice(0,64);
@@ -326,13 +366,14 @@ wss.on('connection', (ws, req) => {
     }
     // host left -> random transfer crown
     if (wasHost && rooms[code]) {
-      const remaining = [...set].map(c => c.username);
+      const remainingWs=[...set];
+      const remaining=remainingWs.map(c=>c.username);
       const newHost = remaining[Math.floor(Math.random() * remaining.length)];
       const oldHost = rooms[code].host;
       rooms[code].host = newHost;
       saveJson(ROOMS_FILE, rooms);
       broadcast(code, { type: 'host_change', oldHost, newHost });
-      const presenceUsers2=remaining.map(name=>{ const u=users.find(x=>x.username===name); return {username:name, avatar:u?.avatar||'😎'}; });
+      const presenceUsers2=remainingWs.map(c=>({username:c.username, avatar:c.avatar||'😎'}));
       broadcast(code, { type: 'presence', users: remaining, usersDetailed: presenceUsers2, count: set.size, host: newHost });
       broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
       return;
@@ -340,7 +381,7 @@ wss.on('connection', (ws, req) => {
     // normal leave
     broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
     if (rooms[code]) {
-      const presenceUsers3=[...set].map(c=>{ const u=users.find(x=>x.username===c.username); return {username:c.username, avatar:u?.avatar||'😎'}; });
+      const presenceUsers3=[...set].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
       broadcast(code, { type: 'presence', users: presenceUsers3.map(u=>u.username), usersDetailed: presenceUsers3, count: set.size, host: rooms[code].host });
     }
   });
