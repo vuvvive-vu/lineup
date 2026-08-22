@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 const db = require('./db');
 
 const app = express();
@@ -10,6 +11,20 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
+
+const smtp = process.env.SMTP_HOST ? nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 465),
+  secure: true,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+}) : null;
+
+if (smtp) {
+  smtp.verify().then(() => console.log('SMTP: подключен')).catch(e => console.error('SMTP ошибка:', e.message));
+}
 
 app.use(require('cors')());
 app.use(express.json({ limit: '3mb' }));
@@ -207,6 +222,86 @@ app.put('/api/me', async (req, res) => {
 app.get('/api/check-username', (req, res) => {
   // always available now (no exclusive names)
   res.json({ available: true });
+});
+
+// --- Email verification ---
+const pendingCodes = new Map(); // fallback when DB is off
+
+function genVerCode() {
+  let c = '';
+  for (let i = 0; i < 6; i++) c += Math.floor(Math.random() * 10);
+  return c;
+}
+
+app.post('/api/auth/send-code', async (req, res) => {
+  if (!smtp) return res.status(500).json({ error: 'SMTP не настроен' });
+  let { username, email } = req.body;
+  username = (username || '').trim();
+  email = (email || '').trim().toLowerCase();
+  if (!username || username.length > 20) return res.status(400).json({ error: 'Неверный username' });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Неверный email' });
+
+  if (db.isEnabled()) {
+    const existing = await db.getUserByEmail(email);
+    if (existing && existing.username !== username) {
+      return res.status(400).json({ error: 'Эта почта уже привязана к другому аккаунту' });
+    }
+  }
+
+  const code = genVerCode();
+  const expires = Date.now() + 10 * 60 * 1000;
+  if (db.isEnabled()) {
+    await db.setVerificationCode(username, email, code);
+  } else {
+    pendingCodes.set(username, { email, code, expires });
+  }
+
+  try {
+    await smtp.sendMail({
+      from: `"togetherly" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Код подтверждения — togetherly',
+      text: `Твой код: ${code}\nОн действителен 10 минут.`,
+      html: `<div style="font-family:sans-serif;text-align:center;padding:40px;">
+        <div style="font-size:32px;font-weight:800;letter-spacing:8px;margin:20px 0;">${code}</div>
+        <p style="color:#888;font-size:14px;">Код действителен 10 минут</p>
+      </div>`,
+    });
+    res.json({ ok: true, message: 'Код отправлен' });
+  } catch (e) {
+    console.error('SMTP send error:', e.message);
+    res.status(500).json({ error: 'Не удалось отправить письмо' });
+  }
+});
+
+app.post('/api/auth/verify', async (req, res) => {
+  let { username, code } = req.body;
+  username = (username || '').trim();
+  code = (code || '').trim();
+  if (!username || !code) return res.status(400).json({ error: 'Заполни все поля' });
+
+  let ok = false;
+  if (db.isEnabled()) {
+    ok = await db.verifyCode(username, code);
+  } else {
+    const stored = pendingCodes.get(username);
+    if (stored && stored.code === code && stored.expires > Date.now()) {
+      ok = true;
+      pendingCodes.delete(username);
+    }
+  }
+  if (!ok) return res.status(400).json({ error: 'Неверный или просроченный код' });
+
+  let user = null;
+  if (db.isEnabled()) {
+    user = await db.getUserByUsername(username);
+    if (!user) user = await db.upsertUser({ username });
+  } else {
+    user = ephemeralUsers.get(username) || { username, avatar: '😎', bio: '' };
+    ephemeralUsers.set(username, user);
+  }
+  const token = makeToken(username);
+  res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
 
 app.post('/api/rooms', async (req, res) => {
