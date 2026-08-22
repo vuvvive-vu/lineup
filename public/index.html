@@ -17,25 +17,15 @@
   <!-- AUTH -->
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
-      <h1 id="authTitle">Вход</h1>
-      <p id="authDesc">Войди, чтобы смотреть фильмы вместе с друзьями. Как в старом Rave — только лучше.</p>
-      <div class="tabs">
-        <button id="tabLogin" class="active">Вход</button>
-        <button id="tabReg">Регистрация</button>
-      </div>
+      <h1>Вход</h1>
+      <p>Введи ник и смотри вместе с друзьями — без пароля, аккаунт живёт пока вкладка открыта.</p>
       <div id="authError" class="error"></div>
       <div class="field">
         <label>Username</label>
-        <input id="username" placeholder="например, anomalyco" autocomplete="username" />
-        <div id="usernameStatus" style="font-size:11px;min-height:16px;margin-top:4px;"></div>
-      </div>
-      <div class="field">
-        <label>Пароль</label>
-        <input id="password" type="password" placeholder="минимум 8 символов и цифра" autocomplete="current-password" />
-        <div id="passwordHint" style="font-size:11px;min-height:16px;margin-top:4px;color:var(--muted);"></div>
+        <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
       </div>
       <button id="authBtn" class="btn-primary">Войти</button>
-      <div class="hint">Регистрируясь, ты создаешь уникальный username. Пароль хранится в зашифрованном виде.</div>
+      <div class="hint">Можешь взять любой ник, даже занятый — аккаунты эфемерные.</div>
     </div>
   </div>
 

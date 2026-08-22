@@ -3,9 +3,6 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcryptjs');
-
-const db = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,15 +10,14 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
 
-app.use(cors = require('cors')());
+app.use(require('cors')());
 app.use(express.json({ limit: '3mb' }));
 app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// storage (rooms stay file-based, users hybrid DB/file)
+// storage: rooms only (file), users ephemeral (memory) + localStorage on client
 const DATA_DIR = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
 
 function loadJson(file, def) {
@@ -34,18 +30,11 @@ function saveJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-let users = loadJson(USERS_FILE, []); // fallback file cache when DB off
-let rooms = loadJson(ROOMS_FILE, {}); // code -> { code, title, platform, videoUrl, embedUrl, host, createdAt, messages: [] }
-// migrate old users file
-users = users.map(u => ({
-  avatar: u.avatar || '😎',
-  bio: u.bio || '',
-  ...u
-}));
-saveJson(USERS_FILE, users);
+let rooms = loadJson(ROOMS_FILE, {});
 
-// init DB if DATABASE_URL present (async, non-blocking for file mode)
-db.initDb().catch(e=> console.error('DB init error', e));
+// ephemeral users (no password, not persisted, deleted after session)
+// we keep map username -> {username, avatar, bio} only for avatars in chat, but actually client holds avatar
+const ephemeralUsers = new Map();
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -56,10 +45,7 @@ function genCode() {
 function toEmbedUrl(platform, url) {
   url = url.trim();
   try {
-    // already embed
     if (url.includes('video_ext.php') || url.includes('/play/embed/') || url.includes('/embed/')) return url;
-
-    // auto-detect VK regardless of platform selection
     if (url.includes('vk.com') || url.includes('vkvideo.ru') || url.includes('vk.ru')) {
       const m = url.match(/video(-?\d+)_(\d+)/);
       if (m) {
@@ -75,13 +61,10 @@ function toEmbedUrl(platform, url) {
       const idMatch = url.match(/[?&]id=(\d+)/);
       if (oidMatch && idMatch) return `https://vk.com/video_ext.php?oid=${oidMatch[1]}&id=${idMatch[1]}&hd=2&js_api=1`;
     }
-    // RuTube auto
     if (url.includes('rutube.ru')) {
       const m = url.match(/rutube\.ru\/video\/([a-f0-9]+)/i);
       if (m) return `https://rutube.ru/play/embed/${m[1]}`;
-      // also handle rutube.ru/play/embed already handled
     }
-    // YouTube auto
     if (url.includes('youtu.be') || url.includes('youtube.com')) {
       let id = null;
       if (url.includes('youtu.be/')) id = url.split('youtu.be/')[1].split(/[?&#]/)[0];
@@ -94,134 +77,25 @@ function toEmbedUrl(platform, url) {
   return url;
 }
 
-// Auth helpers
+// Auth helpers - simple, no password, no uniqueness
 function makeToken(username) {
-  return Buffer.from(username + ':' + Date.now()).toString('base64');
+  return Buffer.from(username + ':' + Date.now() + ':' + Math.random().toString(36).slice(2)).toString('base64');
 }
-async function parseToken(token) {
+function parseToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
     const username = decoded.split(':')[0];
-    if (db.isEnabled()) {
-      return await db.getUserByUsername(username);
+    if (!username || username.length < 1) return null;
+    // ephemeral user - if not in map, create with defaults (avatar will be provided via header or localStorage)
+    // we store minimal
+    let u = ephemeralUsers.get(username);
+    if (!u) {
+      u = { username, avatar: '😎', bio: '' };
+      ephemeralUsers.set(username, u);
     }
-    return users.find(u => u.username === username) || null;
+    return u;
   } catch { return null; }
 }
-async function findUserByUsername(username){
-  if (db.isEnabled()) return await db.getUserByUsername(username);
-  return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
-}
-async function isUsernameTaken(username){
-  if (db.isEnabled()) {
-    const avail = await db.checkUsernameAvailable(username);
-    return !avail;
-  }
-  return users.some(u => u.username.toLowerCase() === username.toLowerCase());
-}
-
-// API
-app.get('/api/check-username', async (req, res) => {
-  const username = (req.query.username || '').trim();
-  if (!username || username.length < 3) return res.json({ available: false, reason: 'too_short' });
-  const taken = await isUsernameTaken(username);
-  res.json({ available: !taken });
-});
-
-app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Заполните все поля' });
-  if (username.length < 3) return res.status(400).json({ error: 'Username минимум 3 символа' });
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) return res.status(400).json({ error: 'Username только буквы, цифры и _' });
-  if (password.length < 8) return res.status(400).json({ error: 'Пароль минимум 8 символов' });
-  if (!/\d/.test(password)) return res.status(400).json({ error: 'Пароль должен содержать хотя бы одну цифру' });
-  if (await isUsernameTaken(username)) return res.status(400).json({ error: 'Username уже занят' });
-  const hash = await bcrypt.hash(password, 8);
-  const user = { id: Date.now().toString(), username, passwordHash: hash, avatar: '😎', bio: '' };
-  if (db.isEnabled()) {
-    await db.createUser(user);
-  } else {
-    users.push(user);
-    saveJson(USERS_FILE, users);
-  }
-  const token = makeToken(username);
-  res.json({ token, username, avatar: user.avatar, bio: user.bio });
-});
-
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = await findUserByUsername(username);
-  if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(400).json({ error: 'Неверный пароль' });
-  const token = makeToken(user.username);
-  res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
-});
-
-app.get('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
-});
-
-app.get('/api/users/:username', async (req, res) => {
-  const u = await findUserByUsername(req.params.username);
-  if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
-  res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
-});
-
-app.put('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  let { username, avatar, bio } = req.body;
-  username = (username||'').trim();
-  avatar = (avatar||'').trim();
-  bio = (bio||'').trim();
-  if (username && username.toLowerCase() !== user.username.toLowerCase()) {
-    if (username.length < 3) return res.status(400).json({ error: 'Username минимум 3 символа' });
-    if (await isUsernameTaken(username)) return res.status(400).json({ error: 'Username уже занят' });
-    const oldName = user.username;
-    for (const code in rooms) {
-      if (rooms[code].host === oldName) rooms[code].host = username;
-      rooms[code].messages.forEach(m => { if (m.username === oldName) m.username = username; });
-    }
-    saveJson(ROOMS_FILE, rooms);
-    if (db.isEnabled()) {
-      await db.updateUser(oldName, { username });
-      // refetch to get updated user
-      const updated = await db.getUserByUsername(username);
-      Object.assign(user, updated);
-    } else {
-      user.username = username;
-      saveJson(USERS_FILE, users);
-    }
-  }
-  if (avatar) {
-    const isDataUrl = avatar.startsWith('data:image/');
-    if (isDataUrl) {
-      if (avatar.length > 500 * 1024) return res.status(400).json({ error: 'Фото слишком большое (макс 500KB)' });
-      if (!/^data:image\/(png|jpeg|jpg|webp|gif);base64,/.test(avatar)) return res.status(400).json({ error: 'Неверный формат фото' });
-    } else {
-      if ([...avatar].length > 4) return res.status(400).json({ error: 'Аватар слишком длинный' });
-    }
-    if (db.isEnabled()) await db.updateUser(user.username, { avatar });
-    else user.avatar = avatar;
-  }
-  if (bio !== undefined) {
-    if (bio.length > 120) return res.status(400).json({ error: 'Описание максимум 120 символов' });
-    if (db.isEnabled()) await db.updateUser(user.username, { bio });
-    else user.bio = bio;
-  }
-  if (!db.isEnabled()) saveJson(USERS_FILE, users);
-  // refetch final user if DB
-  let finalUser = user;
-  if (db.isEnabled()) finalUser = await db.getUserByUsername(user.username) || user;
-  const newToken = makeToken(finalUser.username);
-  res.json({ username: finalUser.username, avatar: finalUser.avatar, bio: finalUser.bio, token: newToken });
-});
-
 function isValidVideoUrl(platform, url){
   url=url.trim();
   try{
@@ -237,9 +111,82 @@ function isValidVideoUrl(platform, url){
   }catch{ return false; }
   return false;
 }
-app.post('/api/rooms', async (req, res) => {
+
+// API - simplified auth: just username
+app.post('/api/auth', (req, res) => {
+  let { username, avatar, bio } = req.body;
+  username = (username||'').trim();
+  if (!username) return res.status(400).json({ error: 'Введи username' });
+  if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
+  if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
+  avatar = (avatar||'😎').toString().slice(0, 512*1024);
+  bio = (bio||'').toString().slice(0,120);
+  const user = { username, avatar: avatar || '😎', bio: bio || '' };
+  ephemeralUsers.set(username, user);
+  const token = makeToken(username);
+  res.json({ token, username, avatar: user.avatar, bio: user.bio });
+});
+
+// keep old endpoints for compatibility (just username)
+app.post('/api/register', (req, res) => {
+  const { username, avatar, bio } = req.body;
+  let u = (username||'').trim();
+  if (!u) return res.status(400).json({ error: 'Введи username' });
+  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+  ephemeralUsers.set(u, user);
+  res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
+});
+app.post('/api/login', (req, res) => {
+  const { username, avatar, bio } = req.body;
+  let u = (username||'').trim();
+  if (!u) return res.status(400).json({ error: 'Введи username' });
+  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+  ephemeralUsers.set(u, user);
+  res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
+});
+app.get('/api/me', (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
+  const user = parseToken(token);
+  if (!user) return res.status(401).json({ error: 'Не авторизован' });
+  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+});
+app.get('/api/users/:username', (req, res) => {
+  const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
+  res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
+});
+app.put('/api/me', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = parseToken(token);
+  if (!user) return res.status(401).json({ error: 'Не авторизован' });
+  let { username, avatar, bio } = req.body;
+  const oldName = user.username;
+  username = (username||'').trim() || oldName;
+  avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
+  bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
+  // allow any username, even taken
+  if (username !== oldName) {
+    ephemeralUsers.delete(oldName);
+    // update rooms host/messages where oldName
+    for (const code in rooms) {
+      if (rooms[code].host === oldName) rooms[code].host = username;
+      rooms[code].messages.forEach(m => { if (m.username === oldName) m.username = username; });
+    }
+    saveJson(ROOMS_FILE, rooms);
+  }
+  const updated = { username, avatar: avatar || '😎', bio: bio || '' };
+  ephemeralUsers.set(username, updated);
+  // if username changed, need new token
+  const newToken = makeToken(username);
+  res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+});
+app.get('/api/check-username', (req, res) => {
+  // always available now (no exclusive names)
+  res.json({ available: true });
+});
+
+app.post('/api/rooms', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = parseToken(token);
   if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
   let { platform, videoUrl, title } = req.body;
   if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
@@ -276,11 +223,11 @@ app.get('/api/rooms/:code', (req, res) => {
 // WebSocket
 const roomClients = new Map(); // code -> Set(ws)
 
-wss.on('connection', async (ws, req) => {
+wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const code = (url.searchParams.get('code')||'').toUpperCase();
   const token = url.searchParams.get('token')||'';
-  const user = await parseToken(token);
+  const user = parseToken(token);
   if (!code || !rooms[code]) {
     ws.close(1008, 'Room not found');
     return;
@@ -296,28 +243,16 @@ wss.on('connection', async (ws, req) => {
   if (!roomClients.has(code)) roomClients.set(code, new Set());
   roomClients.get(code).add(ws);
 
-  // enrich messages with avatar
-  const enriched = await Promise.all(rooms[code].messages.slice(-100).map(async m=>{
-    let ava='😎';
-    if (db.isEnabled()) {
-      const u=await db.getUserByUsername(m.username);
-      ava=u?.avatar || '😎';
-    } else {
-      const u=users.find(x=>x.username===m.username);
-      ava=u?.avatar || '😎';
-    }
+  const enriched = rooms[code].messages.slice(-100).map(m=>{
+    const ava = ephemeralUsers.get(m.username)?.avatar || '😎';
     return {...m, avatar: ava};
-  }));
-  // send history
+  });
   ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched }));
   broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
-  const presenceUsers=await Promise.all([...roomClients.get(code)].map(async c=>{
-    // c is ws with username/avatar
-    return {username:c.username, avatar:c.avatar||'😎'};
-  }));
+  const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
   broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
 
-  ws.on('message', async (data) => {
+  ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data);
       if (msg.type === 'chat') {
@@ -339,7 +274,6 @@ wss.on('connection', async (ws, req) => {
         broadcast(code, { type: 'typing', username: ws.username, isTyping: !!msg.isTyping }, ws);
       }
       if (msg.type === 'sync') {
-        // only host can control
         if (ws.username !== rooms[code].host) {
           ws.send(JSON.stringify({ type: 'error', text: 'Только хост может управлять плеером' }));
           return;
@@ -354,7 +288,10 @@ wss.on('connection', async (ws, req) => {
     if (!set) return;
     const wasHost = rooms[code] && rooms[code].host === ws.username;
     set.delete(ws);
-    // if room becomes empty -> delete room completely
+    // ephemeral user cleanup if no more connections with that username
+    let stillOnline=false;
+    for(const s of roomClients.values()){ for(const c of s){ if(c.username===ws.username) stillOnline=true; } }
+    if(!stillOnline) ephemeralUsers.delete(ws.username);
     if (set.size === 0) {
       roomClients.delete(code);
       if (rooms[code]) {
@@ -364,7 +301,6 @@ wss.on('connection', async (ws, req) => {
       }
       return;
     }
-    // host left -> random transfer crown
     if (wasHost && rooms[code]) {
       const remainingWs=[...set];
       const remaining=remainingWs.map(c=>c.username);
@@ -378,7 +314,6 @@ wss.on('connection', async (ws, req) => {
       broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
       return;
     }
-    // normal leave
     broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
     if (rooms[code]) {
       const presenceUsers3=[...set].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
@@ -394,24 +329,22 @@ function broadcast(code, payload, exclude) {
   for (const c of set) {
     if (c !== exclude && c.readyState === WebSocket.OPEN) c.send(data);
   }
-  // chat needs to go to sender too
   if (payload.type === 'chat' && exclude && exclude.readyState === WebSocket.OPEN) {
     exclude.send(data);
   }
 }
 
-// error handler for JSON
+// error handler
 app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Файл слишком большой (макс 500KB после сжатия)' });
   if (err) return res.status(400).json({ error: 'Ошибка запроса' });
   next();
 });
 
-// fallback to index
 app.get('*', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','index.html'));
 });
 
 server.listen(PORT, () => {
-  console.log(`RAVE running on http://localhost:${PORT}`);
+  console.log(`lineUP running on http://localhost:${PORT}`);
 });
