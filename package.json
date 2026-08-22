@@ -1,0 +1,17 @@
+{
+  "name": "rave-reborn",
+  "version": "1.0.0",
+  "description": "Совместный просмотр фильмов - Rave",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ws": "^8.14.2",
+    "bcryptjs": "^2.4.3"
+  }
+}
