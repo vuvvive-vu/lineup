@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin — lineUP</title>
+<link rel="stylesheet" href="/style.css"/>
+<style>
+.admin-wrap{max-width:900px;margin:0 auto;padding:24px 20px;}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+@media(max-width:700px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#0a0a0a;border:1px solid #1e1e1e;border-radius:16px;padding:14px;text-align:center;}
+.stat b{font-size:22px;display:block;}
+.stat span{font-size:11px;color:#8a8a8a;text-transform:uppercase;letter-spacing:.04em;}
+.admin-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+.admin-table th{color:#8a8a8a;font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid #1e1e1e;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+.admin-table td{padding:9px 10px;border-bottom:1px solid #0f0f0f;vertical-align:middle;}
+.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#1a1a1a;border:1px solid #232323;}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a href="/" class="logo"><i>L</i> lineUP</a>
+  <div class="nav-right"><span style="color:#8a8a8a;font-size:12px;">admin</span></div>
+</header>
+
+<div class="admin-wrap">
+  <div id="loginBox" class="auth-card" style="max-width:380px;margin:40px auto;">
+    <h1>Админка</h1>
+    <p style="color:#8a8a8a;font-size:13px;margin:6px 0 16px;">Введи пароль из <code>ADMIN_PASSWORD</code></p>
+    <div id="aError" class="error"></div>
+    <div class="field"><label>Пароль</label><input id="aPass" type="password" placeholder="••••••••"></div>
+    <button id="aLogin" class="btn-primary">Войти</button>
+  </div>
+
+  <div id="dash" style="display:none;">
+    <h2 style="font-size:20px;font-weight:800;letter-spacing:-.03em;">Обзор</h2>
+    <div class="stat-grid">
+      <div class="stat"><b id="sRooms">—</b><span>Комнат</span></div>
+      <div class="stat"><b id="sOnline">—</b><span>Онлайн</span></div>
+      <div class="stat"><b id="sMsgs">—</b><span>Сообщений</span></div>
+      <div class="stat"><b id="sUsers">—</b><span>Юзеров (эфем.)</span></div>
+    </div>
+
+    <div class="side-card" style="margin-top:16px;">
+      <h4>📢 Broadcast всем комнатам</h4>
+      <p>Отправит системное сообщение во все чаты.</p>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input id="bcText" placeholder="Сообщение для всех..." style="flex:1;background:#000;border:1px solid #1e1e1e;color:#fff;padding:10px 14px;border-radius:999px;outline:none;font-size:13px;">
+        <button id="bcBtn" class="icon-btn">Отправить</button>
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h4>Комнаты</h4>
+      <table class="admin-table" id="roomsTable">
+        <thead><tr><th>Код</th><th>Название</th><th>Хост</th><th>Людей</th><th></th></tr></thead>
+        <tbody id="roomsBody"><tr><td colspan="5" style="color:#6a6a6a;text-align:center;padding:16px;">Загрузка...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="side-card">
+      <h4>Онлайн юзеры</h4>
+      <table class="admin-table">
+        <thead><tr><th>Ник</th><th>Комната</th><th></th></tr></thead>
+        <tbody id="usersBody"><tr><td colspan="3" style="color:#6a6a6a;text-align:center;padding:16px;">—</td></tr></tbody>
+      </table>
+    </div>
+
+    <button id="aLogout" class="btn-ghost" style="margin-top:16px;">Выйти</button>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const loginBox=$('#loginBox'), dash=$('#dash'), aError=$('#aError');
+let token=localStorage.getItem('admin_token')||'';
+if(token) tryLoginWithToken();
+
+$('#aLogin').onclick=async()=>{
+  const pass=$('#aPass').value;
+  if(!pass) return showErr('Введи пароль');
+  try{
+    const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pass})});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error||'Неверный пароль');
+    token=j.token;
+    localStorage.setItem('admin_token', token);
+    showDash();
+  }catch(e){ showErr(e.message); }
+};
+function showErr(m){ aError.textContent=m; aError.classList.add('show'); }
+async function tryLoginWithToken(){
+  try{
+    const r=await fetch('/api/admin/stats',{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok) throw new Error();
+    const j=await r.json();
+    showDash(j);
+  }catch{ localStorage.removeItem('admin_token'); }
+}
+async function showDash(prefetched){
+  loginBox.style.display='none';
+  dash.style.display='block';
+  await refresh();
+  setInterval(refresh, 4000);
+}
+async function refresh(){
+  try{
+    const r=await fetch('/api/admin/stats',{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok) throw new Error('auth');
+    const s=await r.json();
+    $('#sRooms').textContent=s.rooms;
+    $('#sOnline').textContent=s.online;
+    $('#sMsgs').textContent=s.messages;
+    $('#sUsers').textContent=s.ephemeralUsers;
+    // rooms
+    const rb=$('#roomsBody');
+    if(s.roomList.length===0) rb.innerHTML='<tr><td colspan="5" style="color:#6a6a6a;text-align:center;padding:14px;">Нет комнат</td></tr>';
+    else rb.innerHTML=s.roomList.map(r=>`
+      <tr>
+        <td><code style="letter-spacing:.08em;font-weight:700;">${r.code}</code></td>
+        <td>${esc(r.title)}</td>
+        <td>${esc(r.host)} ${r.hostOnline?'':'<span style="color:#6a6a6a;font-size:10px;">(оффлайн)</span>'}</td>
+        <td><span class="pill">${r.count} чел</span></td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="icon-btn" style="font-size:11px;padding:6px 10px;" onclick="closeRoom('${r.code}')">Закрыть</button>
+          <button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#0a0a0a;color:#fff;border:1px solid #1e1e1e;" onclick="clearChat('${r.code}')">Очистить чат</button>
+        </td>
+      </tr>
+    `).join('');
+    // users
+    const ub=$('#usersBody');
+    if(s.userList.length===0) ub.innerHTML='<tr><td colspan="3" style="color:#6a6a6a;text-align:center;padding:14px;">Никого онлайн</td></tr>';
+    else ub.innerHTML=s.userList.map(u=>`
+      <tr><td>${esc(u.username)}</td><td><code>${esc(u.code||'—')}</code></td><td><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="kickUser('${esc(u.username)}')">Кик</button></td></tr>
+    `).join('');
+  }catch(e){
+    if(e.message==='auth'){ localStorage.removeItem('admin_token'); location.reload(); }
+  }
+}
+function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+$('#bcBtn').onclick=async()=>{
+  const t=$('#bcText').value.trim();
+  if(!t) return;
+  await fetch('/api/admin/broadcast',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({text:t})});
+  $('#bcText').value='';
+  alert('Отправлено');
+};
+async function closeRoom(code){
+  if(!confirm(`Закрыть комнату ${code}?`)) return;
+  await fetch(`/api/admin/rooms/${code}/close`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  refresh();
+}
+async function clearChat(code){
+  await fetch(`/api/admin/rooms/${code}/clear`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  refresh();
+}
+async function kickUser(username){
+  if(!confirm(`Кикнуть ${username}?`)) return;
+  await fetch(`/api/admin/users/${encodeURIComponent(username)}/kick`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  refresh();
+}
+$('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
+</script>
+</body>
+</html>

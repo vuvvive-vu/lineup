@@ -297,7 +297,7 @@ function spawnGlobalMilana(){
   if(!layer || document.hidden) return;
   const el=document.createElement('div');
   el.className='milana';
-  el.textContent='(люблю Милану)';
+  el.textContent='♥️';
   milanaY = (milanaY + 29) % 68;
   const y=12 + milanaY + (Math.random()*4-2);
   const x= 4 + Math.random()*88;

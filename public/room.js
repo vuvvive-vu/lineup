@@ -81,7 +81,7 @@ function spawnMilana(){
   if(document.hidden) return;
   const el=document.createElement('div');
   el.className='milana';
-  el.textContent='(люблю Милану)';
+  el.textContent='♥️';
   // even vertical distribution
   milanaYSeed = (milanaYSeed + 37) % 60;
   const y = 18 + milanaYSeed + (Math.random()*6 -3);
@@ -475,6 +475,10 @@ function connect(){
     if(data.type==='reaction'){
       if(data.from===me) return;
       addReactionUI(data.messageId, data.emoji, data.from);
+    }
+    if(data.type==='clear_chat'){
+      messagesEl.innerHTML='';
+      sys('Чат очищен админом');
     }
     if(data.type==='typing'){
       if(data.username===me) return; // not visible to author

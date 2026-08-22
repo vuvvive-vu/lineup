@@ -334,6 +334,87 @@ function broadcast(code, payload, exclude) {
   }
 }
 
+// --- admin ---
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'lineup_admin_2024';
+const adminTokens = new Set();
+function makeAdminToken(){ return Buffer.from('admin:'+Date.now()+':'+Math.random().toString(36).slice(2)).toString('base64'); }
+function isAdmin(req){
+  const tok = (req.headers.authorization||'').replace('Bearer ','').trim();
+  return tok && adminTokens.has(tok);
+}
+app.get('/admin', (req,res)=> res.sendFile(path.join(__dirname,'public','admin.html')));
+app.post('/api/admin/login', (req,res)=>{
+  const { password } = req.body;
+  if(password !== ADMIN_PASSWORD) return res.status(401).json({error:'Неверный пароль'});
+  const tok=makeAdminToken();
+  adminTokens.add(tok);
+  // keep only last 20 tokens
+  if(adminTokens.size>20) adminTokens.delete([...adminTokens][0]);
+  res.json({token:tok});
+});
+app.get('/api/admin/stats', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  let online=0;
+  for(const s of roomClients.values()) online+=s.size;
+  let messages=0;
+  for(const r of Object.values(rooms)) messages+=r.messages.length;
+  const roomList=Object.values(rooms).map(r=>{
+    const set=roomClients.get(r.code);
+    return { code:r.code, title:r.title, host:r.host, count: set?set.size:0, hostOnline: set ? [...set].some(c=>c.username===r.host) : false, createdAt:r.createdAt };
+  });
+  const userList=[];
+  for(const [code,set] of roomClients.entries()){
+    for(const c of set) userList.push({username:c.username, code});
+  }
+  res.json({ rooms:Object.keys(rooms).length, online, messages, ephemeralUsers: ephemeralUsers.size, roomList, userList });
+});
+app.post('/api/admin/broadcast', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  const { text } = req.body;
+  if(!text || !text.trim()) return res.status(400).json({error:'Текст пустой'});
+  const msg={ username:'ADMIN', text: text.trim().slice(0,500), ts: Date.now() };
+  for(const code of Object.keys(rooms)){
+    rooms[code].messages.push(msg);
+    if(rooms[code].messages.length>200) rooms[code].messages.shift();
+    broadcast(code, { type:'chat', ...msg, avatar:'👑' });
+  }
+  saveJson(ROOMS_FILE, rooms);
+  res.json({ok:true});
+});
+app.post('/api/admin/rooms/:code/close', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  const code=req.params.code.toUpperCase();
+  const r=rooms[code];
+  if(!r) return res.status(404).json({error:'Room not found'});
+  const set=roomClients.get(code);
+  if(set){ for(const c of [...set]){ try{c.close(1000,'Admin closed');}catch{} } roomClients.delete(code); }
+  delete rooms[code];
+  saveJson(ROOMS_FILE, rooms);
+  res.json({ok:true});
+});
+app.post('/api/admin/rooms/:code/clear', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  const code=req.params.code.toUpperCase();
+  const r=rooms[code];
+  if(!r) return res.status(404).json({error:'Room not found'});
+  r.messages=[];
+  saveJson(ROOMS_FILE, rooms);
+  broadcast(code, {type:'clear_chat'});
+  res.json({ok:true});
+});
+app.post('/api/admin/users/:username/kick', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  constuname=req.params.username;
+  let kicked=0;
+  for(const [code,set] of roomClients.entries()){
+    for(const c of [...set]){
+      if(c.username===uname){ try{c.close(1000,'Kicked by admin');}catch{} kicked++; }
+    }
+  }
+  ephemeralUsers.delete(uname);
+  res.json({ok:true, kicked});
+});
+
 // error handler
 app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Файл слишком большой (макс 500KB после сжатия)' });
