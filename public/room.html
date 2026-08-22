@@ -2,8 +2,11 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, interactive-widget=resizes-content"/>
 <title>Комната — lineUP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
@@ -17,8 +20,9 @@
 </header>
 
 <div class="room-layout">
-  <div class="player-wrap">
-    <div class="player" id="player">
+  <div class="player-wrap" style="position:relative; overflow:hidden;">
+    <div id="milanaLayer" style="position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1;"></div>
+    <div class="player" id="player" style="position:relative; z-index:2;">
       <div class="player-placeholder" id="placeholder">Загрузка плеера...</div>
       <!-- iframe injected -->
       <div id="guestOverlay" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);border:1px solid #232323;border-radius:999px;padding:6px 12px;z-index:5;font-size:11px;color:#9a9a9a;pointer-events:none;white-space:nowrap;">Управление у хоста 👑</div>

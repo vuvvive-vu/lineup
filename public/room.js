@@ -71,6 +71,38 @@ async function loadRoom(){
 }
 loadRoom();
 
+// milana floating - smoother & even
+let milanaYSeed=0;
+function spawnMilana(){
+  const layer=document.getElementById('milanaLayer');
+  const global=document.getElementById('globalMilana');
+  const target = layer || global;
+  if(!target) return;
+  if(document.hidden) return;
+  const el=document.createElement('div');
+  el.className='milana';
+  el.textContent='(люблю Милану)';
+  // even vertical distribution
+  milanaYSeed = (milanaYSeed + 37) % 60;
+  const y = 18 + milanaYSeed + (Math.random()*6 -3);
+  // side zones only (not over player center) - keep in dark gutters
+  const isLeft = Math.random() < 0.5;
+  const x = isLeft ? (5 + Math.random()*9) : (85 + Math.random()*9);
+  el.style.left=x+'%';
+  el.style.top=y+'%';
+  const dur = 13 + Math.random()*2.5;
+  el.style.animationDuration=dur+'s';
+  // tiny stagger for smoothness, not sharp
+  el.style.animationDelay='0.08s';
+  el.style.fontSize=(14 + Math.random()*1.5)+'px';
+  // subtle opacity variation
+  el.style.opacity = (0.11 + Math.random()*0.04).toString();
+  target.appendChild(el);
+  setTimeout(()=> el.remove(), (dur+0.8)*1000);
+}
+setInterval(spawnMilana, 2400);
+setTimeout(()=>{ spawnMilana(); setTimeout(()=>spawnMilana(), 1200); setTimeout(()=>spawnMilana(), 2400); }, 600);
+
 function updateHostUI(){
   const isHost=me===host;
   guestOverlay.style.display=isHost?'none':'block';

@@ -289,3 +289,30 @@ pSave.onclick=async()=>{
   }catch(e){ showError(pError, e.message); }
   finally{ pSave.disabled=false; pSave.textContent='Сохранить'; }
 };
+
+// milana global - smoother & everywhere empty
+let milanaY=0;
+function spawnGlobalMilana(){
+  const layer=document.getElementById('globalMilana');
+  if(!layer || document.hidden) return;
+  const el=document.createElement('div');
+  el.className='milana';
+  el.textContent='(люблю Милану)';
+  milanaY = (milanaY + 29) % 68;
+  const y=12 + milanaY + (Math.random()*4-2);
+  const x= 4 + Math.random()*88;
+  // avoid center where cards are on lobby/auth - shift to sides on those pages
+  const isLobby = lobby && lobby.classList.contains('show');
+  const isAuth = authScreen && authScreen.style.display!=='none';
+  let finalX=x;
+  if((isAuth || isLobby) && x>28 && x<72) finalX = Math.random()<0.5 ? (6+Math.random()*14) : (80+Math.random()*14);
+  el.style.left=finalX+'%';
+  el.style.top=y+'%';
+  el.style.animationDuration=(13 + Math.random()*2)+'s';
+  el.style.fontSize=(14 + Math.random()*1.2)+'px';
+  el.style.opacity=(0.10 + Math.random()*0.05).toString();
+  layer.appendChild(el);
+  setTimeout(()=> el.remove(), 14500);
+}
+setInterval(spawnGlobalMilana, 1900);
+setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTimeout(spawnGlobalMilana, 1800); }, 500);
