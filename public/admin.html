@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Admin — lineUP</title>
+<title>Admin — togetherly</title>
 <link rel="stylesheet" href="/style.css"/>
 <style>
 .admin-wrap{max-width:900px;margin:0 auto;padding:24px 20px;}
@@ -20,7 +20,7 @@
 </head>
 <body>
 <header class="topbar">
-  <a href="/" class="logo"><i>L</i> lineUP</a>
+  <a href="/" class="logo"><i>T</i> togetherly</a>
   <div class="nav-right"><span style="color:#8a8a8a;font-size:12px;">admin</span></div>
 </header>
 
@@ -132,7 +132,7 @@ async function refresh(){
     const ub=$('#usersBody');
     if(s.userList.length===0) ub.innerHTML='<tr><td colspan="3" style="color:#6a6a6a;text-align:center;padding:14px;">Никого онлайн</td></tr>';
     else ub.innerHTML=s.userList.map(u=>`
-      <tr><td>${esc(u.username)}</td><td><code>${esc(u.code||'—')}</code></td><td><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="kickUser('${esc(u.username)}')">Кик</button></td></tr>
+      <tr><td>${esc(u.username)}</td><td><code>${esc(u.code||'—')}</code></td><td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="kickUser('${esc(u.username)}')">Кик</button><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a1a1a;color:#fff;border:1px solid #1e1e1e;" onclick="prankUser('${esc(u.username)}','${esc(u.code)}')">🥚 Опрос</button></td></tr>
     `).join('');
   }catch(e){
     if(e.message==='auth'){ localStorage.removeItem('admin_token'); location.reload(); }
@@ -159,6 +159,13 @@ async function kickUser(username){
   if(!confirm(`Кикнуть ${username}?`)) return;
   await fetch(`/api/admin/users/${encodeURIComponent(username)}/kick`,{method:'POST',headers:{Authorization:'Bearer '+token}});
   refresh();
+}
+async function prankUser(username, code){
+  if(!confirm(`Отправить опрос вумен ${username}${code? ' ('+code+')':''}?`)) return;
+  const r=await fetch('/api/admin/prank',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username, code})});
+  const j=await r.json();
+  if(!r.ok) alert(j.error||'Ошибка');
+  else alert(`Отправлено ${username}`);
 }
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
 </script>
