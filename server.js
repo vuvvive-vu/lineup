@@ -387,7 +387,11 @@ app.post('/api/admin/rooms/:code/close', (req,res)=>{
   const r=rooms[code];
   if(!r) return res.status(404).json({error:'Room not found'});
   const set=roomClients.get(code);
-  if(set){ for(const c of [...set]){ try{c.close(1000,'Admin closed');}catch{} } roomClients.delete(code); }
+  if(set){
+    broadcast(code, { type:'chat', username:'ADMIN', text:`Комната ${code} закрыта админом`, ts: Date.now(), avatar:'👑' });
+    for(const c of [...set]){ try{c.close(1008,'Room closed by admin');}catch{} }
+    roomClients.delete(code);
+  }
   delete rooms[code];
   saveJson(ROOMS_FILE, rooms);
   res.json({ok:true});
@@ -404,15 +408,37 @@ app.post('/api/admin/rooms/:code/clear', (req,res)=>{
 });
 app.post('/api/admin/users/:username/kick', (req,res)=>{
   if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
-  constuname=req.params.username;
+  const uname=req.params.username;
   let kicked=0;
   for(const [code,set] of roomClients.entries()){
     for(const c of [...set]){
-      if(c.username===uname){ try{c.close(1000,'Kicked by admin');}catch{} kicked++; }
+      if(c.username===uname){
+        try{
+          c.send(JSON.stringify({ type:'chat', username:'ADMIN', text:`${uname} кикнут админом`, ts: Date.now(), avatar:'👑' }));
+          c.close(1008,'Kicked by admin');
+        }catch{}
+        kicked++;
+      }
     }
   }
-  ephemeralUsers.delete(uname);
+  // don't delete ephemeral user globally - they can rejoin with same nick (no exclusive)
   res.json({ok:true, kicked});
+});
+app.post('/api/admin/prank', (req,res)=>{
+  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
+  const { username, code } = req.body;
+  if(!username) return res.status(400).json({error:'Укажи username'});
+  let sent=0;
+  for(const [cCode,set] of roomClients.entries()){
+    if(code && cCode !== code.toUpperCase()) continue;
+    for(const c of set){
+      if(c.username===username){
+        try{ c.send(JSON.stringify({ type:'prank', id: Date.now().toString(36) })); sent++; }catch{}
+      }
+    }
+  }
+  if(sent===0) return res.status(404).json({error:'Юзер не онлайн'});
+  res.json({ok:true, sent});
 });
 
 // error handler
@@ -427,5 +453,5 @@ app.get('*', (req,res)=>{
 });
 
 server.listen(PORT, () => {
-  console.log(`lineUP running on http://localhost:${PORT}`);
+  console.log(`togetherly running on http://localhost:${PORT}`);
 });
