@@ -8,4 +8,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lineup-db
+          property: connectionString
     healthCheckPath: /
+
+databases:
+  - name: lineup-db
+    plan: free
+    databaseName: lineup

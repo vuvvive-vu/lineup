@@ -1,86 +1,83 @@
 const { Pool } = require('pg');
 
-const DATABASE_URL = process.env.DATABASE_URL;
 let pool = null;
-let enabled = !!DATABASE_URL;
+let enabled = false;
 
-if (enabled) {
-  pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
-  });
-  pool.on('error', (e) => console.error('PG pool error', e.message));
-}
+function isEnabled() { return enabled && !!pool; }
 
 async function initDb() {
-  if (!enabled) {
-    console.log('DB: file mode (no DATABASE_URL)');
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.log('DB: DATABASE_URL не задан — режим памяти');
     return false;
   }
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        avatar TEXT DEFAULT '😎',
-        bio TEXT DEFAULT '',
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username));
-    `);
-    console.log('DB: connected & users table ready');
+    pool = new Pool({
+      connectionString: url,
+      ssl: { rejectUnauthorized: false },
+      max: 5,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 8000,
+    });
+    await initSchema();
+    enabled = true;
+    const u = new URL(url);
+    console.log(`DB: подключено ${u.hostname}/${u.pathname.slice(1)}`);
     return true;
   } catch (e) {
-    console.error('DB init failed, fallback to file:', e.message);
+    console.error('DB: не удалось подключиться, работаем в режиме памяти —', e.message);
+    pool = null;
     enabled = false;
     return false;
   }
 }
 
-function isEnabled() { return enabled && !!pool; }
+async function initSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(32) PRIMARY KEY,
+      username VARCHAR(64) NOT NULL,
+      password_hash VARCHAR(255) DEFAULT '',
+      avatar TEXT,
+      bio VARCHAR(255) DEFAULT '',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+}
 
 async function getUserByUsername(username) {
-  if (!isEnabled()) return null;
-  const r = await pool.query('SELECT id, username, password_hash as "passwordHash", avatar, bio FROM users WHERE lower(username)=lower($1) LIMIT 1', [username]);
-  return r.rows[0] || null;
-}
-
-async function getAllUsers() {
-  if (!isEnabled()) return null;
-  const r = await pool.query('SELECT id, username, password_hash as "passwordHash", avatar, bio FROM users ORDER BY created_at');
-  return r.rows;
-}
-
-async function createUser({ id, username, passwordHash, avatar, bio }) {
-  if (!isEnabled()) return null;
-  const r = await pool.query(
-    'INSERT INTO users (id, username, password_hash, avatar, bio) VALUES ($1,$2,$3,$4,$5) RETURNING id, username, password_hash as "passwordHash", avatar, bio',
-    [id, username, passwordHash, avatar || '😎', bio || '']
+  const { rows } = await pool.query(
+    'SELECT id, username, password_hash AS "passwordHash", avatar, bio FROM users WHERE username=$1 LIMIT 1',
+    [username]
   );
-  return r.rows[0];
+  return rows[0] || null;
 }
 
-async function updateUser(oldUsername, { username, avatar, bio }) {
-  if (!isEnabled()) return null;
-  // build dynamic set
-  const fields = [];
+async function upsertUser({ username, avatar, bio }) {
+  await pool.query(
+    `INSERT INTO users (id, username, password_hash, avatar, bio) VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (username) DO NOTHING`,
+    [String(Date.now()), username, '', avatar || '\uD83D\uDE0E', bio || '']
+  );
+  return getUserByUsername(username);
+}
+
+async function updateUserProfile(oldUsername, { username, avatar, bio }) {
+  const sets = [];
   const vals = [];
   let idx = 1;
-  if (username && username !== oldUsername) { fields.push(`username=$${idx++}`); vals.push(username); }
-  if (avatar !== undefined) { fields.push(`avatar=$${idx++}`); vals.push(avatar); }
-  if (bio !== undefined) { fields.push(`bio=$${idx++}`); vals.push(bio); }
-  if (fields.length === 0) return getUserByUsername(oldUsername);
+  if (username && username !== oldUsername) { sets.push(`username=$${idx++}`); vals.push(username); }
+  if (avatar !== undefined && avatar !== null && avatar !== '') { sets.push(`avatar=$${idx++}`); vals.push(avatar); }
+  if (bio !== undefined && bio !== null) { sets.push(`bio=$${idx++}`); vals.push(bio); }
+  if (!sets.length) return getUserByUsername(oldUsername);
   vals.push(oldUsername);
-  const q = `UPDATE users SET ${fields.join(', ')} WHERE lower(username)=lower($${idx}) RETURNING id, username, password_hash as "passwordHash", avatar, bio`;
-  const r = await pool.query(q, vals);
-  return r.rows[0] || null;
+  await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE username=$${idx}`, vals);
+  return getUserByUsername(username || oldUsername);
 }
 
-async function checkUsernameAvailable(username) {
-  if (!isEnabled()) return null;
-  const r = await pool.query('SELECT 1 FROM users WHERE lower(username)=lower($1) LIMIT 1', [username]);
-  return r.rows.length === 0;
+async function countUsers() {
+  const { rows } = await pool.query('SELECT COUNT(*) AS c FROM users');
+  return Number(rows[0].c);
 }
 
-module.exports = { pool, isEnabled, initDb, getUserByUsername, getAllUsers, createUser, updateUser, checkUsernameAvailable };
+module.exports = { isEnabled, initDb, getUserByUsername, upsertUser, updateUserProfile, countUsers };

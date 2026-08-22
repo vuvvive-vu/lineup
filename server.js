@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
+const db = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -32,9 +33,11 @@ function saveJson(file, data) {
 
 let rooms = loadJson(ROOMS_FILE, {});
 
-// ephemeral users (no password, not persisted, deleted after session)
-// we keep map username -> {username, avatar, bio} only for avatars in chat, but actually client holds avatar
+// ephemeral users (fallback mode only, when DB is not connected)
 const ephemeralUsers = new Map();
+
+// init DB if DATABASE_URL is set (Render env var)
+db.initDb().catch(e => console.error('DB init error:', e.message));
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -77,17 +80,21 @@ function toEmbedUrl(platform, url) {
   return url;
 }
 
-// Auth helpers - simple, no password, no uniqueness
 function makeToken(username) {
   return Buffer.from(username + ':' + Date.now() + ':' + Math.random().toString(36).slice(2)).toString('base64');
 }
-function parseToken(token) {
+async function parseToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
     const username = decoded.split(':')[0];
     if (!username || username.length < 1) return null;
-    // ephemeral user - if not in map, create with defaults (avatar will be provided via header or localStorage)
-    // we store minimal
+    if (db.isEnabled()) {
+      let u = await db.getUserByUsername(username);
+      if (!u) {
+        u = await db.upsertUser({ username });
+      }
+      return u;
+    }
     let u = ephemeralUsers.get(username);
     if (!u) {
       u = { username, avatar: '😎', bio: '' };
@@ -113,60 +120,79 @@ function isValidVideoUrl(platform, url){
 }
 
 // API - simplified auth: just username
-app.post('/api/auth', (req, res) => {
+app.post('/api/auth', async (req, res) => {
   let { username, avatar, bio } = req.body;
   username = (username||'').trim();
   if (!username) return res.status(400).json({ error: 'Введи username' });
   if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
   if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
-  avatar = (avatar||'😎').toString().slice(0, 512*1024);
+  avatar = (avatar||'').toString().slice(0, 512*1024);
   bio = (bio||'').toString().slice(0,120);
   const user = { username, avatar: avatar || '😎', bio: bio || '' };
-  ephemeralUsers.set(username, user);
+  if (db.isEnabled()) {
+    await db.upsertUser(user);
+  } else {
+    ephemeralUsers.set(username, user);
+  }
   const token = makeToken(username);
   res.json({ token, username, avatar: user.avatar, bio: user.bio });
 });
 
 // keep old endpoints for compatibility (just username)
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { username, avatar, bio } = req.body;
   let u = (username||'').trim();
   if (!u) return res.status(400).json({ error: 'Введи username' });
   const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
-  ephemeralUsers.set(u, user);
+  if (db.isEnabled()) {
+    await db.upsertUser(user);
+  } else {
+    ephemeralUsers.set(u, user);
+  }
   res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
 });
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, avatar, bio } = req.body;
   let u = (username||'').trim();
   if (!u) return res.status(400).json({ error: 'Введи username' });
   const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
-  ephemeralUsers.set(u, user);
+  if (db.isEnabled()) {
+    await db.upsertUser(user);
+  } else {
+    ephemeralUsers.set(u, user);
+  }
   res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
 });
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
-app.get('/api/users/:username', (req, res) => {
+app.get('/api/users/:username', async (req, res) => {
+  if (db.isEnabled()) {
+    const u = await db.getUserByUsername(req.params.username);
+    if (u) return res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
+  }
   const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
   res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
 });
-app.put('/api/me', (req, res) => {
+app.put('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   let { username, avatar, bio } = req.body;
   const oldName = user.username;
   username = (username||'').trim() || oldName;
   avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
   bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
-  // allow any username, even taken
+  if (db.isEnabled()) {
+    const updated = await db.updateUserProfile(oldName, { username, avatar, bio });
+    const newToken = makeToken(username);
+    return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+  }
   if (username !== oldName) {
     ephemeralUsers.delete(oldName);
-    // update rooms host/messages where oldName
     for (const code in rooms) {
       if (rooms[code].host === oldName) rooms[code].host = username;
       rooms[code].messages.forEach(m => { if (m.username === oldName) m.username = username; });
@@ -175,7 +201,6 @@ app.put('/api/me', (req, res) => {
   }
   const updated = { username, avatar: avatar || '😎', bio: bio || '' };
   ephemeralUsers.set(username, updated);
-  // if username changed, need new token
   const newToken = makeToken(username);
   res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
 });
@@ -184,9 +209,9 @@ app.get('/api/check-username', (req, res) => {
   res.json({ available: true });
 });
 
-app.post('/api/rooms', (req, res) => {
+app.post('/api/rooms', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
-  const user = parseToken(token);
+  const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
   let { platform, videoUrl, title } = req.body;
   if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
@@ -223,15 +248,15 @@ app.get('/api/rooms/:code', (req, res) => {
 // WebSocket
 const roomClients = new Map(); // code -> Set(ws)
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const code = (url.searchParams.get('code')||'').toUpperCase();
   const token = url.searchParams.get('token')||'';
-  const user = parseToken(token);
   if (!code || !rooms[code]) {
     ws.close(1008, 'Room not found');
     return;
   }
+  const user = await parseToken(token);
   if (!user) {
     ws.close(1008, 'Unauthorized');
     return;
@@ -243,10 +268,19 @@ wss.on('connection', (ws, req) => {
   if (!roomClients.has(code)) roomClients.set(code, new Set());
   roomClients.get(code).add(ws);
 
-  const enriched = rooms[code].messages.slice(-100).map(m=>{
-    const ava = ephemeralUsers.get(m.username)?.avatar || '😎';
-    return {...m, avatar: ava};
-  });
+  const enriched = [];
+  for (const m of rooms[code].messages.slice(-100)) {
+    let ava = '😎';
+    if (db.isEnabled()) {
+      try {
+        const mu = await db.getUserByUsername(m.username);
+        if (mu?.avatar) ava = mu.avatar;
+      } catch {}
+    } else {
+      ava = ephemeralUsers.get(m.username)?.avatar || '😎';
+    }
+    enriched.push({ ...m, avatar: ava });
+  }
   ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched }));
   broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
   const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
@@ -366,7 +400,7 @@ app.get('/api/admin/stats', (req,res)=>{
   for(const [code,set] of roomClients.entries()){
     for(const c of set) userList.push({username:c.username, code});
   }
-  res.json({ rooms:Object.keys(rooms).length, online, messages, ephemeralUsers: ephemeralUsers.size, roomList, userList });
+  res.json({ rooms:Object.keys(rooms).length, online, messages, dbUsers: db.isEnabled(), roomList, userList });
 });
 app.post('/api/admin/broadcast', (req,res)=>{
   if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
