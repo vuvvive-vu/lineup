@@ -22,45 +22,13 @@
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
       <h1>Вход</h1>
-      <p id="authDesc">Введи ник и почту — аккаунт сохранится между перезапусками.</p>
+      <p>Введи ник и смотри любые фильмы и сериалы без рекламы и прочей ерунды!</p>
       <div id="authError" class="error"></div>
-
-      <!-- Step 1: username -->
-      <div id="step1">
-        <div class="field">
-          <label>Username</label>
-          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
-        </div>
-        <button id="authBtn" class="btn-primary">Далее</button>
+      <div class="field">
+        <label>Username</label>
+        <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
       </div>
-
-      <!-- Step 2: email -->
-      <div id="step2" style="display:none">
-        <div class="field">
-          <label>Email</label>
-          <input id="emailInput" type="email" placeholder="you@example.com" autocomplete="email" />
-        </div>
-        <button id="sendCodeBtn" class="btn-primary">Отправить код</button>
-        <button id="backToStep1" class="btn-ghost" style="width:100%;margin-top:10px;">Назад</button>
-      </div>
-
-      <!-- Step 3: code -->
-      <div id="step3" style="display:none">
-        <div style="text-align:center;margin-bottom:12px;">
-          <div id="codeSentTo" style="font-size:13px;color:var(--muted);">Код отправлен на</div>
-        </div>
-        <div class="field">
-          <label>Код из письма</label>
-          <input id="codeInput" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:700;" />
-        </div>
-        <div id="resendRow" style="display:flex;justify-content:center;margin-bottom:14px;">
-          <button id="resendBtn" class="btn-ghost" style="font-size:12px;padding:6px 14px;" disabled>Отправить повторно <span id="resendTimer"></span></button>
-        </div>
-        <button id="verifyBtn" class="btn-primary">Войти</button>
-        <button id="backToStep2" class="btn-ghost" style="width:100%;margin-top:10px;">Назад</button>
-      </div>
-
-      <div class="hint" id="authHint">Без пароля — код подтверждения приходит на почту.</div>
+      <button id="authBtn" class="btn-primary">Войти</button>
     </div>
   </div>
 
@@ -69,19 +37,19 @@
     <div class="container">
       <div class="hero">
         <h1>Смотрите фильмы и сериалы вместе с togetherly.</h1>
-        <p>Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку друзьям.</p>
+        <p>Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.</p>
       </div>
       <div class="grid2">
         <div class="card">
-          <div class="card-icon">🔗</div>
+          <div class="card-icon">⛓</div>
           <h3>Войти по коду</h3>
           <p>У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.</p>
           <button class="btn-primary" id="openJoin">Войти в комнату</button>
         </div>
         <div class="card">
-          <div class="card-icon">▶</div>
+          <div class="card-icon">🔧</div>
           <h3>Создать комнату</h3>
-          <p>Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и стань хостом.</p>
+          <p>Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и поделись ссылкой/кодом с другом.</p>
           <button class="btn-primary" id="openCreate">Создать комнату</button>
         </div>
       </div>

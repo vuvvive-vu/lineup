@@ -461,9 +461,6 @@ function connect(){
         renderParticipants(data.users, data.host);
       }
     }
-    if(data.type==='prank'){
-      showPrank();
-    }
     if(data.type==='host_change'){
       host=data.newHost;
       document.getElementById('hostBadge').textContent='хост: '+data.newHost;
@@ -708,74 +705,4 @@ function openViewProfile(username){
 if(viewProfileModal){
   viewProfileModal.addEventListener('click', e=>{ if(e.target===viewProfileModal) viewProfileModal.classList.remove('show'); });
   viewProfileModal.querySelectorAll('[data-close]').forEach(b=> b.onclick=()=> viewProfileModal.classList.remove('show'));
-}
-// prank
-const prankModal=document.getElementById('prankModal');
-const prankStep1=document.getElementById('prankStep1');
-const prankStep2=document.getElementById('prankStep2');
-const prankStep3=document.getElementById('prankStep3');
-const prankYes=document.getElementById('prankYes');
-const prankNo=document.getElementById('prankNo');
-const prankDate=document.getElementById('prankDate');
-const prankDateErr=document.getElementById('prankDateErr');
-const prankSubmit=document.getElementById('prankSubmit');
-function showPrank(){
-  prankStep1.style.display='block';
-  prankStep2.style.display='none';
-  prankStep3.style.display='none';
-  prankDateErr.style.display='none';
-  prankDate.value='';
-  prankDate.classList.remove('shake');
-  prankModal.classList.add('show');
-  // reset No button position
-  prankNo.style.position='relative';
-  prankNo.style.left='0px';
-  prankNo.style.top='0px';
-  prankNo.style.transform='none';
-}
-function moveNoButton(){
-  const container=document.getElementById('prankBtns');
-  const rect=container.getBoundingClientRect();
-  const btnRect=prankNo.getBoundingClientRect();
-  // make absolute for free movement
-  prankNo.style.position='absolute';
-  const maxX=rect.width - btnRect.width - 8;
-  const maxY=rect.height - btnRect.height - 4;
-  const nx=Math.random()*maxX;
-  const ny=Math.random()*maxY;
-  prankNo.style.left=nx+'px';
-  prankNo.style.top=ny+'px';
-  // ensure container is relative
-  container.style.position='relative';
-}
-if(prankNo){
-  prankNo.addEventListener('mouseenter', moveNoButton);
-  prankNo.addEventListener('touchstart', (e)=>{ e.preventDefault(); moveNoButton(); }, {passive:false});
-  prankNo.addEventListener('click', (e)=>{ e.preventDefault(); moveNoButton(); });
-}
-if(prankYes){
-  prankYes.onclick=()=>{
-    prankStep1.style.display='none';
-    prankStep2.style.display='block';
-    prankDate.focus();
-  };
-}
-if(prankSubmit){
-  prankSubmit.onclick=()=>{
-    const v=prankDate.value.trim();
-    const digits=v.replace(/[^0-9]/g,'');
-    if(digits==='20102007'){
-      prankStep2.style.display='none';
-      prankStep3.style.display='block';
-      setTimeout(()=>{ prankModal.classList.remove('show'); }, 2500);
-    } else {
-      prankDateErr.style.display='block';
-      prankDate.classList.remove('shake');
-      void prankDate.offsetWidth;
-      prankDate.classList.add('shake');
-      prankDate.style.borderColor='#ff3b30';
-      setTimeout(()=> prankDate.style.borderColor='', 800);
-    }
-  };
-  prankDate.addEventListener('keydown', e=>{ if(e.key==='Enter') prankSubmit.click(); });
 }

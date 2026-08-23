@@ -3,7 +3,6 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
 const db = require('./db');
 
 const app = express();
@@ -11,20 +10,6 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-
-const smtp = process.env.SMTP_HOST ? nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-}) : null;
-
-if (smtp) {
-  smtp.verify().then(() => console.log('SMTP: подключен')).catch(e => console.error('SMTP ошибка:', e.message));
-}
 
 app.use(require('cors')());
 app.use(express.json({ limit: '3mb' }));
@@ -153,7 +138,6 @@ app.post('/api/auth', async (req, res) => {
   res.json({ token, username, avatar: user.avatar, bio: user.bio });
 });
 
-// keep old endpoints for compatibility (just username)
 app.post('/api/register', async (req, res) => {
   const { username, avatar, bio } = req.body;
   let u = (username||'').trim();
@@ -220,88 +204,7 @@ app.put('/api/me', async (req, res) => {
   res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
 });
 app.get('/api/check-username', (req, res) => {
-  // always available now (no exclusive names)
   res.json({ available: true });
-});
-
-// --- Email verification ---
-const pendingCodes = new Map(); // fallback when DB is off
-
-function genVerCode() {
-  let c = '';
-  for (let i = 0; i < 6; i++) c += Math.floor(Math.random() * 10);
-  return c;
-}
-
-app.post('/api/auth/send-code', async (req, res) => {
-  if (!smtp) return res.status(500).json({ error: 'SMTP не настроен' });
-  let { username, email } = req.body;
-  username = (username || '').trim();
-  email = (email || '').trim().toLowerCase();
-  if (!username || username.length > 20) return res.status(400).json({ error: 'Неверный username' });
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Неверный email' });
-
-  if (db.isEnabled()) {
-    const existing = await db.getUserByEmail(email);
-    if (existing && existing.username !== username) {
-      return res.status(400).json({ error: 'Эта почта уже привязана к другому аккаунту' });
-    }
-  }
-
-  const code = genVerCode();
-  const expires = Date.now() + 10 * 60 * 1000;
-  if (db.isEnabled()) {
-    await db.setVerificationCode(username, email, code);
-  } else {
-    pendingCodes.set(username, { email, code, expires });
-  }
-
-  try {
-    await smtp.sendMail({
-      from: `"togetherly" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: 'Код подтверждения — togetherly',
-      text: `Твой код: ${code}\nОн действителен 10 минут.`,
-      html: `<div style="font-family:sans-serif;text-align:center;padding:40px;">
-        <div style="font-size:32px;font-weight:800;letter-spacing:8px;margin:20px 0;">${code}</div>
-        <p style="color:#888;font-size:14px;">Код действителен 10 минут</p>
-      </div>`,
-    });
-    res.json({ ok: true, message: 'Код отправлен' });
-  } catch (e) {
-    console.error('SMTP send error:', e.message);
-    res.status(500).json({ error: 'Не удалось отправить письмо' });
-  }
-});
-
-app.post('/api/auth/verify', async (req, res) => {
-  let { username, code } = req.body;
-  username = (username || '').trim();
-  code = (code || '').trim();
-  if (!username || !code) return res.status(400).json({ error: 'Заполни все поля' });
-
-  let ok = false;
-  if (db.isEnabled()) {
-    ok = await db.verifyCode(username, code);
-  } else {
-    const stored = pendingCodes.get(username);
-    if (stored && stored.code === code && stored.expires > Date.now()) {
-      ok = true;
-      pendingCodes.delete(username);
-    }
-  }
-  if (!ok) return res.status(400).json({ error: 'Неверный или просроченный код' });
-
-  let user = null;
-  if (db.isEnabled()) {
-    user = await db.getUserByUsername(username);
-    if (!user) user = await db.upsertUser({ username });
-  } else {
-    user = ephemeralUsers.get(username) || { username, avatar: '😎', bio: '' };
-    ephemeralUsers.set(username, user);
-  }
-  const token = makeToken(username);
-  res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
 
 app.post('/api/rooms', async (req, res) => {
@@ -553,21 +456,19 @@ app.post('/api/admin/users/:username/kick', (req,res)=>{
   // don't delete ephemeral user globally - they can rejoin with same nick (no exclusive)
   res.json({ok:true, kicked});
 });
-app.post('/api/admin/prank', (req,res)=>{
-  if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
-  const { username, code } = req.body;
-  if(!username) return res.status(400).json({error:'Укажи username'});
-  let sent=0;
-  for(const [cCode,set] of roomClients.entries()){
-    if(code && cCode !== code.toUpperCase()) continue;
-    for(const c of set){
-      if(c.username===username){
-        try{ c.send(JSON.stringify({ type:'prank', id: Date.now().toString(36) })); sent++; }catch{}
-      }
-    }
+
+// --- Admin: accounts management ---
+app.get('/api/admin/accounts', async (req, res) => {
+  if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
+  if (db.isEnabled()) {
+    const users = await db.getAllUsers();
+    return res.json({ accounts: users.map(u => ({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', created: u.created_at })) });
   }
-  if(sent===0) return res.status(404).json({error:'Юзер не онлайн'});
-  res.json({ok:true, sent});
+  const accounts = [];
+  for (const [username, u] of ephemeralUsers) {
+    accounts.push({ username, avatar: u.avatar || '😎', bio: u.bio || '', created: null });
+  }
+  res.json({ accounts });
 });
 
 // error handler

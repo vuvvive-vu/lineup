@@ -33,7 +33,6 @@ function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
   navRight.innerHTML='';
-  authStep(1);
 }
 function isPhoto(ava){ return ava && ava.startsWith('data:image/'); }
 function renderAvaBtn(btn, ava){
@@ -50,118 +49,32 @@ function showLobby(username, avatar){
   lobby.classList.add('show');
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : avatar;
   const avaCls = isPhoto(avatar) ? ' has-photo' : '';
-  navRight.innerHTML = `<span style="display:flex;align-items:center;gap:6px;">привет, <b>${escapeHtml(username)}</b></span><button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль">${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
+  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль">${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 checkAuth();
 
-// --- 3-step auth ---
-let authPendingUsername = '';
-let authPendingEmail = '';
-let resendInterval = null;
-
-function authStep(n) {
-  $('#step1').style.display = n===1 ? '' : 'none';
-  $('#step2').style.display = n===2 ? '' : 'none';
-  $('#step3').style.display = n===3 ? '' : 'none';
-  hideError(authError);
-  if(n===1) { $('#authDesc').textContent='Введи ник и почту — аккаунт сохранится между перезапусками.'; }
-  if(n===2) { $('#authDesc').textContent='Куда отправить код подтверждения?'; usernameEl.value = authPendingUsername; }
-  if(n===3) { $('#authDesc').textContent='Введи 6-значный код из письма.'; }
-}
-
-authBtn.onclick = async () => {
+authBtn.onclick = async ()=>{
   hideError(authError);
   const username = usernameEl.value.trim();
-  if(!username) return showError(authError, 'Введи username');
-  if(username.length > 20) return showError(authError, 'Максимум 20 символов');
-  authPendingUsername = username;
-  authStep(2);
-};
-
-$('#backToStep1').onclick = () => authStep(1);
-
-$('#sendCodeBtn').onclick = async () => {
-  hideError(authError);
-  const email = $('#emailInput').value.trim();
-  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError(authError, 'Неверный email');
-  authPendingEmail = email;
-  $('#sendCodeBtn').disabled = true;
-  $('#sendCodeBtn').textContent = 'Отправка...';
-  try {
-    const r = await fetch('/api/auth/send-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: authPendingUsername, email })
-    });
+  if(!username) return showError(authError,'Введи username');
+  if(username.length>20) return showError(authError,'Максимум 20 символов');
+  authBtn.disabled = true;
+  try{
+    const ava=localStorage.getItem('rave_ava')||'😎';
+    const bio=localStorage.getItem('rave_bio')||'';
+    const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username, avatar: ava, bio})});
     const j = await r.json();
-    if(!r.ok) throw new Error(j.error || 'Ошибка');
-    $('#codeSentTo').textContent = 'Код отправлен на ' + email;
-    authStep(3);
-    $('#codeInput').focus();
-    startResendTimer();
-  } catch(e) { showError(authError, e.message); }
-  finally { $('#sendCodeBtn').disabled = false; $('#sendCodeBtn').textContent = 'Отправить код'; }
-};
-
-function startResendTimer() {
-  let sec = 60;
-  const btn = $('#resendBtn');
-  const span = $('#resendTimer');
-  btn.disabled = true;
-  span.textContent = '(' + sec + ')';
-  clearInterval(resendInterval);
-  resendInterval = setInterval(() => {
-    sec--;
-    span.textContent = '(' + sec + ')';
-    if(sec <= 0) { clearInterval(resendInterval); btn.disabled = false; span.textContent = ''; }
-  }, 1000);
-}
-
-$('#resendBtn').onclick = async () => {
-  hideError(authError);
-  try {
-    const r = await fetch('/api/auth/send-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: authPendingUsername, email: authPendingEmail })
-    });
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || 'Ошибка');
-    startResendTimer();
-    $('#codeInput').focus();
-  } catch(e) { showError(authError, e.message); }
-};
-
-$('#verifyBtn').onclick = async () => {
-  hideError(authError);
-  const code = $('#codeInput').value.trim();
-  if(!code) return showError(authError, 'Введи код');
-  if(code.length !== 6) return showError(authError, 'Код — 6 цифр');
-  $('#verifyBtn').disabled = true;
-  $('#verifyBtn').textContent = 'Проверка...';
-  try {
-    const r = await fetch('/api/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: authPendingUsername, code })
-    });
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error || 'Ошибка');
+    if(!r.ok) throw new Error(j.error||'Ошибка');
     setToken(j.token, j.username, j.avatar, j.bio);
-    currentAvatar = j.avatar || '😎'; currentBio = j.bio || ''; currentUsername = j.username;
+    currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
     showLobby(j.username, currentAvatar);
-  } catch(e) { showError(authError, e.message); }
-  finally { $('#verifyBtn').disabled = false; $('#verifyBtn').textContent = 'Войти'; }
+  }catch(e){ showError(authError, e.message); }
+  finally{ authBtn.disabled=false; }
 };
-
-$('#backToStep2').onclick = () => authStep(2);
-
 usernameEl.addEventListener('keydown', e=>{ if(e.key==='Enter') authBtn.click(); });
-$('#emailInput').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#sendCodeBtn').click(); });
-$('#codeInput').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#verifyBtn').click(); });
 
 // modals
 const joinModal = $('#joinModal');

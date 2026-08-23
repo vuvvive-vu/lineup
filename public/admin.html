@@ -39,7 +39,7 @@
       <div class="stat"><b id="sRooms">—</b><span>Комнат</span></div>
       <div class="stat"><b id="sOnline">—</b><span>Онлайн</span></div>
       <div class="stat"><b id="sMsgs">—</b><span>Сообщений</span></div>
-      <div class="stat"><b id="sUsers">—</b><span>Юзеров (эфем.)</span></div>
+      <div class="stat"><b id="sAccounts">—</b><span>Аккаунтов</span></div>
     </div>
 
     <div class="side-card" style="margin-top:16px;">
@@ -64,6 +64,14 @@
       <table class="admin-table">
         <thead><tr><th>Ник</th><th>Комната</th><th></th></tr></thead>
         <tbody id="usersBody"><tr><td colspan="3" style="color:#6a6a6a;text-align:center;padding:16px;">—</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="side-card">
+      <h4>Все аккаунты <span style="color:#6a6a6a;font-weight:600;font-size:12px;" id="accCount"></span></h4>
+      <table class="admin-table">
+        <thead><tr><th style="width:40px;"></th><th>Ник</th><th>Описание</th><th>Создан</th><th></th></tr></thead>
+        <tbody id="accountsBody"><tr><td colspan="5" style="color:#6a6a6a;text-align:center;padding:16px;">Загрузка...</td></tr></tbody>
       </table>
     </div>
 
@@ -112,7 +120,6 @@ async function refresh(){
     $('#sRooms').textContent=s.rooms;
     $('#sOnline').textContent=s.online;
     $('#sMsgs').textContent=s.messages;
-    $('#sUsers').textContent=s.ephemeralUsers;
     // rooms
     const rb=$('#roomsBody');
     if(s.roomList.length===0) rb.innerHTML='<tr><td colspan="5" style="color:#6a6a6a;text-align:center;padding:14px;">Нет комнат</td></tr>';
@@ -132,11 +139,44 @@ async function refresh(){
     const ub=$('#usersBody');
     if(s.userList.length===0) ub.innerHTML='<tr><td colspan="3" style="color:#6a6a6a;text-align:center;padding:14px;">Никого онлайн</td></tr>';
     else ub.innerHTML=s.userList.map(u=>`
-      <tr><td>${esc(u.username)}</td><td><code>${esc(u.code||'—')}</code></td><td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="kickUser('${esc(u.username)}')">Кик</button><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a1a1a;color:#fff;border:1px solid #1e1e1e;" onclick="prankUser('${esc(u.username)}','${esc(u.code)}')">🥚 Опрос</button></td></tr>
+      <tr><td>${esc(u.username)}</td><td><code>${esc(u.code||'—')}</code></td><td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="kickUser('${esc(u.username)}')">Кик</button></td></tr>
     `).join('');
+    // accounts
+    await refreshAccounts();
   }catch(e){
     if(e.message==='auth'){ localStorage.removeItem('admin_token'); location.reload(); }
   }
+}
+async function refreshAccounts(){
+  try{
+    const r=await fetch('/api/admin/accounts',{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok) return;
+    const data=await r.json();
+    const ab=$('#accountsBody');
+    const ac=$('#accCount');
+    ac.textContent=`(${data.accounts.length})`;
+    $('#sAccounts').textContent=data.accounts.length;
+    if(data.accounts.length===0){
+      ab.innerHTML='<tr><td colspan="5" style="color:#6a6a6a;text-align:center;padding:14px;">Нет аккаунтов</td></tr>';
+      return;
+    }
+    ab.innerHTML=data.accounts.map(a=>{
+      const isPhoto=a.avatar && a.avatar.startsWith('data:image/');
+      const avaHtml=isPhoto?`<img src="${a.avatar}" style="width:28px;height:28px;border-radius:999px;object-fit:cover;">`:esc(a.avatar);
+      const created=a.created ? new Date(a.created).toLocaleDateString('ru') : '—';
+      const userListRaw=$('#usersBody')?.textContent||'';
+      const isOnline=userListRaw.includes(a.username);
+      return `<tr>
+        <td>${avaHtml}</td>
+        <td><b>${esc(a.username)}</b></td>
+        <td style="color:#8a8a8a;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.bio||'—')}</td>
+        <td style="font-size:11px;color:#6a6a6a;">${created}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${isOnline?'<span class="pill" style="color:#34c759;border-color:#1f6b2a;">онлайн</span>':''}
+        </td>
+      </tr>`;
+    }).join('');
+  }catch{}
 }
 function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 $('#bcBtn').onclick=async()=>{
@@ -159,13 +199,6 @@ async function kickUser(username){
   if(!confirm(`Кикнуть ${username}?`)) return;
   await fetch(`/api/admin/users/${encodeURIComponent(username)}/kick`,{method:'POST',headers:{Authorization:'Bearer '+token}});
   refresh();
-}
-async function prankUser(username, code){
-  if(!confirm(`Отправить опрос вумен ${username}${code? ' ('+code+')':''}?`)) return;
-  const r=await fetch('/api/admin/prank',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({username, code})});
-  const j=await r.json();
-  if(!r.ok) alert(j.error||'Ошибка');
-  else alert(`Отправлено ${username}`);
 }
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
 </script>
