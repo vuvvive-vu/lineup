@@ -241,3 +241,16 @@ button { cursor:pointer; font-family:inherit; }
 .ctx-action-btn:active { background:#333; }
 .ctx-action-btn.ctx-delete { color:#ff3b30; }
 .ctx-action-btn.ctx-delete:hover { background:#2a1215; }
+
+/* welcome modal */
+.welcome-modal { max-width:420px; width:100%; background:linear-gradient(145deg,#111,#0a0a0a); border:1px solid #1e1e1e; border-radius:24px; padding:40px 32px 32px; text-align:center; animation:pop .3s ease; }
+.welcome-icon { margin-bottom:16px; }
+.welcome-icon svg { display:block; margin:0 auto; }
+.welcome-title { font-size:26px; font-weight:800; letter-spacing:-0.03em; margin-bottom:18px; background:linear-gradient(135deg,#fff,#999); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.welcome-text { font-size:13px; color:#8a8a8a; line-height:1.7; margin-bottom:10px; }
+.welcome-text a { color:#fff; text-decoration:underline; text-underline-offset:3px; text-decoration-color:#333; transition:text-decoration-color .2s; }
+.welcome-text a:hover { text-decoration-color:#fff; }
+.welcome-footer { font-size:11px; color:#444; margin:24px 0 24px; line-height:1.6; letter-spacing:0.02em; }
+.welcome-btn { width:100%; background:#fff; color:#000; border:none; padding:14px; border-radius:999px; font-weight:700; font-size:14px; cursor:pointer; transition:all .2s; }
+.welcome-btn:hover { background:#e8e8e8; transform:translateY(-1px); box-shadow:0 4px 20px rgba(255,255,255,.15); }
+.welcome-btn:active { transform:scale(0.98); }

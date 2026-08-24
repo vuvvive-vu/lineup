@@ -360,7 +360,8 @@ wss.on('connection', async (ws, req) => {
         if (!mid) return;
         const idx = rooms[code].messages.findIndex(m => {
           const mId = m.username + '-' + m.ts;
-          return mId === mid;
+          if (mId !== mid) return false;
+          return m.username === ws.username;
         });
         if (idx === -1) return;
         rooms[code].messages.splice(idx, 1);

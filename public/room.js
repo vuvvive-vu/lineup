@@ -15,7 +15,6 @@ const linkBox=document.getElementById('linkBox');
 const participantsList=document.getElementById('participantsList');
 const pCount=document.getElementById('pCount');
 const hostHint=document.getElementById('hostHint');
-const guestOverlay=document.getElementById('guestOverlay');
 const typingEl=document.getElementById('typing');
 let currentAvatar=localStorage.getItem('rave_ava')||'😎';
 let currentBio=localStorage.getItem('rave_bio')||'';
@@ -106,8 +105,6 @@ setTimeout(()=>{ spawnMilana(); setTimeout(()=>spawnMilana(), 1200); setTimeout(
 
 function updateHostUI(){
   const isHost=me===host;
-  guestOverlay.style.display=isHost?'none':'block';
-  guestOverlay.title=isHost?'':'Только хост управляет плеером';
   if(hostHint){
     if(isHost){
       hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
@@ -647,18 +644,18 @@ function openCtxMenu(messageId, msgUser, bubble, x, y){
   ctxBubbleEl=bubble;
   ctxMsgText=bubble.textContent||'';
 
+  const isOwn=msgUser===me;
+  const deleteBtn=ctxMenu.querySelector('[data-action="delete"]');
+  if(deleteBtn) deleteBtn.style.display=isOwn?'':'none';
   ctxMenu.classList.add('show');
   ctxJustOpened=true;
   setTimeout(()=>ctxJustOpened=false,100);
 
   const menuRect=ctxMenu.getBoundingClientRect();
-  let left=x-menuRect.width/2;
+  let left=Math.max(8, Math.min(x-menuRect.width/2, window.innerWidth-menuRect.width-8));
   let top=y-menuRect.height-10;
   if(top<8) top=y+10;
-  if(left<8) left=8;
-  if(left+menuRect.width>window.innerWidth-8) left=window.innerWidth-menuRect.width-8;
   if(top+menuRect.height>window.innerHeight-8) top=window.innerHeight-menuRect.height-8;
-
   ctxMenu.style.left=left+'px';
   ctxMenu.style.top=top+'px';
 }
@@ -745,7 +742,7 @@ document.addEventListener('mousedown',(e)=>{
   }
 });
 
-guestOverlay.addEventListener('click',()=>{});
+// welcome done
 
 document.getElementById('copyCode').onclick=async()=>{
   await navigator.clipboard.writeText(codeBox.textContent);
