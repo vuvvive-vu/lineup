@@ -4,7 +4,6 @@ const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
-const { sendVerifyEmail, sendResetEmail } = require('./email');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,8 +12,8 @@ const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 3000;
 
 app.use(require('cors')());
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+app.use(express.json({ limit: '3mb' }));
+app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // storage: rooms only (file), users ephemeral (memory) + localStorage on client
@@ -36,7 +35,6 @@ let rooms = loadJson(ROOMS_FILE, {});
 
 // ephemeral users (fallback mode only, when DB is not connected)
 const ephemeralUsers = new Map();
-const ephemeralEmailUsers = new Map(); // email -> { id, username, email, passwordHash, avatar, bio, emailVerified }
 
 // init DB if DATABASE_URL is set (Render env var)
 db.initDb().catch(e => console.error('DB init error:', e.message));
@@ -172,152 +170,11 @@ app.post('/api/login', async (req, res) => {
   ephemeralUsers.set(id, { id, ...user });
   res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
-
-// --- Email auth routes ---
-
-const bcrypt = require('bcrypt');
-const crypto = require('crypto');
-
-app.post('/api/auth/register-email', async (req, res) => {
-  try {
-    let { username, email, password } = req.body;
-    username = (username || '').trim();
-    email = (email || '').trim().toLowerCase();
-    password = password || '';
-    if (!username || username.length < 1 || username.length > 20) return res.status(400).json({ error: 'Username 1-20 символов' });
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
-    if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-
-    if (db.isEnabled()) {
-      const existing = await db.getUserByEmail(email);
-      if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
-      const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
-      sendVerifyEmail(email, verifyToken).catch(e => console.error('Email send error:', e.message));
-      const token = makeToken(user.id);
-      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false });
-    }
-
-    // ephemeral mode
-    if (ephemeralEmailUsers.has(email)) return res.status(400).json({ error: 'Email уже зарегистрирован' });
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    const passwordHash = await bcrypt.hash(password, 10);
-    const verifyToken = crypto.randomBytes(32).toString('hex');
-    ephemeralEmailUsers.set(email, { id, username, email, passwordHash, avatar: '😎', bio: '', emailVerified: false, verifyToken });
-    sendVerifyEmail(email, verifyToken).catch(e => console.error('Email send error:', e.message));
-    const token = makeToken(id);
-    res.json({ token, username, avatar: '😎', bio: '', emailVerified: false });
-  } catch (e) {
-    console.error('Register error:', e);
-    res.status(500).json({ error: 'Ошибка регистрации' });
-  }
-});
-
-app.post('/api/auth/login-email', async (req, res) => {
-  try {
-    let { email, password } = req.body;
-    email = (email || '').trim().toLowerCase();
-    password = password || '';
-    if (!email || !password) return res.status(400).json({ error: 'Введите email и пароль' });
-
-    if (db.isEnabled()) {
-      const user = await db.verifyPassword(email, password);
-      if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
-      const token = makeToken(user.id);
-      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
-    }
-
-    // ephemeral mode
-    const user = ephemeralEmailUsers.get(email);
-    if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
-    const token = makeToken(user.id);
-    res.json({ token, username: user.username, avatar: user.avatar, bio: user.bio, emailVerified: user.emailVerified });
-  } catch (e) {
-    console.error('Login error:', e);
-    res.status(500).json({ error: 'Ошибка входа' });
-  }
-});
-
-app.get('/api/auth/verify/:token', async (req, res) => {
-  try {
-    if (db.isEnabled()) {
-      const result = await db.verifyEmail(req.params.token);
-      if (!result) return res.redirect('/?error=invalid_token');
-      return res.redirect('/?verified=1');
-    }
-    // ephemeral mode
-    for (const [email, user] of ephemeralEmailUsers) {
-      if (user.verifyToken === req.params.token) {
-        user.emailVerified = true;
-        user.verifyToken = null;
-        return res.redirect('/?verified=1');
-      }
-    }
-    res.redirect('/?error=invalid_token');
-  } catch (e) {
-    res.redirect('/?error=verify_failed');
-  }
-});
-
-app.post('/api/auth/forgot', async (req, res) => {
-  try {
-    let { email } = req.body;
-    email = (email || '').trim().toLowerCase();
-    if (!email) return res.status(400).json({ error: 'Введите email' });
-
-    if (db.isEnabled()) {
-      const reset = await db.setResetToken(email);
-      if (reset) sendResetEmail(reset.email, reset.token).catch(e => console.error('Reset email error:', e.message));
-      return res.json({ ok: true, message: 'Если аккаунт с таким email существует, письмо отправлено' });
-    }
-
-    // ephemeral mode
-    const user = ephemeralEmailUsers.get(email);
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      user.resetToken = resetToken;
-      user.resetExpires = Date.now() + 3600000;
-      sendResetEmail(email, resetToken).catch(e => console.error('Reset email error:', e.message));
-    }
-    res.json({ ok: true, message: 'Если аккаунт с таким email существует, письмо отправлено' });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
-});
-
-app.post('/api/auth/reset', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-    if (!token || !password) return res.status(400).json({ error: 'Требуется токен и пароль' });
-    if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-
-    if (db.isEnabled()) {
-      const userId = await db.resetPassword(token, password);
-      if (!userId) return res.status(400).json({ error: 'Ссылка недействительна или истекла' });
-      return res.json({ ok: true });
-    }
-
-    // ephemeral mode
-    for (const [email, user] of ephemeralEmailUsers) {
-      if (user.resetToken === token && user.resetExpires > Date.now()) {
-        user.passwordHash = await bcrypt.hash(password, 10);
-        user.resetToken = null;
-        user.resetExpires = null;
-        return res.json({ ok: true });
-      }
-    }
-    res.status(400).json({ error: 'Ссылка недействительна или истекла' });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
-});
-
 app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false });
+  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
@@ -437,16 +294,12 @@ wss.on('connection', async (ws, req) => {
       const msg = JSON.parse(data);
       if (msg.type === 'chat') {
         const text = (msg.text||'').trim();
-        const image = msg.image || null;
-        if (!text && !image) return;
-        if (text.length > 500) return;
-        if (image && image.length > 2 * 1024 * 1024) return;
+        if (!text || text.length>500) return;
         const chatMsg = { username: ws.username, text, ts: Date.now() };
-        if (image) chatMsg.image = image;
         rooms[code].messages.push(chatMsg);
-        if (rooms[code].messages.length > 200) rooms[code].messages.shift();
+        if (rooms[code].messages.length>200) rooms[code].messages.shift();
         saveJson(ROOMS_FILE, rooms);
-        broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar || '😎' });
+        broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar||'😎' });
       }
       if (msg.type === 'reaction') {
         const mid=(msg.messageId||'').toString().slice(0,64);
@@ -497,19 +350,6 @@ wss.on('connection', async (ws, req) => {
         rooms[code].bans = rooms[code].bans.filter(u => u !== target);
         saveJson(ROOMS_FILE, rooms);
         broadcast(code, { type: 'user_unbanned', username: target, by: ws.username });
-      }
-      if (msg.type === 'delete_message') {
-        const mid = (msg.messageId || '').toString().slice(0, 128);
-        if (!mid) return;
-        const idx = rooms[code].messages.findIndex(m => {
-          const mId = m.username + '-' + m.ts;
-          if (mId !== mid) return false;
-          return m.username === ws.username;
-        });
-        if (idx === -1) return;
-        rooms[code].messages.splice(idx, 1);
-        saveJson(ROOMS_FILE, rooms);
-        broadcast(code, { type: 'delete_message', messageId: mid });
       }
     } catch {}
   });
@@ -683,14 +523,6 @@ app.get('/privacy', (req,res)=>{
 
 app.get('/faq', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','faq.html'));
-});
-
-app.get('/verify', (req,res)=>{
-  res.sendFile(path.join(__dirname,'public','verify.html'));
-});
-
-app.get('/reset', (req,res)=>{
-  res.sendFile(path.join(__dirname,'public','reset.html'));
 });
 
 app.get('*', (req,res)=>{
