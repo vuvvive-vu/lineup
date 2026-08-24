@@ -129,7 +129,6 @@ if(unmuteBtn){
     try{ iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
     try{ iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
     unmuteBtn.style.display='none';
-    sys('🔊 Звук включён');
   };
 }
 let presenceAvatars={};
@@ -183,7 +182,7 @@ function renderBans(){
     el.appendChild(d);
   });
 }
-function addMessage({username,text,ts,avatar},isMe){
+function addMessage({username,text,ts,avatar,image},isMe){
   if(typingUsers[username]){ delete typingUsers[username]; renderTyping(); }
   const ava=avatar||getAvatarFor(username, '😎');
   const mid=`${username}-${ts}`;
@@ -193,22 +192,14 @@ function addMessage({username,text,ts,avatar},isMe){
   const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`:escapeHtml(ava);
   const avaEl=`<div class="msg-avatar" data-user="${escapeHtml(username)}" title="${escapeHtml(username)}">${avaInner}</div>`;
-  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${escapeHtml(text)}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
+  const imgHtml=image ? `<img class="msg-image" src="${image}" alt="photo" loading="lazy" />` : '';
+  const textHtml=text ? escapeHtml(text) : '';
+  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${textHtml}${imgHtml}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
   const avaDom=d.querySelector('.msg-avatar');
   if(avaDom) avaDom.onclick=()=> openViewProfile(username);
-  // double click / double tap -> heart
+
   const bubble=d.querySelector('.bubble');
-  let lastTap=0;
-  function handleHeart(){
-    sendReaction(mid, '❤️');
-    addReactionUI(mid, '❤️', me);
-  }
-  bubble.addEventListener('dblclick', handleHeart);
-  bubble.addEventListener('touchend', (e)=>{
-    const now=Date.now();
-    if(now-lastTap<400){ e.preventDefault(); handleHeart(); }
-    lastTap=now;
-  });
+  setupLongPress(bubble, mid, username);
   messagesEl.appendChild(d);
   messagesEl.scrollTop=messagesEl.scrollHeight;
 }
@@ -229,7 +220,6 @@ function addReactionUI(messageId, emoji, from){
     cont.innerHTML='';
     return;
   }
-  // group by emoji
   const counts={};
   const who={};
   entries.forEach(([user,e])=>{
@@ -240,15 +230,12 @@ function addReactionUI(messageId, emoji, from){
   cont.innerHTML='';
   Object.entries(counts).forEach(([e,c])=>{
     const pill=document.createElement('span');
-    pill.className='reaction-pill'+(Object.values(messageReactions[messageId]).includes(e) && messageReactions[messageId][me]===e ? ' mine' : '');
+    pill.className='reaction-pill'+(messageReactions[messageId][me]===e ? ' mine' : '');
     pill.title=who[e].join(', ');
     pill.textContent=c>1?`${e} ${c}`:e;
     pill.onclick=()=>{
-      // toggle own reaction by clicking pill
-      if(messageReactions[messageId][me]===e){
-        sendReaction(messageId, e);
-        addReactionUI(messageId, e, me);
-      }
+      sendReaction(messageId, e);
+      addReactionUI(messageId, e, me);
     };
     cont.appendChild(pill);
   });
@@ -256,12 +243,12 @@ function addReactionUI(messageId, emoji, from){
   if(!already){
     const bubble=document.querySelector(`.bubble[data-id="${messageId}"]`);
     if(bubble){
-      const heart=document.createElement('span');
-      heart.textContent='❤️';
-      heart.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
+      const el=document.createElement('span');
+      el.textContent=emoji;
+      el.style.cssText='position:absolute;right:-6px;top:-6px;font-size:14px;animation: heartPop .6s ease; pointer-events:none;';
       bubble.style.position='relative';
-      bubble.appendChild(heart);
-      setTimeout(()=> heart.remove(), 600);
+      bubble.appendChild(el);
+      setTimeout(()=> el.remove(), 600);
     }
   }
 }
@@ -430,11 +417,6 @@ function applySync(action,time){
       else if(action==='seek') w.postMessage({method:'seek', time:t},'*');
     }catch{}
   }
-  // tiny hint
-  if(action!=='time'){
-    const labels={play:`▶ Хост запустил ${fmt(t)}`, pause:`⏸ Пауза ${fmt(t)}`, seek:`⏩ ${fmt(t)}`};
-    sys(labels[action]||`${action} ${fmt(t)}`);
-  }
 }
 
 // typing indicator state
@@ -474,7 +456,6 @@ function connect(){
       }
       updateHostUI();
       data.messages.forEach(m=> addMessage(m, m.username===me));
-      if(data.messages.length===0) sys('Чат пуст. Напиши первым!');
       renderBans();
     }
     if(data.type==='chat'){ if(data.avatar) presenceAvatars[data.username]=data.avatar; addMessage(data, data.username===me); }
@@ -490,11 +471,9 @@ function connect(){
       host=data.newHost;
       document.getElementById('hostBadge').textContent='хост: '+data.newHost;
       updateHostUI();
-      sys(`👑 Корона перешла от ${data.oldHost} к ${data.newHost}`);
     }
-    if(data.type==='user_join') sys(`${data.username} вошёл`);
+    if(data.type==='user_join'){}
     if(data.type==='user_leave'){
-      sys(`${data.username} вышел`);
       if(typingUsers[data.username]){ delete typingUsers[data.username]; renderTyping(); }
     }
     if(data.type==='reaction'){
@@ -503,17 +482,14 @@ function connect(){
     }
     if(data.type==='clear_chat'){
       messagesEl.innerHTML='';
-      sys('Чат очищен админом');
     }
     if(data.type==='user_banned'){
       if(!roomBans.includes(data.username)) roomBans.push(data.username);
       renderBans();
-      sys(`🚫 ${data.username} забанен`);
     }
     if(data.type==='user_unbanned'){
       roomBans=roomBans.filter(u=>u!==data.username);
       renderBans();
-      sys(`✅ ${data.username} разбанен`);
     }
     if(data.type==='typing'){
       if(data.username===me) return; // not visible to author
@@ -523,6 +499,10 @@ function connect(){
       // auto clear after 4s if no stop signal
       if(data.isTyping) setTimeout(()=>{ if(Date.now()-typingUsers[data.username]>3500){ delete typingUsers[data.username]; renderTyping(); } },4000);
     }
+    if(data.type==='delete_message'){
+      const el=document.querySelector(`.msg[data-id="${data.messageId}"]`);
+      if(el){ el.style.transition='opacity .2s, transform .2s'; el.style.opacity='0'; el.style.transform='scale(0.9)'; setTimeout(()=>el.remove(),200); }
+    }
     if(data.type==='sync'){
       if(data.from===me) return;
       if(data.action==='time'){
@@ -531,7 +511,7 @@ function connect(){
         applySync(data.action, data.time);
       }
     }
-    if(data.type==='error') sys(data.text);
+    if(data.type==='error'){}
   };
   ws.onclose=e=>{
     if(e.code===1008){
@@ -575,15 +555,205 @@ chatInput.addEventListener('blur', ()=>{
   if(typingSent){ sendTyping(false); typingSent=false; }
   clearTimeout(typingTimeout);
 });
-guestOverlay.addEventListener('click',()=> sys('Только хост управляет. У тебя всегда тот же момент что и у него — он перемотал, у тебя тоже.'));
+
+// --- photo upload ---
+const photoBtn=document.getElementById('photoBtn');
+const photoFile=document.getElementById('photoFile');
+let pendingImage=null;
+
+if(photoBtn && photoFile){
+  photoBtn.onclick=()=> photoFile.click();
+  photoFile.onchange=()=>{
+    const file=photoFile.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){ return; }
+    if(file.size>5*1024*1024){ return; }
+    const reader=new FileReader();
+    reader.onload=()=>{
+      let dataUrl=reader.result;
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        const max=800;
+        let w=img.width, h=img.height;
+        if(w>h){ if(w>max){ h*=max/w; w=max; } } else { if(h>max){ w*=max/h; h=max; } }
+        canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        dataUrl=canvas.toDataURL('image/jpeg',0.75);
+        if(dataUrl.length>2*1024*1024){ return; }
+        pendingImage=dataUrl;
+        chatInput.placeholder='Фото выбрано ✅';
+        chatInput.focus();
+      };
+      img.src=dataUrl;
+    };
+    reader.readAsDataURL(file);
+    photoFile.value='';
+  };
+}
+
+const origSendChat=sendChat;
+sendChat=function(){
+  const text=chatInput.value.trim();
+  if(!text && !pendingImage) return;
+  if(ws&&ws.readyState===1){
+    ws.send(JSON.stringify({type:'chat', text:text||'', image:pendingImage||null}));
+    sendTyping(false);
+    typingSent=false;
+  }
+  chatInput.value='';
+  pendingImage=null;
+  chatInput.placeholder='Написать сообщение...';
+  clearTimeout(typingTimeout);
+};
+document.getElementById('sendBtn').onclick=sendChat;
+
+// --- long press + context menu ---
+const ctxMenu=document.getElementById('msgContextMenu');
+let longPressTimer=null;
+let ctxMsgId=null;
+let ctxMsgUser=null;
+let ctxMsgText='';
+let ctxBubbleEl=null;
+let ctxJustOpened=false;
+
+function setupLongPress(bubble, messageId, msgUser){
+  // Right-click on desktop
+  bubble.addEventListener('contextmenu',(e)=>{
+    e.preventDefault();
+    openCtxMenu(messageId,msgUser,bubble,e.clientX,e.clientY);
+  });
+
+  // Long press on touch devices
+  let touchStartY=0;
+  bubble.addEventListener('touchstart',(e)=>{
+    touchStartY=e.touches[0].clientY;
+    longPressTimer=setTimeout(()=>{
+      openCtxMenu(messageId,msgUser,bubble,e.touches[0].clientX,e.touches[0].clientY);
+    },500);
+  },{passive:true});
+  bubble.addEventListener('touchmove',(e)=>{
+    const dy=Math.abs(e.touches[0].clientY-touchStartY);
+    if(dy>10) clearTimeout(longPressTimer);
+  },{passive:true});
+  bubble.addEventListener('touchend',()=>clearTimeout(longPressTimer));
+  bubble.addEventListener('touchcancel',()=>clearTimeout(longPressTimer));
+}
+
+function openCtxMenu(messageId, msgUser, bubble, x, y){
+  ctxMsgId=messageId;
+  ctxMsgUser=msgUser;
+  ctxBubbleEl=bubble;
+  ctxMsgText=bubble.textContent||'';
+
+  ctxMenu.classList.add('show');
+  ctxJustOpened=true;
+  setTimeout(()=>ctxJustOpened=false,100);
+
+  const menuRect=ctxMenu.getBoundingClientRect();
+  let left=x-menuRect.width/2;
+  let top=y-menuRect.height-10;
+  if(top<8) top=y+10;
+  if(left<8) left=8;
+  if(left+menuRect.width>window.innerWidth-8) left=window.innerWidth-menuRect.width-8;
+  if(top+menuRect.height>window.innerHeight-8) top=window.innerHeight-menuRect.height-8;
+
+  ctxMenu.style.left=left+'px';
+  ctxMenu.style.top=top+'px';
+}
+
+function closeCtxMenu(){
+  ctxMenu.classList.remove('show');
+  fullEmojiPicker.classList.remove('show');
+  ctxMsgId=null;
+  ctxMsgUser=null;
+  ctxMsgText='';
+  ctxBubbleEl=null;
+}
+
+ctxMenu.querySelectorAll('.ctx-react-btn').forEach(btn=>{
+  btn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const emoji=btn.dataset.emoji;
+    if(!emoji) return;
+    if(ctxMsgId){
+      sendReaction(ctxMsgId,emoji);
+      addReactionUI(ctxMsgId,emoji,me);
+    }
+    closeCtxMenu();
+  });
+});
+
+// full emoji picker
+const fullEmojiPicker=document.getElementById('emojiPickerFull');
+const ALL_EMOJIS=['😀','😃','😄','😁','😆','🥹','😅','🤣','😂','🙂','🥰','😍','🤩','😘','😗','😚','😋','😛','🤔','🤫','🤭','🫡','🤐','😐','🙄','😬','😮‍💨','😌','😔','😪','🤤','😴','😷','🤒','🤕','🥴','😵‍💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😤','😡','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','🤖','😺','😸','😻','🙀','😿','🙈','🙉','🙊','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','👍','👎','👊','✊','🤛','🤜','🤝','🙏','🫶','👏','🙌','👐','💪','🦾','🔥','✨','💫','⭐','🌟','🎉','🎊','💯','💢','💥','💦','💨','🕊️'];
+ALL_EMOJIS.forEach(e=>{
+  const btn=document.createElement('button');
+  btn.className='emoji-item';
+  btn.textContent=e;
+  const handler=(ev)=>{
+    ev.stopPropagation();
+    ev.preventDefault();
+    if(ctxMsgId){
+      sendReaction(ctxMsgId,e);
+      addReactionUI(ctxMsgId,e,me);
+    }
+    closeCtxMenu();
+  };
+  btn.addEventListener('click',handler);
+  btn.addEventListener('touchend',(ev)=>{
+    ev.preventDefault();
+    handler(ev);
+  });
+  fullEmojiPicker.appendChild(btn);
+});
+
+document.getElementById('ctxMoreEmoji').addEventListener('click',(e)=>{
+  e.stopPropagation();
+  const menuRect=ctxMenu.getBoundingClientRect();
+  fullEmojiPicker.style.left=menuRect.left+'px';
+  fullEmojiPicker.style.bottom=(window.innerHeight-menuRect.top+6)+'px';
+  fullEmojiPicker.style.top='auto';
+  fullEmojiPicker.classList.add('show');
+});
+
+ctxMenu.querySelectorAll('.ctx-action-btn').forEach(btn=>{
+  btn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const action=btn.dataset.action;
+    if(action==='copy'){
+      navigator.clipboard.writeText(ctxMsgText).catch(()=>{
+        const ta=document.createElement('textarea');
+        ta.value=ctxMsgText; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        ta.remove();
+      });
+    }
+    if(action==='delete'){
+      if(ctxMsgId && ws&&ws.readyState===1){
+        ws.send(JSON.stringify({type:'delete_message',messageId:ctxMsgId}));
+      }
+    }
+    closeCtxMenu();
+  });
+});
+
+document.addEventListener('mousedown',(e)=>{
+  if(!ctxMenu.contains(e.target) && !fullEmojiPicker.contains(e.target) && !ctxJustOpened){
+    closeCtxMenu();
+  }
+});
+
+guestOverlay.addEventListener('click',()=>{});
 
 document.getElementById('copyCode').onclick=async()=>{
   await navigator.clipboard.writeText(codeBox.textContent);
-  const b=document.getElementById('copyCode'); const t=b.textContent; b.textContent='Скопировано!'; setTimeout(()=>b.textContent=t,1500);
+  const b=document.getElementById('copyCode'); const t=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=t,1200);
 };
 document.getElementById('copyLink').onclick=async()=>{
   await navigator.clipboard.writeText(linkBox.value);
-  const b=document.getElementById('copyLink'); const t=b.textContent; b.textContent='Скопировано!'; setTimeout(()=>b.textContent=t,1500);
+  const b=document.getElementById('copyLink'); const t=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=t,1200);
 };
 
 function isPhotoRoom(ava){ return ava && ava.startsWith('data:image/'); }

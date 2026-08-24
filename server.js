@@ -12,8 +12,8 @@ const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 3000;
 
 app.use(require('cors')());
-app.use(express.json({ limit: '3mb' }));
-app.use(express.urlencoded({ extended: true, limit: '3mb' }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // storage: rooms only (file), users ephemeral (memory) + localStorage on client
@@ -294,12 +294,16 @@ wss.on('connection', async (ws, req) => {
       const msg = JSON.parse(data);
       if (msg.type === 'chat') {
         const text = (msg.text||'').trim();
-        if (!text || text.length>500) return;
+        const image = msg.image || null;
+        if (!text && !image) return;
+        if (text.length > 500) return;
+        if (image && image.length > 2 * 1024 * 1024) return;
         const chatMsg = { username: ws.username, text, ts: Date.now() };
+        if (image) chatMsg.image = image;
         rooms[code].messages.push(chatMsg);
-        if (rooms[code].messages.length>200) rooms[code].messages.shift();
+        if (rooms[code].messages.length > 200) rooms[code].messages.shift();
         saveJson(ROOMS_FILE, rooms);
-        broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar||'😎' });
+        broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar || '😎' });
       }
       if (msg.type === 'reaction') {
         const mid=(msg.messageId||'').toString().slice(0,64);
@@ -350,6 +354,18 @@ wss.on('connection', async (ws, req) => {
         rooms[code].bans = rooms[code].bans.filter(u => u !== target);
         saveJson(ROOMS_FILE, rooms);
         broadcast(code, { type: 'user_unbanned', username: target, by: ws.username });
+      }
+      if (msg.type === 'delete_message') {
+        const mid = (msg.messageId || '').toString().slice(0, 128);
+        if (!mid) return;
+        const idx = rooms[code].messages.findIndex(m => {
+          const mId = m.username + '-' + m.ts;
+          return mId === mid;
+        });
+        if (idx === -1) return;
+        rooms[code].messages.splice(idx, 1);
+        saveJson(ROOMS_FILE, rooms);
+        broadcast(code, { type: 'delete_message', messageId: mid });
       }
     } catch {}
   });
