@@ -27,6 +27,38 @@ async function logout(){
 }
 
 let currentAvatar='😎', currentBio='', currentUsername='';
+function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
+function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
+const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Username','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK / RuTube / YouTube and share the link/code with friends.'}};
+function t(s){ return (isEn()?T.en:T.ru)[s]||s; }
+function toggleLang(){ setLang(!isEn()); location.reload(); }
+function translatePage(){
+  if(!isEn()) return;
+  const h1=document.querySelector('.hero h1'); if(h1) h1.textContent='Watch movies and series together with togetherly.';
+  const hp=document.querySelector('.hero p'); if(hp) hp.textContent='Create a room, pick a video from VK / RuTube / YouTube and share the link/code with friends.';
+  const h3s=document.querySelectorAll('.card h3');
+  if(h3s[0]) h3s[0].textContent='Create room';
+  if(h3s[1]) h3s[1].textContent='Join by code';
+  const ps=document.querySelectorAll('.card p');
+  if(ps[0]) ps[0].textContent='Choose a platform — VK, RuTube or YouTube — paste a video link and share the room link/code with a friend.';
+  if(ps[1]) ps[1].textContent='Got a link or code from a friend? Paste it and jump straight into the room.';
+  const btns=document.querySelectorAll('.card .btn-primary');
+  if(btns[0]) btns[0].textContent='Create room';
+  if(btns[1]) btns[1].textContent='Join room';
+  const aboutH2=document.querySelector('.about-section h2'); if(aboutH2) aboutH2.textContent='About us';
+  const aboutP=document.querySelector('.about-section p'); if(aboutP) aboutP.textContent='Togetherly is a convenient platform for watching any media content from available platforms in a player. The service grows every day, adding new features for your comfort!';
+  const contactH3=document.querySelector('.about-section h3'); if(contactH3) contactH3.textContent='Contact developer';
+  const privacyLink=document.querySelector('a[href="/privacy"]'); if(privacyLink) privacyLink.textContent='Privacy Policy';
+  const faqLink=document.querySelector('a[href="/faq"]'); if(faqLink) faqLink.textContent='FAQ';
+  document.querySelectorAll('#authScreen .auth-card h1').forEach(h=>h.textContent='Login');
+  document.querySelectorAll('#authScreen .auth-card p').forEach(p=>p.textContent='Enter a username and watch any movies and series without ads or other nonsense!');
+  if(authBtn) authBtn.textContent='Login';
+  document.querySelectorAll('.modal-head h3').forEach(h=>{
+    if(h.textContent==='Войти в комнату') h.textContent='Join room';
+    if(h.textContent==='Создать комнату') h.textContent='Create room';
+    if(h.textContent==='Профиль') h.textContent='Profile';
+  });
+}
 async function checkAuth(){
   const t = token();
   if(!t){ showAuth(); return; }
@@ -42,7 +74,8 @@ async function checkAuth(){
 function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
-  navRight.innerHTML='';
+  navRight.innerHTML=`<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">EN</button>`;
+  $('#langToggle').onclick=toggleLang;
 }
 function isPhoto(ava){ return ava && ava.startsWith('data:image/'); }
 function renderAvaBtn(btn, ava){
@@ -59,12 +92,14 @@ function showLobby(username, avatar){
   lobby.classList.add('show');
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : avatar;
   const avaCls = isPhoto(avatar) ? ' has-photo' : '';
-  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль">${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
+  navRight.innerHTML = `<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button><button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль">${avaHtml}</button><button class="btn-ghost" id="logoutBtn">${isEn()?'Logout':'Выйти'}</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
+  $('#langToggle').onclick = toggleLang;
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 checkAuth();
+translatePage();
 
 authBtn.onclick = async ()=>{
   hideError(authError);
