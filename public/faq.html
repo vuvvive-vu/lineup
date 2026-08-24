@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>togetherly — FAQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css" />
+<style>
+  .legal-wrap { max-width:780px; margin:0 auto; padding:100px 24px 80px; animation: pageIn .4s ease both; }
+  @keyframes pageIn { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:translateY(0)} }
+  .legal-wrap h1 { font-size:28px; font-weight:800; letter-spacing:-0.03em; margin-bottom:8px; }
+  .legal-wrap .updated { color:var(--muted); font-size:13px; margin-bottom:32px; }
+  .lang-toggle { display:inline-flex; background:#0a0a0a; border:1px solid var(--border); border-radius:999px; padding:3px; margin-bottom:28px; }
+  .lang-toggle button { padding:8px 18px; border-radius:999px; border:none; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; transition: all .15s; font-family:inherit; }
+  .lang-toggle button.active { background:#fff; color:#000; }
+  .lang-toggle button { outline:none; }
+  .faq-item { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px 24px; margin-bottom:12px; animation: fadeUp .5s ease both; }
+  .faq-item:nth-child(2){ animation-delay:.04s; }
+  .faq-item:nth-child(3){ animation-delay:.08s; }
+  .faq-item:nth-child(4){ animation-delay:.12s; }
+  .faq-item:nth-child(5){ animation-delay:.16s; }
+  .faq-item:nth-child(6){ animation-delay:.2s; }
+  .faq-item:nth-child(7){ animation-delay:.24s; }
+  .faq-item:nth-child(8){ animation-delay:.28s; }
+  .faq-item:nth-child(9){ animation-delay:.32s; }
+  .faq-item:nth-child(10){ animation-delay:.36s; }
+  .faq-item:nth-child(11){ animation-delay:.4s; }
+  @keyframes fadeUp { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+  .faq-item h3 { font-size:15px; font-weight:700; margin-bottom:8px; }
+  .faq-item p { color:var(--muted); font-size:13.5px; line-height:1.7; }
+  .faq-item ul { color:var(--muted); font-size:13.5px; line-height:1.7; padding-left:20px; margin-top:6px; }
+  .faq-item li { margin-bottom:4px; }
+  .faq-item code { background:#1a1a1a; padding:2px 6px; border-radius:6px; font-size:12px; color:#fff; }
+  .back-link { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; margin-bottom:24px; transition: color .15s; }
+  .back-link:hover { color:#fff; }
+  [data-lang="en"] { display:none; }
+  body.lang-en [data-lang="ru"] { display:none; }
+  body.lang-en [data-lang="en"] { display:block; }
+  [data-lang].fade { animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @media(max-width:600px){ .legal-wrap{padding:80px 16px 60px;} .legal-wrap h1{font-size:22px;} .faq-item{padding:16px;} }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo"><a href="/" style="display:flex;align-items:center;gap:8px;text-decoration:none"><i>T</i> togetherly</a></div>
+  </header>
+
+  <div class="legal-wrap">
+    <a href="/" class="back-link" id="backLink">&larr; Назад</a>
+
+    <div class="lang-toggle" id="langToggle">
+      <button class="active" data-btn="ru">RU</button>
+      <button data-btn="en">EN</button>
+    </div>
+
+    <!-- ======================= RU ======================= -->
+    <div data-lang="ru">
+      <h1>Часто задаваемые вопросы</h1>
+      <p class="updated">Последнее обновление: 24 августа 2026 г.</p>
+
+      <div class="faq-item">
+        <h3>Как создать комнату?</h3>
+        <p>Нажми «Создать комнату» на главной, выбери площадку (VK, RuTube или YouTube), вставь ссылку на видео и нажми «Создать и войти». После этого поделись кодом или ссылкой на комнату с друзьями.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Как войти по коду?</h3>
+        <p>Получи код от друга (6 символов, например <code>7X9KQ2</code>), нажми «Войти в комнату» и вставь код или полную ссылку. Ссылка выглядит так: <code>https://togetherly.online/room.html?code=7X9KQ2</code></p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Какие площадки поддерживаются?</h3>
+        <ul>
+          <li><strong>VK</strong> — обычная ссылка на видео (<code>vk.com/video-123_456</code>)</li>
+          <li><strong>YouTube</strong> — стандартная ссылка (<code>youtube.com/watch?v=...</code> или <code>youtu.be/...</code>)</li>
+          <li><strong>Rutube</strong> — ссылка на видео (<code>rutube.ru/video/...</code>)</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <h3>Как работает синхронизация?</h3>
+        <p>Тот, кто создал комнату (хост), управляет воспроизведением. Когда хост нажимает play/pause/перемотку, все остальные участники автоматически синхронизируются. Гости не могут управлять видео independently.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Что такое профиль?</h3>
+        <p>Профиль состоит из ника, аватара (эмодзи или фото) и краткого описания (био до 120 символов). Профиль можно настроить через меню в шапке. Имя, аватар и био видят другие участники в списке участников комнаты.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Можно ли удалить аккаунт?</h3>
+        <p>Аккаунт удаляется автоматически при выходе из аккаунта. Все данные (ник, аватар, био) удаляются из базы данных. При повторном входе создаётся новый аккаунт.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Кто видит мои сообщения?</h3>
+        <p>Сообщения в чате видны всем участникам комнаты в реальном времени. Сообщения хранятся на сервере в файле и удаляются при опустошении комнаты (когда все выйдут).</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Есть ли ограничения?</h3>
+        <ul>
+          <li>Сообщения — до 500 символов</li>
+          <li>Хранение сообщений — до 200 на комнату</li>
+          <li>Аватар — до 2 МБ (сжимается до ~500 КБ)</li>
+          <li>Био — до 120 символов</li>
+          <li>Ник — до 20 символов</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <h3>Нужен ли пароль?</h3>
+        <p>Нет. Авторизация работает только по нику. Каждый вход создаёт временный аккаунт, который удаляется при выходе. Паролей, email и телефонов не требуется.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Можно ли смотреть с телефона?</h3>
+        <p>Да, Togetherly адаптирован для мобильных устройств. Интерфейс работает на любых экранах — от смартфона до десктопа.</p>
+      </div>
+    </div>
+
+    <!-- ======================= EN ======================= -->
+    <div data-lang="en">
+      <h1>Frequently Asked Questions</h1>
+      <p class="updated">Last updated: August 24, 2026</p>
+
+      <div class="faq-item">
+        <h3>How to create a room?</h3>
+        <p>Click "Create room" on the home page, choose a platform (VK, RuTube, or YouTube), paste a video link, and click "Create and join". Then share the room code or link with your friends.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How to join by code?</h3>
+        <p>Get the code from a friend (6 characters, e.g. <code>7X9KQ2</code>), click "Join room" and paste the code or the full link. The link looks like this: <code>https://togetherly.online/room.html?code=7X9KQ2</code></p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Which platforms are supported?</h3>
+        <ul>
+          <li><strong>VK</strong> — regular video link (<code>vk.com/video-123_456</code>)</li>
+          <li><strong>YouTube</strong> — standard link (<code>youtube.com/watch?v=...</code> or <code>youtu.be/...</code>)</li>
+          <li><strong>Rutube</strong> — video link (<code>rutube.ru/video/...</code>)</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <h3>How does synchronization work?</h3>
+        <p>The person who created the room (host) controls playback. When the host presses play/pause/seek, all other participants automatically sync. Guests cannot control video independently.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>What is a profile?</h3>
+        <p>A profile consists of a username, an avatar (emoji or photo), and a short bio (up to 120 characters). You can customize your profile through the menu in the header. Your username, avatar, and bio are visible to other participants in the room list.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Can I delete my account?</h3>
+        <p>Your account is automatically deleted when you log out. All data (username, avatar, bio) is removed from the database. A new account is created when you log in again.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Who can see my messages?</h3>
+        <p>Chat messages are visible to all room participants in real time. Messages are stored on the server in a file and deleted when the room becomes empty (when everyone leaves).</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Are there any limitations?</h3>
+        <ul>
+          <li>Messages — up to 500 characters</li>
+          <li>Message storage — up to 200 per room</li>
+          <li>Avatar — up to 2 MB (compressed to ~500 KB)</li>
+          <li>Bio — up to 120 characters</li>
+          <li>Username — up to 20 characters</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <h3>Do I need a password?</h3>
+        <p>No. Authentication works by username only. Each login creates a temporary account that is deleted when you log out. No passwords, emails, or phone numbers are required.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Can I watch on my phone?</h3>
+        <p>Yes, Togetherly is optimized for mobile devices. The interface works on any screen — from smartphone to desktop.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('langToggle');
+    const backLink = document.getElementById('backLink');
+    toggle.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const isEn = btn.dataset.btn === 'en';
+      document.body.classList.toggle('lang-en', isEn);
+      document.documentElement.lang = isEn ? 'en' : 'ru';
+      backLink.innerHTML = isEn ? '&larr; Back' : '&larr; Назад';
+      document.querySelectorAll('[data-lang]').forEach(el => {
+        el.classList.remove('fade');
+        void el.offsetWidth;
+        el.classList.add('fade');
+      });
+    });
+  </script>
+</body>
+</html>

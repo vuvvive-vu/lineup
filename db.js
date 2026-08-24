@@ -44,34 +44,38 @@ async function initSchema() {
   `);
 }
 
+async function getUserById(id) {
+  const { rows } = await pool.query(
+    'SELECT id, username, avatar, bio FROM users WHERE id=$1',
+    [id]
+  );
+  return rows[0] || null;
+}
+
 async function getUserByUsername(username) {
   const { rows } = await pool.query(
-    'SELECT id, username, avatar, bio FROM users WHERE username=$1 LIMIT 1',
+    'SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1',
     [username]
   );
   return rows[0] || null;
 }
 
-async function upsertUser({ username, avatar, bio }) {
+async function createAccount({ username, avatar, bio }) {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await pool.query(
-    `INSERT INTO users (id, username, avatar, bio) VALUES ($1,$2,$3,$4)
-     ON CONFLICT (username) DO NOTHING`,
-    [String(Date.now()), username, avatar || '\uD83D\uDE0E', bio || '']
+    'INSERT INTO users (id, username, avatar, bio) VALUES ($1,$2,$3,$4)',
+    [id, username, avatar || '\uD83D\uDE0E', bio || '']
   );
-  return getUserByUsername(username);
+  return getUserById(id);
 }
 
-async function updateUserProfile(oldUsername, { username, avatar, bio }) {
-  const sets = [];
-  const vals = [];
-  let idx = 1;
-  if (username && username !== oldUsername) { sets.push(`username=$${idx++}`); vals.push(username); }
-  if (avatar !== undefined && avatar !== null && avatar !== '') { sets.push(`avatar=$${idx++}`); vals.push(avatar); }
-  if (bio !== undefined && bio !== null) { sets.push(`bio=$${idx++}`); vals.push(bio); }
-  if (!sets.length) return getUserByUsername(oldUsername);
-  vals.push(oldUsername);
-  await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE username=$${idx}`, vals);
-  return getUserByUsername(username || oldUsername);
+async function deleteAccount(id) {
+  await pool.query('DELETE FROM users WHERE id=$1', [id]);
+}
+
+async function updateUserProfileById(id, { username, avatar, bio }) {
+  await pool.query('UPDATE users SET username=$1, avatar=$2, bio=$3 WHERE id=$4', [username, avatar || '\uD83D\uDE0E', bio || '', id]);
+  return getUserById(id);
 }
 
 async function countUsers() {
@@ -84,4 +88,4 @@ async function getAllUsers() {
   return rows;
 }
 
-module.exports = { isEnabled, initDb, getUserByUsername, upsertUser, updateUserProfile, countUsers, getAllUsers };
+module.exports = { isEnabled, initDb, getUserById, getUserByUsername, createAccount, deleteAccount, updateUserProfileById, countUsers, getAllUsers };

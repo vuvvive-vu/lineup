@@ -14,7 +14,17 @@ function hideError(el){ el.classList.remove('show'); }
 
 function token(){ return localStorage.getItem('rave_token'); }
 function setToken(t, u, ava, bio){ localStorage.setItem('rave_token', t); localStorage.setItem('rave_user', u); if(ava) localStorage.setItem('rave_ava', ava); if(bio!==undefined) localStorage.setItem('rave_bio', bio); }
-function logout(){ localStorage.removeItem('rave_token'); localStorage.removeItem('rave_user'); localStorage.removeItem('rave_ava'); localStorage.removeItem('rave_bio'); location.reload(); }
+async function logout(){
+  const t = token();
+  if(t){
+    try{ await fetch('/api/logout', { method:'POST', headers:{ Authorization:'Bearer '+t } }); }catch{}
+  }
+  localStorage.removeItem('rave_token');
+  localStorage.removeItem('rave_user');
+  localStorage.removeItem('rave_ava');
+  localStorage.removeItem('rave_bio');
+  location.reload();
+}
 
 let currentAvatar='😎', currentBio='', currentUsername='';
 async function checkAuth(){

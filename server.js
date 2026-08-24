@@ -80,25 +80,21 @@ function toEmbedUrl(platform, url) {
   return url;
 }
 
-function makeToken(username) {
-  return Buffer.from(username + ':' + Date.now() + ':' + Math.random().toString(36).slice(2)).toString('base64');
+function makeToken(accountId) {
+  return Buffer.from(accountId + ':' + Date.now() + ':' + Math.random().toString(36).slice(2)).toString('base64');
 }
 async function parseToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const username = decoded.split(':')[0];
-    if (!username || username.length < 1) return null;
+    const accountId = decoded.split(':')[0];
+    if (!accountId || accountId.length < 1) return null;
     if (db.isEnabled()) {
-      let u = await db.getUserByUsername(username);
-      if (!u) {
-        u = await db.upsertUser({ username });
-      }
-      return u;
+      return await db.getUserById(accountId);
     }
-    let u = ephemeralUsers.get(username);
+    let u = ephemeralUsers.get(accountId);
     if (!u) {
-      u = { username, avatar: '😎', bio: '' };
-      ephemeralUsers.set(username, u);
+      u = { id: accountId, username: accountId, avatar: '😎', bio: '' };
+      ephemeralUsers.set(accountId, u);
     }
     return u;
   } catch { return null; }
@@ -119,7 +115,7 @@ function isValidVideoUrl(platform, url){
   return false;
 }
 
-// API - simplified auth: just username
+// API - simplified auth: just username, always creates new account
 app.post('/api/auth', async (req, res) => {
   let { username, avatar, bio } = req.body;
   username = (username||'').trim();
@@ -130,12 +126,27 @@ app.post('/api/auth', async (req, res) => {
   bio = (bio||'').toString().slice(0,120);
   const user = { username, avatar: avatar || '😎', bio: bio || '' };
   if (db.isEnabled()) {
-    await db.upsertUser(user);
-  } else {
-    ephemeralUsers.set(username, user);
+    const created = await db.createAccount(user);
+    const token = makeToken(created.id);
+    return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
   }
-  const token = makeToken(username);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  const token = makeToken(id);
   res.json({ token, username, avatar: user.avatar, bio: user.bio });
+});
+
+app.post('/api/logout', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = await parseToken(token);
+  if (user && user.id) {
+    if (db.isEnabled()) {
+      await db.deleteAccount(user.id);
+    } else {
+      ephemeralUsers.delete(user.id);
+    }
+  }
+  res.json({ ok: true });
 });
 
 app.post('/api/register', async (req, res) => {
@@ -144,11 +155,12 @@ app.post('/api/register', async (req, res) => {
   if (!u) return res.status(400).json({ error: 'Введи username' });
   const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
   if (db.isEnabled()) {
-    await db.upsertUser(user);
-  } else {
-    ephemeralUsers.set(u, user);
+    const created = await db.createAccount(user);
+    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
   }
-  res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
 app.post('/api/login', async (req, res) => {
   const { username, avatar, bio } = req.body;
@@ -156,11 +168,12 @@ app.post('/api/login', async (req, res) => {
   if (!u) return res.status(400).json({ error: 'Введи username' });
   const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
   if (db.isEnabled()) {
-    await db.upsertUser(user);
-  } else {
-    ephemeralUsers.set(u, user);
+    const created = await db.createAccount(user);
+    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
   }
-  res.json({ token: makeToken(u), username: u, avatar: user.avatar, bio: user.bio });
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
 app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
@@ -170,8 +183,8 @@ app.get('/api/me', async (req, res) => {
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const u = await db.getUserByUsername(req.params.username);
-    if (u) return res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
+    const { rows } = await pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    if (rows[0]) return res.json({ username: rows[0].username, avatar: rows[0].avatar || '😎', bio: rows[0].bio || '' });
   }
   const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
   res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
@@ -181,27 +194,18 @@ app.put('/api/me', async (req, res) => {
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   let { username, avatar, bio } = req.body;
-  const oldName = user.username;
-  username = (username||'').trim() || oldName;
+  username = (username||'').trim() || user.username;
   avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
   bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
   if (db.isEnabled()) {
-    const updated = await db.updateUserProfile(oldName, { username, avatar, bio });
-    const newToken = makeToken(username);
+    await db.updateUserProfileById(user.id, { username, avatar, bio });
+    const updated = await db.getUserById(user.id);
+    const newToken = makeToken(user.id);
     return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
   }
-  if (username !== oldName) {
-    ephemeralUsers.delete(oldName);
-    for (const code in rooms) {
-      if (rooms[code].host === oldName) rooms[code].host = username;
-      rooms[code].messages.forEach(m => { if (m.username === oldName) m.username = username; });
-    }
-    saveJson(ROOMS_FILE, rooms);
-  }
-  const updated = { username, avatar: avatar || '😎', bio: bio || '' };
-  ephemeralUsers.set(username, updated);
-  const newToken = makeToken(username);
-  res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+  ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
+  const newToken = makeToken(user.id);
+  res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
 });
 app.get('/api/check-username', (req, res) => {
   res.json({ available: true });
@@ -476,6 +480,14 @@ app.use((err, req, res, next) => {
   if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Файл слишком большой (макс 500KB после сжатия)' });
   if (err) return res.status(400).json({ error: 'Ошибка запроса' });
   next();
+});
+
+app.get('/privacy', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','privacy.html'));
+});
+
+app.get('/faq', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','faq.html'));
 });
 
 app.get('*', (req,res)=>{
