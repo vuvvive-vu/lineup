@@ -12,13 +12,18 @@ async function initDb() {
     return false;
   }
   try {
+    let dbUrl = url;
+    if (!dbUrl.includes('sslmode=')) {
+      dbUrl += (dbUrl.includes('?') ? '&' : '?') + 'sslmode=require';
+    }
     pool = new Pool({
-      connectionString: url,
+      connectionString: dbUrl,
       ssl: { rejectUnauthorized: false },
       max: 5,
       idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 8000,
+      connectionTimeoutMillis: 15000,
     });
+    await pool.query('SELECT 1');
     await initSchema();
     enabled = true;
     const u = new URL(url);
@@ -37,10 +42,17 @@ async function initSchema() {
     CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(32) PRIMARY KEY,
       username VARCHAR(64) NOT NULL,
+      password_hash VARCHAR(255) DEFAULT '',
       avatar TEXT,
       bio VARCHAR(255) DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255) DEFAULT '';
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
   `);
 }
 
@@ -63,8 +75,8 @@ async function getUserByUsername(username) {
 async function createAccount({ username, avatar, bio }) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   await pool.query(
-    'INSERT INTO users (id, username, avatar, bio) VALUES ($1,$2,$3,$4)',
-    [id, username, avatar || '\uD83D\uDE0E', bio || '']
+    'INSERT INTO users (id, username, password_hash, avatar, bio) VALUES ($1,$2,$3,$4,$5)',
+    [id, username, '', avatar || '\uD83D\uDE0E', bio || '']
   );
   return getUserById(id);
 }
