@@ -21,6 +21,7 @@ let currentAvatar=localStorage.getItem('rave_ava')||'😎';
 let currentBio=localStorage.getItem('rave_bio')||'';
 
 let room=null, ws=null, host=null;
+let roomBans=[];
 let iframe=null;
 let vkPlayer=null, ytPlayer=null, ytReady=false;
 let suppressSync=false; // prevent echo loop
@@ -155,9 +156,31 @@ function renderParticipants(users,h){
     d.style.cursor='pointer';
     d.onclick=()=> openViewProfile(uname);
     const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`: escapeHtml(ava[0]||ava);
+    const canBan=me===host && !isMe && !isHost;
+    const banBtn=canBan?`<button class="ban-btn" style="background:none;border:none;color:#ff3b30;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Забанить">✕</button>`:'';
     // for participant ava we show avatar
-    d.innerHTML=`<div class="ava" style="${isPhotoAva(ava)?'padding:0;overflow:hidden;':''}">${isPhotoAva(ava)?`<img src="${ava}" style="width:100%;height:100%;object-fit:cover;display:block;">`:escapeHtml(ava)}</div><div class="name">${escapeHtml(uname)}</div>${isHost?'<span class="crown">👑</span>':''}`;
+    d.innerHTML=`<div class="ava" style="${isPhotoAva(ava)?'padding:0;overflow:hidden;':''}">${isPhotoAva(ava)?`<img src="${ava}" style="width:100%;height:100%;object-fit:cover;display:block;">`:escapeHtml(ava)}</div><div class="name">${escapeHtml(uname)}</div>${banBtn}${isHost?'<span class="crown">👑</span>':''}`;
+    if(canBan){
+      const btn=d.querySelector('.ban-btn');
+      btn.onclick=(e)=>{ e.stopPropagation(); if(confirm('Забанить '+uname+'?')){ ws.send(JSON.stringify({type:'ban',username:uname})); } };
+    }
     participantsList.appendChild(d);
+  });
+}
+function renderBans(){
+  const el=document.getElementById('bansList');
+  const card=document.getElementById('bansCard');
+  if(!el||!card) return;
+  if(me!==host||roomBans.length===0){ card.style.display='none'; return; }
+  card.style.display='';
+  el.innerHTML='';
+  roomBans.forEach(u=>{
+    const d=document.createElement('div');
+    d.className='participant';
+    d.style.justifyContent='space-between';
+    d.innerHTML=`<div style="display:flex;align-items:center;gap:8px;"><div class="ava" style="background:#1a0f0f;color:#ff3b30;border-color:#3a2020;">🚫</div><div class="name" style="color:#ff8a8a;">${escapeHtml(u)}</div></div><button class="icon-btn" style="font-size:11px;padding:4px 10px;background:#0a0a0a;color:#fff;border:1px solid #1e1e1e;">Разбанить</button>`;
+    d.querySelector('button').onclick=()=>{ ws.send(JSON.stringify({type:'unban',username:u})); };
+    el.appendChild(d);
   });
 }
 function addMessage({username,text,ts,avatar},isMe){
@@ -444,6 +467,7 @@ function connect(){
     const data=JSON.parse(e.data);
     if(data.type==='init'){
       host=data.host||data.room?.host||host;
+      roomBans=data.bans||[];
       // build avatar map from init
       if(data.messages){
         data.messages.forEach(m=>{ if(m.avatar) presenceAvatars[m.username]=m.avatar; });
@@ -451,6 +475,7 @@ function connect(){
       updateHostUI();
       data.messages.forEach(m=> addMessage(m, m.username===me));
       if(data.messages.length===0) sys('Чат пуст. Напиши первым!');
+      renderBans();
     }
     if(data.type==='chat'){ if(data.avatar) presenceAvatars[data.username]=data.avatar; addMessage(data, data.username===me); }
     if(data.type==='presence'){
@@ -480,6 +505,16 @@ function connect(){
       messagesEl.innerHTML='';
       sys('Чат очищен админом');
     }
+    if(data.type==='user_banned'){
+      if(!roomBans.includes(data.username)) roomBans.push(data.username);
+      renderBans();
+      sys(`🚫 ${data.username} забанен`);
+    }
+    if(data.type==='user_unbanned'){
+      roomBans=roomBans.filter(u=>u!==data.username);
+      renderBans();
+      sys(`✅ ${data.username} разбанен`);
+    }
     if(data.type==='typing'){
       if(data.username===me) return; // not visible to author
       if(data.isTyping) typingUsers[data.username]=Date.now();
@@ -499,7 +534,10 @@ function connect(){
     if(data.type==='error') sys(data.text);
   };
   ws.onclose=e=>{
-    if(e.code===1008){ alert('Ошибка: '+e.reason); location.href='/'; }
+    if(e.code===1008){
+      if(e.reason==='You are banned from this room'){ alert('Ты забанен в этой комнате.'); location.href='/'; }
+      else{ alert('Ошибка: '+e.reason); location.href='/'; }
+    }
     else setTimeout(connect,2000);
   };
 }

@@ -91,12 +91,7 @@ async function parseToken(token) {
     if (db.isEnabled()) {
       return await db.getUserById(accountId);
     }
-    let u = ephemeralUsers.get(accountId);
-    if (!u) {
-      u = { id: accountId, username: accountId, avatar: '😎', bio: '' };
-      ephemeralUsers.set(accountId, u);
-    }
-    return u;
+    return ephemeralUsers.get(accountId) || null;
   } catch { return null; }
 }
 function isValidVideoUrl(platform, url){
@@ -234,7 +229,8 @@ app.post('/api/rooms', async (req, res) => {
     embedUrl,
     host: user.username,
     createdAt: new Date().toISOString(),
-    messages: []
+    messages: [],
+    bans: []
   };
   rooms[code] = room;
   saveJson(ROOMS_FILE, rooms);
@@ -267,6 +263,11 @@ wss.on('connection', async (ws, req) => {
   ws.avatar = user.avatar || '😎';
   ws.code = code;
 
+  if (rooms[code].bans && rooms[code].bans.includes(ws.username)) {
+    ws.close(1008, 'You are banned from this room');
+    return;
+  }
+
   if (!roomClients.has(code)) roomClients.set(code, new Set());
   roomClients.get(code).add(ws);
 
@@ -283,7 +284,7 @@ wss.on('connection', async (ws, req) => {
     }
     enriched.push({ ...m, avatar: ava });
   }
-  ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched }));
+  ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched, bans: rooms[code].bans || [] }));
   broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
   const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
   broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
@@ -315,6 +316,40 @@ wss.on('connection', async (ws, req) => {
           return;
         }
         broadcast(code, { type: 'sync', action: msg.action, time: msg.time, from: ws.username }, null);
+      }
+      if (msg.type === 'ban') {
+        if (ws.username !== rooms[code].host) {
+          ws.send(JSON.stringify({ type: 'error', text: 'Только хост может банить' }));
+          return;
+        }
+        const target = (msg.username||'').trim();
+        if (!target || target === ws.username) return;
+        if (!rooms[code].bans) rooms[code].bans = [];
+        if (!rooms[code].bans.includes(target)) {
+          rooms[code].bans.push(target);
+          saveJson(ROOMS_FILE, rooms);
+        }
+        const set = roomClients.get(code);
+        if (set) {
+          for (const c of set) {
+            if (c.username === target) {
+              c.close(1008, 'You have been banned');
+            }
+          }
+        }
+        broadcast(code, { type: 'user_banned', username: target, by: ws.username });
+      }
+      if (msg.type === 'unban') {
+        if (ws.username !== rooms[code].host) {
+          ws.send(JSON.stringify({ type: 'error', text: 'Только хост может разбанить' }));
+          return;
+        }
+        const target = (msg.username||'').trim();
+        if (!target) return;
+        if (!rooms[code].bans) rooms[code].bans = [];
+        rooms[code].bans = rooms[code].bans.filter(u => u !== target);
+        saveJson(ROOMS_FILE, rooms);
+        broadcast(code, { type: 'user_unbanned', username: target, by: ws.username });
       }
     } catch {}
   });
@@ -469,8 +504,8 @@ app.get('/api/admin/accounts', async (req, res) => {
     return res.json({ accounts: users.map(u => ({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', created: u.created_at })) });
   }
   const accounts = [];
-  for (const [username, u] of ephemeralUsers) {
-    accounts.push({ username, avatar: u.avatar || '😎', bio: u.bio || '', created: null });
+  for (const [id, u] of ephemeralUsers) {
+    accounts.push({ username: u.username || id, avatar: u.avatar || '😎', bio: u.bio || '', created: null });
   }
   res.json({ accounts });
 });
