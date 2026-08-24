@@ -10,9 +10,12 @@ const authBtn = $('#authBtn');
 const welcomeModal = document.getElementById('welcomeModal');
 const welcomeContinue = document.getElementById('welcomeContinue');
 if(welcomeModal && welcomeContinue){
-  welcomeModal.classList.add('show');
+  if(!sessionStorage.getItem('togetherly_welcomed')){
+    welcomeModal.classList.add('show');
+  }
   welcomeContinue.onclick = ()=>{
     welcomeModal.classList.remove('show');
+    sessionStorage.setItem('togetherly_welcomed','1');
   };
 }
 
