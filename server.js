@@ -132,7 +132,7 @@ app.post('/api/auth', async (req, res) => {
     res.json({ token, username, avatar: user.avatar, bio: user.bio });
   } catch (e) {
     console.error('Auth error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    res.status(500).json({ error: 'Ошибка сервера: ' + e.message });
   }
 });
 
