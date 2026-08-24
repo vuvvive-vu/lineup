@@ -6,6 +6,19 @@ const authError = $('#authError');
 const usernameEl = $('#username');
 const authBtn = $('#authBtn');
 
+// welcome modal
+const welcomeModal = document.getElementById('welcomeModal');
+const welcomeContinue = document.getElementById('welcomeContinue');
+if(welcomeModal && welcomeContinue){
+  if(!sessionStorage.getItem('togetherly_welcomed')){
+    welcomeModal.classList.add('show');
+  }
+  welcomeContinue.onclick = ()=>{
+    welcomeModal.classList.remove('show');
+    sessionStorage.setItem('togetherly_welcomed','1');
+  };
+}
+
 function showError(el, msg){
   el.textContent = msg;
   el.classList.add('show');

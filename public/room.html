@@ -6,7 +6,7 @@
 <title>Комната — togetherly</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css"/>
 </head>
 <body>
@@ -25,7 +25,6 @@
     <div class="player" id="player" style="position:relative; z-index:2;">
       <div class="player-placeholder" id="placeholder">Загрузка плеера...</div>
       <!-- iframe injected -->
-      <div id="guestOverlay" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);border:1px solid #232323;border-radius:999px;padding:6px 12px;z-index:5;font-size:11px;color:#9a9a9a;pointer-events:none;white-space:nowrap;">Управление у хоста 👑</div>
       <button id="unmuteBtn" style="display:none;position:absolute;bottom:12px;right:12px;z-index:6;background:#fff;color:#000;border:none;padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);">🔊 Включить звук</button>
     </div>
   </div>
@@ -39,6 +38,8 @@
       <div class="messages" id="messages"></div>
       <div class="typing" id="typing" style="display:none;"></div>
       <div class="chat-input">
+        <button id="photoBtn" class="chat-icon-btn" title="Прикрепить фото">📷</button>
+        <input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
         <input id="chatInput" placeholder="Написать сообщение..." maxlength="500"/>
         <button id="sendBtn">Отправить</button>
       </div>
@@ -129,5 +130,26 @@
     </div>
   </div>
 
+
+  <div id="msgContextMenu" class="msg-context-menu">
+    <div class="ctx-reactions">
+      <button class="ctx-react-btn" data-emoji="❤️">❤️</button>
+      <button class="ctx-react-btn" data-emoji="👍">👍</button>
+      <button class="ctx-react-btn" data-emoji="😂">😂</button>
+      <button class="ctx-react-btn" data-emoji="😮">😮</button>
+      <button class="ctx-react-btn" data-emoji="😢">😢</button>
+      <button class="ctx-react-btn" data-emoji="🔥">🔥</button>
+      <button class="ctx-react-btn" data-emoji="👑">👑</button>
+      <button class="ctx-react-btn" data-emoji="💀">💀</button>
+      <button class="ctx-react-btn ctx-more-btn" id="ctxMoreEmoji">+</button>
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-actions">
+      <button class="ctx-action-btn" data-action="copy">📋 Копировать</button>
+      <button class="ctx-action-btn ctx-delete" data-action="delete">🗑 Удалить</button>
+    </div>
+  </div>
+
+  <div id="emojiPickerFull" class="emoji-picker-full"></div>
 
 <script src="/room.js"></script>
