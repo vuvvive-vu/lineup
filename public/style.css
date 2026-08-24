@@ -4,7 +4,8 @@ html,body { height:100%; background:#000; color:#fff; font-family: Inter, -apple
 a { color:inherit; text-decoration:none; }
 button { cursor:pointer; font-family:inherit; }
 
-.topbar { height:58px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid var(--border); background:#000; position:sticky; top:0; z-index:10; }
+.topbar { height:58px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid var(--border); background:#000; position:fixed; top:0; left:0; right:0; z-index:10; transition: transform 0.3s ease; }
+.topbar.hidden { transform: translateY(-100%); }
 .logo { font-weight:800; letter-spacing:-0.04em; font-size:22px; display:flex; align-items:center; gap:8px; }
 .logo i { width:28px; height:28px; background:#fff; color:#000; display:grid; place-items:center; border-radius:8px; font-style:normal; font-weight:900; font-size:14px; }
 .nav-right { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); }
@@ -15,8 +16,8 @@ button { cursor:pointer; font-family:inherit; }
 .avatar-btn:hover { transform: scale(1.05); border-color:#333; background:#222; }
 .avatar-btn:active { transform: scale(0.96); }
 
-.container { max-width:980px; margin:0 auto; padding:32px 20px; }
-.auth-wrap { min-height:calc(100vh - 58px); display:grid; place-items:center; padding:24px; }
+.container { max-width:980px; margin:0 auto; padding:32px 20px; padding-top:76px; }
+.auth-wrap { min-height:calc(100vh - 58px); display:grid; place-items:center; padding:24px; padding-top:82px; }
 .auth-card { width:100%; max-width:380px; background:var(--card); border:1px solid var(--border); border-radius:24px; padding:28px; animation: pop .35s ease both; }
 .auth-card h1 { font-size:22px; font-weight:700; margin-bottom:6px; }
 .auth-card p { color:var(--muted); font-size:13px; margin-bottom:20px; line-height:1.5; }
@@ -78,7 +79,7 @@ button { cursor:pointer; font-family:inherit; }
 .badge { font-size:12px; padding:6px 10px; border-radius:999px; background:#1c1c1c; border:1px solid var(--border); color:#cfcfcf; }
 
 /* room page */
-.room-layout { display:flex; flex-direction:column; height:calc(100vh - 58px); height:calc(100dvh - 58px); overflow:hidden; }
+.room-layout { display:flex; flex-direction:column; height:calc(100vh - 58px); height:calc(100dvh - 58px); overflow:hidden; margin-top:58px; }
 .player-wrap { background:#000; border-bottom:1px solid var(--border); display:grid; place-items:center; padding:10px 14px; flex-shrink:0; }
 .player { width:100%; max-width:860px; aspect-ratio:16/9; max-height:46vh; background:#0a0a0a; border:1px solid var(--border); border-radius:16px; overflow:hidden; position:relative; }
 .player iframe { width:100%; height:100%; border:0; }

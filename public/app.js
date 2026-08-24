@@ -316,3 +316,25 @@ function spawnGlobalMilana(){
 }
 setInterval(spawnGlobalMilana, 1900);
 setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTimeout(spawnGlobalMilana, 1800); }, 500);
+
+// hide topbar on scroll down, show on scroll up
+let lastScrollY=0;
+let ticking=false;
+window.addEventListener('scroll',()=>{
+  if(!ticking){
+    requestAnimationFrame(()=>{
+      const topbar=document.querySelector('.topbar');
+      if(!topbar){ ticking=false; return; }
+      const y=window.scrollY;
+      if(y>60){
+        if(y>lastScrollY) topbar.classList.add('hidden');
+        else topbar.classList.remove('hidden');
+      } else {
+        topbar.classList.remove('hidden');
+      }
+      lastScrollY=y;
+      ticking=false;
+    });
+    ticking=true;
+  }
+});

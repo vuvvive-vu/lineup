@@ -706,3 +706,24 @@ if(viewProfileModal){
   viewProfileModal.addEventListener('click', e=>{ if(e.target===viewProfileModal) viewProfileModal.classList.remove('show'); });
   viewProfileModal.querySelectorAll('[data-close]').forEach(b=> b.onclick=()=> viewProfileModal.classList.remove('show'));
 }
+
+let lastScrollY=0;
+let ticking=false;
+window.addEventListener('scroll',()=>{
+  if(!ticking){
+    requestAnimationFrame(()=>{
+      const topbar=document.querySelector('.topbar');
+      if(!topbar){ ticking=false; return; }
+      const y=window.scrollY;
+      if(y>60){
+        if(y>lastScrollY) topbar.classList.add('hidden');
+        else topbar.classList.remove('hidden');
+      } else {
+        topbar.classList.remove('hidden');
+      }
+      lastScrollY=y;
+      ticking=false;
+    });
+    ticking=true;
+  }
+});
