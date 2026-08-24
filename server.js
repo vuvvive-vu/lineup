@@ -36,6 +36,7 @@ let rooms = loadJson(ROOMS_FILE, {});
 
 // ephemeral users (fallback mode only, when DB is not connected)
 const ephemeralUsers = new Map();
+const ephemeralEmailUsers = new Map(); // email -> { id, username, email, passwordHash, avatar, bio, emailVerified }
 
 // init DB if DATABASE_URL is set (Render env var)
 db.initDb().catch(e => console.error('DB init error:', e.message));
@@ -174,6 +175,9 @@ app.post('/api/login', async (req, res) => {
 
 // --- Email auth routes ---
 
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+
 app.post('/api/auth/register-email', async (req, res) => {
   try {
     let { username, email, password } = req.body;
@@ -183,13 +187,25 @@ app.post('/api/auth/register-email', async (req, res) => {
     if (!username || username.length < 1 || username.length > 20) return res.status(400).json({ error: 'Username 1-20 символов' });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
-    const existing = await db.getUserByEmail(email);
-    if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
-    const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
+
+    if (db.isEnabled()) {
+      const existing = await db.getUserByEmail(email);
+      if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+      const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
+      sendVerifyEmail(email, verifyToken).catch(e => console.error('Email send error:', e.message));
+      const token = makeToken(user.id);
+      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false });
+    }
+
+    // ephemeral mode
+    if (ephemeralEmailUsers.has(email)) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    ephemeralEmailUsers.set(email, { id, username, email, passwordHash, avatar: '😎', bio: '', emailVerified: false, verifyToken });
     sendVerifyEmail(email, verifyToken).catch(e => console.error('Email send error:', e.message));
-    const token = makeToken(user.id);
-    res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false });
+    const token = makeToken(id);
+    res.json({ token, username, avatar: '😎', bio: '', emailVerified: false });
   } catch (e) {
     console.error('Register error:', e);
     res.status(500).json({ error: 'Ошибка регистрации' });
@@ -202,11 +218,21 @@ app.post('/api/auth/login-email', async (req, res) => {
     email = (email || '').trim().toLowerCase();
     password = password || '';
     if (!email || !password) return res.status(400).json({ error: 'Введите email и пароль' });
-    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
-    const user = await db.verifyPassword(email, password);
+
+    if (db.isEnabled()) {
+      const user = await db.verifyPassword(email, password);
+      if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+      const token = makeToken(user.id);
+      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
     if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const token = makeToken(user.id);
-    res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
+    res.json({ token, username: user.username, avatar: user.avatar, bio: user.bio, emailVerified: user.emailVerified });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Ошибка входа' });
@@ -215,10 +241,20 @@ app.post('/api/auth/login-email', async (req, res) => {
 
 app.get('/api/auth/verify/:token', async (req, res) => {
   try {
-    if (!db.isEnabled()) return res.redirect('/?error=nodb');
-    const result = await db.verifyEmail(req.params.token);
-    if (!result) return res.redirect('/?error=invalid_token');
-    res.redirect('/?verified=1');
+    if (db.isEnabled()) {
+      const result = await db.verifyEmail(req.params.token);
+      if (!result) return res.redirect('/?error=invalid_token');
+      return res.redirect('/?verified=1');
+    }
+    // ephemeral mode
+    for (const [email, user] of ephemeralEmailUsers) {
+      if (user.verifyToken === req.params.token) {
+        user.emailVerified = true;
+        user.verifyToken = null;
+        return res.redirect('/?verified=1');
+      }
+    }
+    res.redirect('/?error=invalid_token');
   } catch (e) {
     res.redirect('/?error=verify_failed');
   }
@@ -229,10 +265,20 @@ app.post('/api/auth/forgot', async (req, res) => {
     let { email } = req.body;
     email = (email || '').trim().toLowerCase();
     if (!email) return res.status(400).json({ error: 'Введите email' });
-    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
-    const reset = await db.setResetToken(email);
-    if (reset) {
-      sendResetEmail(reset.email, reset.token).catch(e => console.error('Reset email error:', e.message));
+
+    if (db.isEnabled()) {
+      const reset = await db.setResetToken(email);
+      if (reset) sendResetEmail(reset.email, reset.token).catch(e => console.error('Reset email error:', e.message));
+      return res.json({ ok: true, message: 'Если аккаунт с таким email существует, письмо отправлено' });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetToken = resetToken;
+      user.resetExpires = Date.now() + 3600000;
+      sendResetEmail(email, resetToken).catch(e => console.error('Reset email error:', e.message));
     }
     res.json({ ok: true, message: 'Если аккаунт с таким email существует, письмо отправлено' });
   } catch (e) {
@@ -245,10 +291,23 @@ app.post('/api/auth/reset', async (req, res) => {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: 'Требуется токен и пароль' });
     if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
-    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
-    const userId = await db.resetPassword(token, password);
-    if (!userId) return res.status(400).json({ error: 'Ссылка недействительна или истекла' });
-    res.json({ ok: true });
+
+    if (db.isEnabled()) {
+      const userId = await db.resetPassword(token, password);
+      if (!userId) return res.status(400).json({ error: 'Ссылка недействительна или истекла' });
+      return res.json({ ok: true });
+    }
+
+    // ephemeral mode
+    for (const [email, user] of ephemeralEmailUsers) {
+      if (user.resetToken === token && user.resetExpires > Date.now()) {
+        user.passwordHash = await bcrypt.hash(password, 10);
+        user.resetToken = null;
+        user.resetExpires = null;
+        return res.json({ ok: true });
+      }
+    }
+    res.status(400).json({ error: 'Ссылка недействительна или истекла' });
   } catch (e) {
     res.status(500).json({ error: 'Ошибка' });
   }
