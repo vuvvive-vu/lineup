@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
+const { sendVerifyEmail, sendResetEmail } = require('./email');
 
 const app = express();
 const server = http.createServer(app);
@@ -170,11 +171,94 @@ app.post('/api/login', async (req, res) => {
   ephemeralUsers.set(id, { id, ...user });
   res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
+
+// --- Email auth routes ---
+
+app.post('/api/auth/register-email', async (req, res) => {
+  try {
+    let { username, email, password } = req.body;
+    username = (username || '').trim();
+    email = (email || '').trim().toLowerCase();
+    password = password || '';
+    if (!username || username.length < 1 || username.length > 20) return res.status(400).json({ error: 'Username 1-20 символов' });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
+    if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
+    const existing = await db.getUserByEmail(email);
+    if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+    const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
+    sendVerifyEmail(email, verifyToken).catch(e => console.error('Email send error:', e.message));
+    const token = makeToken(user.id);
+    res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false });
+  } catch (e) {
+    console.error('Register error:', e);
+    res.status(500).json({ error: 'Ошибка регистрации' });
+  }
+});
+
+app.post('/api/auth/login-email', async (req, res) => {
+  try {
+    let { email, password } = req.body;
+    email = (email || '').trim().toLowerCase();
+    password = password || '';
+    if (!email || !password) return res.status(400).json({ error: 'Введите email и пароль' });
+    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
+    const user = await db.verifyPassword(email, password);
+    if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+    const token = makeToken(user.id);
+    res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
+  } catch (e) {
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Ошибка входа' });
+  }
+});
+
+app.get('/api/auth/verify/:token', async (req, res) => {
+  try {
+    if (!db.isEnabled()) return res.redirect('/?error=nodb');
+    const result = await db.verifyEmail(req.params.token);
+    if (!result) return res.redirect('/?error=invalid_token');
+    res.redirect('/?verified=1');
+  } catch (e) {
+    res.redirect('/?error=verify_failed');
+  }
+});
+
+app.post('/api/auth/forgot', async (req, res) => {
+  try {
+    let { email } = req.body;
+    email = (email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Введите email' });
+    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
+    const reset = await db.setResetToken(email);
+    if (reset) {
+      sendResetEmail(reset.email, reset.token).catch(e => console.error('Reset email error:', e.message));
+    }
+    res.json({ ok: true, message: 'Если аккаунт с таким email существует, письмо отправлено' });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auth/reset', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Требуется токен и пароль' });
+    if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+    if (!db.isEnabled()) return res.status(500).json({ error: 'База данных недоступна' });
+    const userId = await db.resetPassword(token, password);
+    if (!userId) return res.status(400).json({ error: 'Ссылка недействительна или истекла' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
@@ -540,6 +624,14 @@ app.get('/privacy', (req,res)=>{
 
 app.get('/faq', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','faq.html'));
+});
+
+app.get('/verify', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','verify.html'));
+});
+
+app.get('/reset', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','reset.html'));
 });
 
 app.get('*', (req,res)=>{

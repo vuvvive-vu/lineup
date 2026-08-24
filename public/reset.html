@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Новый пароль — togetherly</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div style="min-height:100vh;display:grid;place-items:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div id="formWrap">
+      <h2 style="font-size:22px;font-weight:700;margin-bottom:6px;">Новый пароль</h2>
+      <p style="color:#9a9a9a;font-size:13px;margin-bottom:20px;">Введите новый пароль для аккаунта</p>
+      <div class="field">
+        <label>Пароль</label>
+        <input id="pw" type="password" placeholder="минимум 6 символов" />
+      </div>
+      <div class="field">
+        <label>Повторите пароль</label>
+        <input id="pw2" type="password" placeholder="ещё раз" />
+      </div>
+      <div id="err" class="error"></div>
+      <button id="btn" class="btn-primary">Задать пароль</button>
+    </div>
+    <div id="done" style="display:none;text-align:center;">
+      <div style="font-size:48px;margin-bottom:16px;">✅</div>
+      <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Пароль изменён</h2>
+      <p style="color:#9a9a9a;font-size:14px;margin-bottom:24px;">Теперь можно войти с новым паролем</p>
+      <a href="/" style="display:inline-block;background:#fff;color:#000;padding:12px 32px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">На главную</a>
+    </div>
+  </div>
+</div>
+<script>
+const params=new URLSearchParams(location.search);
+const token=params.get('token');
+const errEl=document.getElementById('err');
+const btn=document.getElementById('btn');
+if(!token){document.getElementById('formWrap').innerHTML='<h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Ссылка недействительна</h2><p style="color:#9a9a9a;font-size:14px;"><a href="/" style="color:#fff;">На главную</a></p>';}
+btn.onclick=async()=>{
+  errEl.classList.remove('show');
+  const pw=document.getElementById('pw').value;
+  const pw2=document.getElementById('pw2').value;
+  if(pw.length<6){errEl.textContent='Минимум 6 символов';errEl.classList.add('show');return;}
+  if(pw!==pw2){errEl.textContent='Пароли не совпадают';errEl.classList.add('show');return;}
+  btn.disabled=true;btn.textContent='Сохранение...';
+  try{
+    const r=await fetch('/api/auth/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password:pw})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'Ошибка');
+    document.getElementById('formWrap').style.display='none';
+    document.getElementById('done').style.display='block';
+  }catch(e){errEl.textContent=e.message;errEl.classList.add('show');btn.disabled=false;btn.textContent='Задать пароль';}
+};
+</script>
+</body>
+</html>

@@ -12,6 +12,12 @@ services:
         fromDatabase:
           name: lineup-db
           property: connectionString
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: noreply@togetherly.online
+      - key: SITE_URL
+        sync: false
     healthCheckPath: /
 
 databases:

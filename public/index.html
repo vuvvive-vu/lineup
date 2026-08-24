@@ -23,12 +23,57 @@
     <div class="auth-card">
       <h1>Вход</h1>
       <p>Введи ник и смотри любые фильмы и сериалы без рекламы и прочей ерунды!</p>
-      <div id="authError" class="error"></div>
-      <div class="field">
-        <label>Username</label>
-        <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
+      <div class="tabs" id="authTabs">
+        <button class="active" data-tab="email">Почта</button>
+        <button data-tab="quick">Быстро</button>
       </div>
-      <button id="authBtn" class="btn-primary">Войти</button>
+      <div id="authError" class="error"></div>
+      <!-- Email auth -->
+      <div id="tabEmail">
+        <div id="emailFields">
+          <div class="field" id="regUsernameField" style="display:none;">
+            <label>Username</label>
+            <input id="regUsername" placeholder="твой ник" maxlength="20" />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="authEmail" type="email" placeholder="mail@example.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label>Пароль</label>
+            <input id="authPassword" type="password" placeholder="минимум 6 символов" autocomplete="current-password" />
+          </div>
+        </div>
+        <button id="authBtn" class="btn-primary">Войти</button>
+        <div style="text-align:right;margin-top:8px;">
+          <a href="#" id="forgotLink" style="font-size:12px;color:#6a6a6a;">Забыли пароль?</a>
+        </div>
+        <p class="hint" id="authSwitch">Нет аккаунта? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Зарегистрироваться</a></p>
+      </div>
+      <!-- Quick auth (old style) -->
+      <div id="tabQuick" style="display:none;">
+        <div class="field">
+          <label>Username</label>
+          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
+        </div>
+        <button id="quickAuthBtn" class="btn-primary">Войти</button>
+        <p class="hint">Быстрый вход без пароля — подойдёт для тестов</p>
+      </div>
+      <!-- Forgot password -->
+      <div id="forgotForm" style="display:none;">
+        <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите email — отправим ссылку для сброса пароля</p>
+        <div class="field">
+          <label>Email</label>
+          <input id="forgotEmail" type="email" placeholder="mail@example.com" />
+        </div>
+        <button id="forgotBtn" class="btn-primary">Отправить</button>
+        <p class="hint"><a href="#" id="backToLogin" style="color:#fff;">Назад ко входу</a></p>
+      </div>
+      <!-- Success message -->
+      <div id="authSuccess" style="display:none;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">📧</div>
+        <p style="font-size:14px;color:#9a9a9a;">Проверьте почту — мы отправили ссылку для подтверждения</p>
+      </div>
     </div>
   </div>
 
