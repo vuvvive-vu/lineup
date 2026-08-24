@@ -112,129 +112,169 @@ function isValidVideoUrl(platform, url){
 
 // API - simplified auth: just username, always creates new account
 app.post('/api/auth', async (req, res) => {
-  let { username, avatar, bio } = req.body;
-  username = (username||'').trim();
-  if (!username) return res.status(400).json({ error: 'Введи username' });
-  if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
-  if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
-  avatar = (avatar||'').toString().slice(0, 512*1024);
-  bio = (bio||'').toString().slice(0,120);
-  const user = { username, avatar: avatar || '😎', bio: bio || '' };
-  if (db.isEnabled()) {
-    const created = await db.createAccount(user);
-    const token = makeToken(created.id);
-    return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
+  try {
+    let { username, avatar, bio } = req.body;
+    username = (username||'').trim();
+    if (!username) return res.status(400).json({ error: 'Введи username' });
+    if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
+    if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
+    avatar = (avatar||'').toString().slice(0, 512*1024);
+    bio = (bio||'').toString().slice(0,120);
+    const user = { username, avatar: avatar || '😎', bio: bio || '' };
+    if (db.isEnabled()) {
+      const created = await db.createAccount(user);
+      const token = makeToken(created.id);
+      return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
+    }
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    ephemeralUsers.set(id, { id, ...user });
+    const token = makeToken(id);
+    res.json({ token, username, avatar: user.avatar, bio: user.bio });
+  } catch (e) {
+    console.error('Auth error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  ephemeralUsers.set(id, { id, ...user });
-  const token = makeToken(id);
-  res.json({ token, username, avatar: user.avatar, bio: user.bio });
 });
 
 app.post('/api/logout', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (user && user.id) {
-    if (db.isEnabled()) {
-      await db.deleteAccount(user.id);
-    } else {
-      ephemeralUsers.delete(user.id);
+  try {
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if (user && user.id) {
+      if (db.isEnabled()) {
+        await db.deleteAccount(user.id);
+      } else {
+        ephemeralUsers.delete(user.id);
+      }
     }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Logout error:', e.message);
+    res.json({ ok: true });
   }
-  res.json({ ok: true });
 });
 
 app.post('/api/register', async (req, res) => {
-  const { username, avatar, bio } = req.body;
-  let u = (username||'').trim();
-  if (!u) return res.status(400).json({ error: 'Введи username' });
-  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
-  if (db.isEnabled()) {
-    const created = await db.createAccount(user);
-    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+  try {
+    const { username, avatar, bio } = req.body;
+    let u = (username||'').trim();
+    if (!u) return res.status(400).json({ error: 'Введи username' });
+    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+    if (db.isEnabled()) {
+      const created = await db.createAccount(user);
+      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+    }
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    ephemeralUsers.set(id, { id, ...user });
+    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+  } catch (e) {
+    console.error('Register error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  ephemeralUsers.set(id, { id, ...user });
-  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
 app.post('/api/login', async (req, res) => {
-  const { username, avatar, bio } = req.body;
-  let u = (username||'').trim();
-  if (!u) return res.status(400).json({ error: 'Введи username' });
-  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
-  if (db.isEnabled()) {
-    const created = await db.createAccount(user);
-    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+  try {
+    const { username, avatar, bio } = req.body;
+    let u = (username||'').trim();
+    if (!u) return res.status(400).json({ error: 'Введи username' });
+    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+    if (db.isEnabled()) {
+      const created = await db.createAccount(user);
+      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+    }
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    ephemeralUsers.set(id, { id, ...user });
+    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+  } catch (e) {
+    console.error('Login error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  ephemeralUsers.set(id, { id, ...user });
-  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
 app.get('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+  try {
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if (!user) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+  } catch (e) {
+    console.error('Get me error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
 });
 app.get('/api/users/:username', async (req, res) => {
-  if (db.isEnabled()) {
-    const { rows } = await pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
-    if (rows[0]) return res.json({ username: rows[0].username, avatar: rows[0].avatar || '😎', bio: rows[0].bio || '' });
+  try {
+    if (db.isEnabled()) {
+      const user = await db.getUserByUsername(req.params.username);
+      if (user) return res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+    }
+    const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
+    res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
+  } catch (e) {
+    console.error('Get user error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
-  res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
 });
 app.put('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  let { username, avatar, bio } = req.body;
-  username = (username||'').trim() || user.username;
-  avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
-  bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
-  if (db.isEnabled()) {
-    await db.updateUserProfileById(user.id, { username, avatar, bio });
-    const updated = await db.getUserById(user.id);
+  try {
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if (!user) return res.status(401).json({ error: 'Не авторизован' });
+    let { username, avatar, bio } = req.body;
+    username = (username||'').trim() || user.username;
+    avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
+    bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
+    if (db.isEnabled()) {
+      await db.updateUserProfileById(user.id, { username, avatar, bio });
+      const updated = await db.getUserById(user.id);
+      const newToken = makeToken(user.id);
+      return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+    }
+    ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
     const newToken = makeToken(user.id);
-    return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+    res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
+  } catch (e) {
+    console.error('Update me error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
-  const newToken = makeToken(user.id);
-  res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
 });
 app.get('/api/check-username', (req, res) => {
   res.json({ available: true });
 });
 
 app.post('/api/rooms', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
-  let { platform, videoUrl, title } = req.body;
-  if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
-  platform = platform.toLowerCase();
-  if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
-  if (!isValidVideoUrl(platform, videoUrl)) {
-    const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
-    return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
+  try {
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    let { platform, videoUrl, title } = req.body;
+    if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
+    platform = platform.toLowerCase();
+    if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
+    if (!isValidVideoUrl(platform, videoUrl)) {
+      const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
+      return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
+    }
+    const embedUrl = toEmbedUrl(platform, videoUrl);
+    let code;
+    do { code = genCode(); } while (rooms[code]);
+    const room = {
+      code,
+      title: title?.trim() || 'Без названия',
+      platform,
+      videoUrl,
+      embedUrl,
+      host: user.username,
+      createdAt: new Date().toISOString(),
+      messages: [],
+      bans: []
+    };
+    rooms[code] = room;
+    saveJson(ROOMS_FILE, rooms);
+    res.json({ code, room });
+  } catch (e) {
+    console.error('Create room error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-  const embedUrl = toEmbedUrl(platform, videoUrl);
-  let code;
-  do { code = genCode(); } while (rooms[code]);
-  const room = {
-    code,
-    title: title?.trim() || 'Без названия',
-    platform,
-    videoUrl,
-    embedUrl,
-    host: user.username,
-    createdAt: new Date().toISOString(),
-    messages: [],
-    bans: []
-  };
-  rooms[code] = room;
-  saveJson(ROOMS_FILE, rooms);
-  res.json({ code, room });
 });
 
 app.get('/api/rooms/:code', (req, res) => {
