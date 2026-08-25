@@ -756,6 +756,7 @@ function setupHandleCheck(input, statusEl){
     clearTimeout(t);
     const v=input.value.trim().toLowerCase();
     if(!v){ statusEl.textContent=''; return; }
+    if(v.length < 3){ statusEl.textContent='Имя пользователя должно содержать не меньше 3 символов.'; statusEl.style.color='#ff3b30'; return; }
     if(!/^[a-z0-9_]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
     statusEl.textContent='Проверка...';
     statusEl.style.color='#9a9a9a';
