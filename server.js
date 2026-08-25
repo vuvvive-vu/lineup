@@ -222,7 +222,7 @@ app.post('/api/auth', async (req, res) => {
     if (displayName.length > 20) return res.status(400).json({ error: 'Имя максимум 20 символов' });
     
     // Validate avatar if provided
-    if (avatar) {
+    if (avatar && avatar.length > 0) {
       const validation = validateBase64Image(avatar, 512 * 1024);
       if (!validation.valid) return res.status(400).json({ error: validation.error });
       avatar = validation.data;
@@ -491,7 +491,7 @@ app.put('/api/me', async (req, res) => {
   
   // Validate avatar if provided
   if (avatar !== undefined) {
-    if (avatar) {
+    if (avatar && avatar.length > 0) {
       const validation = validateBase64Image(avatar, 512 * 1024);
       if (!validation.valid) return res.status(400).json({ error: validation.error });
       avatar = validation.data;
@@ -639,7 +639,7 @@ wss.on('connection', async (ws, req) => {
         if (text.length > 500) return;
         
         // Validate image if provided
-        if (image) {
+        if (image && image.length > 0) {
           const validation = validateBase64Image(image, 2 * 1024 * 1024);
           if (!validation.valid) {
             ws.send(JSON.stringify({ type: 'error', text: validation.error }));
