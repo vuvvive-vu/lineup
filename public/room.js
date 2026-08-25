@@ -905,8 +905,8 @@ function openProfileRoom(){
   if(openEditBtnRoom) openEditBtnRoom.style.display = localIsGuestRoom ? 'none' : '';
   const cardSync=document.getElementById('profileInfoCard');
   if(cardSync) cardSync.style.display = localIsGuestRoom ? 'none' : '';
-  // instant badge from localStorage - всё оформление привязано к бейджу
-  const localBadgeR = getBadgeLocalR();
+  // instant badge from localStorage - всё оформление привязано к бейджу + fallback owner
+  const localBadgeR = getBadgeLocalR() || (handle.toLowerCase() === 'owner' ? 'developer' : null);
   const crownIconSyncR = document.getElementById('pCrownIcon');
   const creatorBadgeSyncR = document.getElementById('pCreatorBadge');
   const avaWrapSyncR = document.getElementById('pAvaWrap');

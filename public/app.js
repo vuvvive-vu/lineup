@@ -26,7 +26,7 @@ function hideError(el){ el.classList.remove('show'); }
 
 function token(){ return localStorage.getItem('rave_token'); }
 const BADGE_PRESETS_CLIENT = {
-  developer: { label: 'DEVELOPER', theme: 'snow', snow: true }
+  developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true }
 };
 
 function setToken(t, displayName, username, ava, bio, badgeOrCreator){
@@ -686,8 +686,8 @@ function openProfile(){
   if(openEditBtn) openEditBtn.style.display = localIsGuest ? 'none' : '';
   const cardSync=document.getElementById('profileInfoCard');
   if(cardSync) cardSync.style.display = localIsGuest ? 'none' : '';
-  // instant badge from localStorage (no delay) - привязано всё оформление
-  const localBadge = getBadgeLocal();
+  // instant badge from localStorage (no delay) - привязано всё оформление + fallback для owner
+  const localBadge = getBadgeLocal() || (handle.toLowerCase() === 'owner' ? 'developer' : null);
   const crownIconSync = document.getElementById('pCrownIcon');
   const creatorBadgeSync = document.getElementById('pCreatorBadge');
   const avaWrapSync = document.getElementById('pAvaWrap');

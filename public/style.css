@@ -254,7 +254,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   margin: 0 auto;
 }
 .profile-view-modal {
-  overflow: hidden !important;
+  overflow: visible !important;
   position: relative;
 }
 .profile-view-modal .profile-ava-wrap {
