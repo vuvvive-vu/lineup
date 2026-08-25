@@ -5,6 +5,28 @@ const token = localStorage.getItem('rave_token');
 const me = localStorage.getItem('rave_user')||'гость';
 if(!token) location.href='/?needAuth=1';
 
+const BADGE_PRESETS_CLIENT_R = {
+  developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true }
+};
+function getBadgeLocalR(){ const b=localStorage.getItem('rave_badge'); if(b) return b.toLowerCase(); if(localStorage.getItem('rave_isCreator')==='1') return 'developer'; return null; }
+function setBadgeLocalR(badge){ if(badge){ localStorage.setItem('rave_badge', String(badge).toLowerCase()); localStorage.setItem('rave_isCreator','1'); } else { localStorage.removeItem('rave_badge'); localStorage.setItem('rave_isCreator','0'); } }
+function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
+  if(!avaWrap) return;
+  avaWrap.classList.remove('creator-badge','badge-developer','badge-snow');
+  avaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
+  delete avaWrap.dataset.badge;
+  if(crownIcon) crownIcon.style.display='none';
+  if(badgeEl){ badgeEl.style.display='none'; badgeEl.textContent='DEVELOPER'; }
+  if(isGuest || !badge) return;
+  const cfg=BADGE_PRESETS_CLIENT_R[badge]; if(!cfg) return;
+  avaWrap.dataset.badge=badge;
+  if(badge==='developer') avaWrap.classList.add('badge-developer','badge-snow');
+  else { avaWrap.classList.add('badge-'+badge); if(cfg.snow) avaWrap.classList.add('badge-snow'); }
+  if(cfg.icon==='crown' && crownIcon) crownIcon.style.display='block';
+  if(badgeEl){ badgeEl.textContent=cfg.label||badge.toUpperCase(); badgeEl.style.display='inline-block'; }
+  if(cfg.snow) createSnowflakesRoom(avaWrap);
+}
+
 const T={
 "Выйти":"Exit","Загрузка плеера...":"Loading player...","🔊 Включить звук":"🔊 Unmute",
 "Чат":"Chat","Написать сообщение...":"Type a message...","Отправить":"Send",
@@ -819,7 +841,7 @@ let currentUsernameRoom=localStorage.getItem('rave_user')||'';
 (async()=>{
   try{
     const r=await fetch('/api/me', {headers:{Authorization:'Bearer '+token}});
-    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0'); }
+    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); setBadgeLocalR(j.badge || (j.isCreator ? 'developer' : null)); }
   }catch{}
   injectProfileBtn();
 })();
@@ -877,43 +899,24 @@ function openProfileRoom(){
   if(openEditBtnRoom) openEditBtnRoom.style.display = localIsGuestRoom ? 'none' : '';
   const cardSync=document.getElementById('profileInfoCard');
   if(cardSync) cardSync.style.display = localIsGuestRoom ? 'none' : '';
-  // instant creator badge from localStorage (no delay)
-  const localIsCreatorRoom = localStorage.getItem('rave_isCreator') === '1' || handle.toLowerCase() === 'owner';
+  // instant badge from localStorage - всё оформление привязано к бейджу
+  const localBadgeR = getBadgeLocalR();
   const crownIconSyncR = document.getElementById('pCrownIcon');
   const creatorBadgeSyncR = document.getElementById('pCreatorBadge');
   const avaWrapSyncR = document.getElementById('pAvaWrap');
-  if(localIsCreatorRoom && !localIsGuestRoom) {
-    if(crownIconSyncR) crownIconSyncR.style.display = 'block';
-    if(creatorBadgeSyncR) creatorBadgeSyncR.style.display = 'inline-block';
-    if(avaWrapSyncR) { avaWrapSyncR.classList.add('creator-badge'); createSnowflakesRoom(avaWrapSyncR); }
-  } else {
-    if(crownIconSyncR) crownIconSyncR.style.display = 'none';
-    if(creatorBadgeSyncR) creatorBadgeSyncR.style.display = 'none';
-    if(avaWrapSyncR) { avaWrapSyncR.classList.remove('creator-badge'); avaWrapSyncR.querySelectorAll('.snowflake').forEach(s => s.remove()); }
-  }
+  applyBadgeToProfileR(avaWrapSyncR, crownIconSyncR, creatorBadgeSyncR, localBadgeR, localIsGuestRoom);
   // confirm via server (update if changed)
   fetch('/api/me', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
     const guest=j.isGuest;
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
+    const badge = j.badge || (j.isCreator ? 'developer' : null);
+    setBadgeLocalR(badge);
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
-    const isCreatorNow = !!j.isCreator;
-    const wasCreator = avaWrap && avaWrap.classList.contains('creator-badge');
-    if(isCreatorNow !== wasCreator) {
-      if(isCreatorNow) {
-        if(crownIcon) crownIcon.style.display = 'block';
-        if(creatorBadge) creatorBadge.style.display = 'inline-block';
-        if(avaWrap) { avaWrap.classList.add('creator-badge'); createSnowflakesRoom(avaWrap); }
-      } else {
-        if(crownIcon) crownIcon.style.display = 'none';
-        if(creatorBadge) creatorBadge.style.display = 'none';
-        if(avaWrap) { avaWrap.classList.remove('creator-badge'); avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove()); }
-      }
-    }
+    applyBadgeToProfileR(avaWrap, crownIcon, creatorBadge, badge, guest);
   }).catch(()=>{});
   profileModalRoom.classList.add('show');
 }
@@ -1031,7 +1034,7 @@ if(profileModalRoom){
       localStorage.setItem('rave_user', j.username);
       localStorage.setItem('rave_ava', j.avatar);
       localStorage.setItem('rave_bio', j.bio);
-      localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
+      setBadgeLocalR(j.badge || (j.isCreator ? 'developer' : null));
       currentAvatar=j.avatar; currentDisplayNameRoom=j.displayName; currentUsernameRoom=j.username;
       const btn=document.getElementById('profileBtnRoom');
       if(btn) renderAvaBtnRoom(btn, j.avatar, j.displayName);
@@ -1079,7 +1082,7 @@ function openViewProfile(username){
     const handle=u.username||null;
     const bio=u.bio||'';
     const isGuest = !handle || String(handle).startsWith('guest:');
-    const isCreator = u.isCreator || false;
+    const badge = u.badge || (u.isCreator ? 'developer' : null);
     
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); vAvaLarge.style.background=''; vAvaLarge.style.color=''; }
     else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); vAvaLarge.style.backgroundImage='none'; }
@@ -1092,25 +1095,11 @@ function openViewProfile(username){
       vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
     }
     
-    // Show creator badge
+    // Show badge - всё оформление привязано к бейджу
     const vCrownIcon = document.getElementById('vCrownIcon');
     const vCreatorBadge = document.getElementById('vCreatorBadge');
     const vAvaWrap = document.getElementById('vAvaWrap');
-    if(isCreator) {
-      if(vCrownIcon) vCrownIcon.style.display = 'block';
-      if(vCreatorBadge) vCreatorBadge.style.display = 'inline-block';
-      if(vAvaWrap) {
-        vAvaWrap.classList.add('creator-badge');
-        createSnowflakesRoom(vAvaWrap);
-      }
-    } else {
-      if(vCrownIcon) vCrownIcon.style.display = 'none';
-      if(vCreatorBadge) vCreatorBadge.style.display = 'none';
-      if(vAvaWrap) {
-        vAvaWrap.classList.remove('creator-badge');
-        vAvaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
-      }
-    }
+    applyBadgeToProfileR(vAvaWrap, vCrownIcon, vCreatorBadge, badge, isGuest);
     
     viewProfileModal.classList.add('show');
   }).catch(()=>{

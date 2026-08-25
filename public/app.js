@@ -25,7 +25,11 @@ function showError(el, msg){
 function hideError(el){ el.classList.remove('show'); }
 
 function token(){ return localStorage.getItem('rave_token'); }
-function setToken(t, displayName, username, ava, bio, isCreator){
+const BADGE_PRESETS_CLIENT = {
+  developer: { label: 'DEVELOPER', theme: 'snow', snow: true }
+};
+
+function setToken(t, displayName, username, ava, bio, badgeOrCreator){
   if (bio===undefined){
     bio=ava; ava=username; username=displayName; displayName=username;
   }
@@ -34,7 +38,38 @@ function setToken(t, displayName, username, ava, bio, isCreator){
   if(username) localStorage.setItem('rave_user', username);
   if(ava!==undefined) localStorage.setItem('rave_ava', ava||'');
   if(bio!==undefined) localStorage.setItem('rave_bio', bio||'');
-  if(isCreator!==undefined) localStorage.setItem('rave_isCreator', isCreator ? '1' : '0');
+  if(badgeOrCreator!==undefined) {
+    // поддержка и строки badge и булева isCreator
+    if (typeof badgeOrCreator === 'string' && badgeOrCreator) {
+      localStorage.setItem('rave_badge', badgeOrCreator.toLowerCase());
+      localStorage.setItem('rave_isCreator', '1');
+    } else if (badgeOrCreator === true || badgeOrCreator === '1') {
+      localStorage.setItem('rave_badge', 'developer');
+      localStorage.setItem('rave_isCreator', '1');
+    } else if (badgeOrCreator === false || badgeOrCreator === null) {
+      localStorage.removeItem('rave_badge');
+      localStorage.setItem('rave_isCreator', '0');
+    } else {
+      localStorage.setItem('rave_badge', String(badgeOrCreator).toLowerCase());
+    }
+  }
+}
+
+function getBadgeLocal() {
+  const b = localStorage.getItem('rave_badge');
+  if (b) return b.toLowerCase();
+  // легаси
+  if (localStorage.getItem('rave_isCreator') === '1') return 'developer';
+  return null;
+}
+function setBadgeLocal(badge) {
+  if (badge) {
+    localStorage.setItem('rave_badge', String(badge).toLowerCase());
+    localStorage.setItem('rave_isCreator', '1');
+  } else {
+    localStorage.removeItem('rave_badge');
+    localStorage.setItem('rave_isCreator', '0');
+  }
 }
 function getDisplayName(){ return localStorage.getItem('rave_display') || localStorage.getItem('rave_user') || 'гость'; }
 function getUsername(){ return localStorage.getItem('rave_user') || ''; }
@@ -50,6 +85,7 @@ async function logout(){
   localStorage.removeItem('rave_ava');
   localStorage.removeItem('rave_bio');
   localStorage.removeItem('rave_isCreator');
+  localStorage.removeItem('rave_badge');
   location.reload();
 }
 
@@ -154,7 +190,7 @@ async function checkAuth(){
     if(!r.ok) throw new Error();
     const j = await r.json();
     currentAvatar=j.avatar||localStorage.getItem('rave_ava')||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||j.username||localStorage.getItem('rave_display')||currentUsername;
-    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
+    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); setBadgeLocal(j.badge || (j.isCreator ? 'developer' : null));
     if(!j.emailVerified && j.email){
       showAuth();
       inVerification=true;
@@ -349,7 +385,7 @@ if(authBtnEl){
           document.getElementById('authError').style.display='none';
           authSuccessEl.style.display='';
         } else {
-          setToken(j.token,j.displayName||displayName,j.username,j.avatar,j.bio, j.isCreator);
+          setToken(j.token,j.displayName||displayName,j.username,j.avatar,j.bio, j.badge || (j.isCreator ? 'developer' : null));
           localStorage.setItem('rave_email', j.email||email);
           showLobby(j.displayName||displayName,currentAvatar);
         }
@@ -369,7 +405,7 @@ if(authBtnEl){
           document.getElementById('authError').style.display='none';
           authSuccessEl.style.display='';
         } else {
-          setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio, j.isCreator);
+          setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio, j.badge || (j.isCreator ? 'developer' : null));
           localStorage.setItem('rave_email', j.email||email);
           showLobby(j.displayName||j.username,currentAvatar);
         }
@@ -650,58 +686,54 @@ function openProfile(){
   if(openEditBtn) openEditBtn.style.display = localIsGuest ? 'none' : '';
   const cardSync=document.getElementById('profileInfoCard');
   if(cardSync) cardSync.style.display = localIsGuest ? 'none' : '';
-  // instant creator badge from localStorage (no delay)
-  const localIsCreator = localStorage.getItem('rave_isCreator') === '1' || handle.toLowerCase() === 'owner';
+  // instant badge from localStorage (no delay) - привязано всё оформление
+  const localBadge = getBadgeLocal();
   const crownIconSync = document.getElementById('pCrownIcon');
   const creatorBadgeSync = document.getElementById('pCreatorBadge');
   const avaWrapSync = document.getElementById('pAvaWrap');
-  if(localIsCreator && !localIsGuest) {
-    if(crownIconSync) crownIconSync.style.display = 'block';
-    if(creatorBadgeSync) creatorBadgeSync.style.display = 'inline-block';
-    if(avaWrapSync) {
-      avaWrapSync.classList.add('creator-badge');
-      createSnowflakes(avaWrapSync);
-    }
-  } else {
-    if(crownIconSync) crownIconSync.style.display = 'none';
-    if(creatorBadgeSync) creatorBadgeSync.style.display = 'none';
-    if(avaWrapSync) {
-      avaWrapSync.classList.remove('creator-badge');
-      avaWrapSync.querySelectorAll('.snowflake').forEach(s => s.remove());
-    }
-  }
+  applyBadgeToProfile(avaWrapSync, crownIconSync, creatorBadgeSync, localBadge, localIsGuest);
   // confirm via server (update if changed)
   fetch('/api/me', { headers:{ Authorization:'Bearer '+token() }}).then(r=>r.json()).then(j=>{
     const guest = j.isGuest;
     if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
-    // Show creator badge (server truth)
+    const badge = j.badge || (j.isCreator ? 'developer' : null);
+    setBadgeLocal(badge);
+    // Show badge (server truth)
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
-    const isCreatorNow = !!j.isCreator;
-    const wasCreator = avaWrap && avaWrap.classList.contains('creator-badge');
-    if(isCreatorNow !== wasCreator) {
-      if(isCreatorNow) {
-        if(crownIcon) crownIcon.style.display = 'block';
-        if(creatorBadge) creatorBadge.style.display = 'inline-block';
-        if(avaWrap) {
-          avaWrap.classList.add('creator-badge');
-          createSnowflakes(avaWrap);
-        }
-      } else {
-        if(crownIcon) crownIcon.style.display = 'none';
-        if(creatorBadge) creatorBadge.style.display = 'none';
-        if(avaWrap) {
-          avaWrap.classList.remove('creator-badge');
-          avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
-        }
-      }
-    }
+    applyBadgeToProfile(avaWrap, crownIcon, creatorBadge, badge, guest);
   }).catch(()=>{});
   profileModal.classList.add('show');
+}
+
+function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
+  if (!avaWrap) return;
+  // очистить старые бейдж-классы
+  avaWrap.classList.remove('creator-badge', 'badge-developer', 'badge-snow');
+  avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
+  delete avaWrap.dataset.badge;
+  if (crownIcon) crownIcon.style.display = 'none';
+  if (badgeEl) { badgeEl.style.display = 'none'; badgeEl.textContent = 'DEVELOPER'; }
+  if (isGuest || !badge) return;
+  const cfg = BADGE_PRESETS_CLIENT[badge];
+  if (!cfg) return;
+  avaWrap.dataset.badge = badge;
+  // все оформление привязано к бейджу
+  if (badge === 'developer') {
+    avaWrap.classList.add('badge-developer', 'badge-snow');
+  } else {
+    avaWrap.classList.add('badge-' + badge);
+    if (cfg.snow) avaWrap.classList.add('badge-snow');
+  }
+  if (cfg.icon === 'crown' && crownIcon) crownIcon.style.display = 'block';
+  if (badgeEl) {
+    badgeEl.textContent = cfg.label || badge.toUpperCase();
+    badgeEl.style.display = 'inline-block';
+  }
+  if (cfg.snow) createSnowflakes(avaWrap);
 }
 
 function createSnowflakes(container) {
@@ -827,7 +859,7 @@ pSave.onclick=async()=>{
     localStorage.setItem('rave_user', j.username);
     localStorage.setItem('rave_ava', j.avatar);
     localStorage.setItem('rave_bio', j.bio);
-    localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
+    setBadgeLocal(j.badge || (j.isCreator ? 'developer' : null));
     currentAvatar=j.avatar; currentBio=j.bio; currentUsername=j.username; currentDisplayName=j.displayName;
     const avaBtn=document.getElementById('profileBtn');
     if(avaBtn){

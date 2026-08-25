@@ -166,12 +166,18 @@ async function refreshAccounts(){
       const created=a.created ? new Date(a.created).toLocaleDateString('ru') : '—';
       const userListRaw=$('#usersBody')?.textContent||'';
       const isOnline=userListRaw.includes(a.username);
+      const badge=a.badge ? `<span class="pill" style="background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;border-color:#bae6ff;font-weight:700;">${esc(a.badge.toUpperCase())}</span>` : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
+      const badgeBtn = a.badge
+        ? `<button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#0a0a0a;color:#e0f2ff;border-color:#1e3a4a;" onclick="setBadge('${esc(a.id)}',null)">Снять бейдж</button>`
+        : `<button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#e0f2ff;color:#0a3a52;border-color:#bae6ff;font-weight:700;" onclick="setBadge('${esc(a.id)}','developer')">DEVELOPER</button>`;
       return `<tr>
         <td>${avaHtml}</td>
-        <td><b>${esc(a.username)}</b></td>
+        <td><b>${esc(a.username)}</b><div style="font-size:10px;color:#5a5a5a;">${esc(a.id).slice(0,8)}</div></td>
         <td style="color:#8a8a8a;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.bio||'—')}</td>
         <td style="font-size:11px;color:#6a6a6a;">${created}</td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          ${badge}
+          ${badgeBtn}
           ${isOnline?'<span class="pill" style="color:#34c759;border-color:#1f6b2a;">онлайн</span>':''}
           <button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="deleteAccount('${esc(a.id)}','${esc(a.username)}')">Удалить</button>
         </td>
@@ -204,6 +210,14 @@ async function kickUser(username){
 async function deleteAccount(id,username){
   if(!confirm(`Удалить аккаунт ${username}?`)) return;
   const r=await fetch(`/api/admin/accounts/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  const j=await r.json();
+  if(!r.ok) return alert(j.error||'Ошибка');
+  refresh();
+}
+async function setBadge(id, badge){
+  const action = badge ? `Выдать бейдж ${badge.toUpperCase()}?` : 'Снять бейдж? (оформление пропадет)';
+  if(!confirm(action)) return;
+  const r=await fetch(`/api/admin/accounts/${id}/badge`, { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({ badge }) });
   const j=await r.json();
   if(!r.ok) return alert(j.error||'Ошибка');
   refresh();
