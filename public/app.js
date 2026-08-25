@@ -81,6 +81,8 @@ const T={
   'Введи код':'Enter code','Комната не найдена':'Room not found',
   'Слишком много попыток':'Too many attempts',
   // Lobby
+  'Смотрите фильмы и сериалы вместе с togetherly.':'Watch movies and series together with togetherly.',
+  'Togetherly — сервис для удобного совместного просмотра любого медиаконтента из доступных площадок в плеере. Сервис развивается с каждым днём, добавляются новые функции для вашего удобства!':'Togetherly is a service for convenient joint viewing of any media content from available platforms in the player. The service is evolving every day, adding new features for your convenience!',
   'Создать комнату':'Create room','Войти по коду':'Join by code','Войти в комнату':'Join room',
   'Немного про нас':'About us','Связь с разработчиком':'Contact developer',
   'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':
@@ -89,6 +91,12 @@ const T={
     'Choose a platform — VK, RuTube or YouTube — paste a video link and share it with a friend.',
   'У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.':
     'Have a link or code from a friend? Paste it and join the room instantly.',
+  // Profile/auth new
+  'Имя':'Name','Имя пользователя':'Username','имя пользователя':'username','О себе':'About','о себе':'about',
+  'Отмена':'Cancel','Готово':'Done','Изменить фотографию':'Change photo','Изм.':'Edit','в сети':'online',
+  'например, Валентин':'e.g. Valentin','ваше имя':'your name',
+  'Это имя уже занято.':'This username is taken.','Имя пользователя должно содержать не меньше 3 символов.':'Username must be at least 3 characters.',
+  'Проверка...':'Checking...',
   // Room
   'Профиль':'Profile','Описание':'Description','Сохранить':'Save',
   'Выбери аватар или загрузи фото':'Choose an avatar or upload a photo',
@@ -756,9 +764,9 @@ function setupHandleCheck(input, statusEl){
     clearTimeout(t);
     const v=input.value.trim().toLowerCase();
     if(!v){ statusEl.textContent=''; return; }
-    if(v.length < 3){ statusEl.textContent='Имя пользователя должно содержать не меньше 3 символов.'; statusEl.style.color='#ff3b30'; return; }
+    if(v.length < 3){ statusEl.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); statusEl.style.color='#ff3b30'; return; }
     if(!/^[a-z0-9_]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
-    statusEl.textContent='Проверка...';
+    statusEl.textContent=t('Проверка...');
     statusEl.style.color='#9a9a9a';
     t=setTimeout(async()=>{
       try{
@@ -768,11 +776,11 @@ function setupHandleCheck(input, statusEl){
         const r=await fetch('/api/check-username?username='+encodeURIComponent(v), {headers});
         const j=await r.json();
         if(j.available){
-          statusEl.textContent=`Имя ${v} доступно.`;
+          statusEl.textContent=isEn() ? `Username ${v} is available.` : `Имя ${v} доступно.`;
           statusEl.style.color='#4ade80';
         } else {
           if(j.reason==='invalid'){ statusEl.textContent=''; }
-          else { statusEl.textContent='Это имя уже занято.'; statusEl.style.color='#ff3b30'; }
+          else { statusEl.textContent=t('Это имя уже занято.'); statusEl.style.color='#ff3b30'; }
         }
       }catch{ statusEl.textContent=''; }
     },380);

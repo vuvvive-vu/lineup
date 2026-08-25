@@ -529,7 +529,8 @@ wss.on('connection', async (ws, req) => {
     return;
   }
   ws.username = user.username;
-  ws.avatar = user.avatar || '😎';
+  ws.displayName = user.display_name || user.displayName || user.username || 'гость';
+  ws.avatar = user.avatar || '';
   ws.code = code;
 
   if (rooms[code].bans && rooms[code].bans.includes(ws.username)) {
@@ -555,7 +556,7 @@ wss.on('connection', async (ws, req) => {
   }
   ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched, bans: rooms[code].bans || [] }));
   broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
-  const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
+  const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
   broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
 
   ws.on('message', (data) => {
@@ -666,14 +667,14 @@ wss.on('connection', async (ws, req) => {
       rooms[code].host = newHost;
       saveJson(ROOMS_FILE, rooms);
       broadcast(code, { type: 'host_change', oldHost, newHost });
-      const presenceUsers2=remainingWs.map(c=>({username:c.username, avatar:c.avatar||'😎'}));
+      const presenceUsers2=remainingWs.map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
       broadcast(code, { type: 'presence', users: remaining, usersDetailed: presenceUsers2, count: set.size, host: newHost });
       broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
       return;
     }
     broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
     if (rooms[code]) {
-      const presenceUsers3=[...set].map(c=>({username:c.username, avatar:c.avatar||'😎'}));
+      const presenceUsers3=[...set].map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
       broadcast(code, { type: 'presence', users: presenceUsers3.map(u=>u.username), usersDetailed: presenceUsers3, count: set.size, host: rooms[code].host });
     }
   });

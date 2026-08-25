@@ -20,6 +20,11 @@ const T={
 "Управление воспроизведением (только хост)":"Playback control (host only)","Удаление сообщений (только хост)":"Delete messages (host only)",
 "О приложении":"About the app","Связь с разработчиком":"Contact developer",
 "Выйти из аккаунта":"Log out","Сменить аккаунт":"Switch account",
+"Имя":"Name","Имя пользователя":"Username","имя пользователя":"username","О себе":"About","о себе":"about",
+"Отмена":"Cancel","Готово":"Done","Изменить фотографию":"Change photo","Изм.":"Edit","в сети":"online",
+"например, Валентин":"e.g. Valentin","ваше имя":"your name",
+"Это имя уже занято.":"This username is taken.","Имя пользователя должно содержать не меньше 3 символов.":"Username must be at least 3 characters.",
+"Проверка...":"Checking...",
 };
 function isEn(){return localStorage.getItem('rave_lang')==='en';}
 function t(s){if(!isEn())return s;return T[s]||s;}
@@ -34,6 +39,8 @@ function applyTranslations(){
   });
 }
 applyTranslations();
+function letterForRoom(name){ return (name||'?').trim()[0]?.toUpperCase() || '?'; }
+function avatarBgRoom(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return `hsl(${h},62%,42%)`; }
 const rlBtn=document.getElementById('roomLangToggle');
 if(rlBtn){rlBtn.textContent=isEn()?'RU':'EN';rlBtn.onclick=()=>{localStorage.setItem('rave_lang',isEn()?'ru':'en');location.reload();};}
 
@@ -177,17 +184,19 @@ function renderParticipants(users,h){
   onlineEl.textContent=`${users.length} в комнате`;
   users.forEach(u=>{
     const uname = typeof u==='string'? u : u.username;
+    const display = typeof u==='object' ? (u.displayName||u.username) : u;
     const ava = typeof u==='object' ? (u.avatar||getAvatarFor(uname)) : getAvatarFor(uname);
     const isHost=uname===host, isMe=uname===me;
     const d=document.createElement('div');
     d.className='participant'+(isHost?' host':'')+(isMe?' me':'');
     d.style.cursor='pointer';
     d.onclick=()=> openViewProfile(uname);
-    const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`: escapeHtml(ava[0]||ava);
     const canBan=me===host && !isMe && !isHost;
     const banBtn=canBan?`<button class="ban-btn" style="background:none;border:none;color:#ff3b30;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Забанить">✕</button>`:'';
-    // for participant ava we show avatar
-    d.innerHTML=`<div class="ava" style="${isPhotoAva(ava)?'padding:0;overflow:hidden;':''}">${isPhotoAva(ava)?`<img src="${ava}" style="width:100%;height:100%;object-fit:cover;display:block;">`:escapeHtml(ava)}</div><div class="name">${escapeHtml(uname)}</div>${banBtn}${isHost?'<span class="crown">👑</span>':''}`;
+    // for participant ava we show avatar letter or photo
+    const avaHtml = isPhotoAva(ava) ? `<img src="${ava}" style="width:100%;height:100%;object-fit:cover;display:block;">` : escapeHtml(letterForRoom(display));
+    const avaStyle = isPhotoAva(ava) ? 'padding:0;overflow:hidden;' : `background:${avatarBgRoom(display)};color:#fff;`;
+    d.innerHTML=`<div class="ava" style="${avaStyle}">${avaHtml}</div><div class="name" style="display:flex;flex-direction:column;line-height:1.2;"><span>${escapeHtml(display)}</span><span style="font-size:11px;color:#9a9a9a;">@${escapeHtml(uname)}</span></div>${banBtn}${isHost?'<span class="crown">👑</span>':''}`;
     if(canBan){
       const btn=d.querySelector('.ban-btn');
       btn.onclick=(e)=>{ e.stopPropagation(); if(confirm('Забанить '+uname+'?')){ ws.send(JSON.stringify({type:'ban',username:uname})); } };
@@ -786,19 +795,25 @@ document.getElementById('copyLink').onclick=async()=>{
 };
 
 function isPhotoRoom(ava){ return ava && ava.startsWith('data:image/'); }
-function renderAvaBtnRoom(btn, ava){
-  if(isPhotoRoom(ava)){ btn.innerHTML=`<img src="${ava}" alt="ava">`; btn.classList.add('has-photo'); }
-  else { btn.textContent=ava; btn.classList.remove('has-photo'); }
+function letterForRoom(name){ return (name||'?').trim()[0]?.toUpperCase() || '?'; }
+function avatarBgRoom(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return `hsl(${h},62%,42%)`; }
+function renderAvaBtnRoom(btn, ava, fallback){
+  const name=fallback||localStorage.getItem('rave_display')||localStorage.getItem('rave_user')||'Г';
+  if(isPhotoRoom(ava)){ btn.innerHTML=`<img src="${ava}" alt="ava">`; btn.classList.add('has-photo'); btn.style.background=''; btn.style.color=''; }
+  else { btn.textContent=letterForRoom(name); btn.style.background=avatarBgRoom(name); btn.style.color='#fff'; btn.classList.remove('has-photo'); }
 }
-function renderAvaLargeRoomEl(el, ava){
-  if(isPhotoRoom(ava)){ el.innerHTML=`<img src="${ava}" alt="ava">`; el.classList.add('has-photo'); }
-  else { el.textContent=ava; el.classList.remove('has-photo'); el.innerHTML=ava; if(el.textContent!==ava) el.textContent=ava; }
+function renderAvaLargeRoomEl(el, ava, fallback){
+  if(!el) return;
+  if(isPhotoRoom(ava)){ el.innerHTML=`<img src="${ava}" alt="ava">`; el.classList.add('has-photo'); el.style.background=''; el.style.color=''; }
+  else { const name=fallback||localStorage.getItem('rave_display')||localStorage.getItem('rave_user')||'?'; el.textContent=letterForRoom(name); el.style.background=avatarBgRoom(name); el.style.color='#fff'; el.classList.remove('has-photo'); el.style.backgroundImage='none'; }
 }
 // --- profile in room ---
+let currentDisplayNameRoom=localStorage.getItem('rave_display')||'';
+let currentUsernameRoom=localStorage.getItem('rave_user')||'';
 (async()=>{
   try{
     const r=await fetch('/api/me', {headers:{Authorization:'Bearer '+token}});
-    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); localStorage.setItem('rave_user', j.username); }
+    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); }
   }catch{}
   injectProfileBtn();
 })();
@@ -807,61 +822,100 @@ function injectProfileBtn(){
   if(!nav || document.getElementById('profileBtnRoom')) return;
   const btn=document.createElement('button');
   btn.className='avatar-btn';
-  if(isPhotoRoom(currentAvatar)) btn.classList.add('has-photo');
+  const ava=currentAvatar;
+  const fallback=currentDisplayNameRoom||currentUsernameRoom;
+  if(isPhotoRoom(ava)) btn.classList.add('has-photo');
+  else btn.style.background=avatarBgRoom(fallback);
   btn.id='profileBtnRoom';
-  if(isPhotoRoom(currentAvatar)) btn.innerHTML=`<img src="${currentAvatar}" alt="ava">`;
-  else btn.textContent=currentAvatar;
+  if(isPhotoRoom(ava)) btn.innerHTML=`<img src="${ava}" alt="ava">`;
+  else { btn.textContent=letterForRoom(fallback); btn.style.color='#fff'; }
   btn.title='Профиль';
   btn.onclick=openProfileRoom;
   const exitBtn=nav.querySelector('.btn-ghost');
   nav.insertBefore(btn, exitBtn);
 }
 const profileModalRoom=document.getElementById('profileModal');
+const editModalRoom=document.getElementById('editModal');
 const pAvaLargeRoom=document.getElementById('pAvaLarge');
+const eAvaLargeRoom=document.getElementById('eAvaLarge');
 const pUsernameRoom=document.getElementById('pUsername');
+const eUsernameRoom=document.getElementById('eUsername');
+const eDisplayNameRoom=document.getElementById('eDisplayName');
 const pBioRoom=document.getElementById('pBio');
 const pErrorRoom=document.getElementById('pError');
 const pSaveRoom=document.getElementById('pSave');
 const pLogoutRoom=document.getElementById('pLogout');
 const bioCountRoom=document.getElementById('bioCount');
+const openEditBtnRoom=document.getElementById('openEditBtn');
+const editCancelRoom=document.getElementById('editCancel');
+const editDoneRoom=document.getElementById('editDone');
+const changePhotoLinkRoom=document.getElementById('changePhotoLink');
 let selectedAvaRoom='';
 function openProfileRoom(){
-  const ava=localStorage.getItem('rave_ava')||currentAvatar||'😎';
+  const ava=localStorage.getItem('rave_ava')||currentAvatar||'';
   const bio=localStorage.getItem('rave_bio')||currentBio||'';
-  const uname=localStorage.getItem('rave_user')||'';
+  const disp=localStorage.getItem('rave_display')||currentDisplayNameRoom||'';
+  const handle=localStorage.getItem('rave_user')||currentUsernameRoom||'';
   selectedAvaRoom=ava;
-  renderAvaLargeRoomEl(pAvaLargeRoom, ava);
-  pUsernameRoom.value=uname;
-  pBioRoom.value=bio;
-  bioCountRoom.textContent=bio.length;
-  pErrorRoom.classList.remove('show');
-  document.querySelectorAll('#avaGrid button').forEach(b=> b.classList.toggle('active', !isPhotoRoom(ava) && b.dataset.ava===ava));
+  const pViewDisp=document.getElementById('pViewDisplayName');
+  const pViewUser=document.getElementById('pViewUsername');
+  const pViewBioEl=document.getElementById('pViewBio');
+  if(pViewDisp) pViewDisp.textContent=disp||'?';
+  if(pViewUser) pViewUser.textContent= handle ? '@'+handle : 'гость';
+  if(pViewBioEl) pViewBioEl.textContent=bio||'—';
+  renderAvaLargeRoomEl(pAvaLargeRoom, ava, disp);
+  if(eAvaLargeRoom) renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
+  pErrorRoom.classList.remove('show'); pErrorRoom.textContent=''; pErrorRoom.style.display='none';
+  // show edit only for non-guest own
+  fetch('/api/me', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
+    const guest=j.isGuest;
+    if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
+  }).catch(()=>{ if(openEditBtnRoom) openEditBtnRoom.style.display=''; });
   profileModalRoom.classList.add('show');
 }
 function closeProfileRoom(){ profileModalRoom.classList.remove('show'); }
+function openEditRoom(){
+  const ava=localStorage.getItem('rave_ava')||currentAvatar||'';
+  const bio=localStorage.getItem('rave_bio')||currentBio||'';
+  const disp=localStorage.getItem('rave_display')||currentDisplayNameRoom||'';
+  const handle=localStorage.getItem('rave_user')||currentUsernameRoom||'';
+  selectedAvaRoom=ava;
+  if(eDisplayNameRoom) eDisplayNameRoom.value=disp;
+  if(eUsernameRoom) eUsernameRoom.value=handle;
+  if(pBioRoom) pBioRoom.value=bio;
+  if(bioCountRoom) bioCountRoom.textContent=bio.length;
+  const eEmail=document.getElementById('eEmail');
+  if(eEmail) eEmail.textContent=localStorage.getItem('rave_email')||'—';
+  renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
+  pErrorRoom.classList.remove('show'); pErrorRoom.style.display='none';
+  profileModalRoom.classList.remove('show');
+  if(editModalRoom) editModalRoom.classList.add('show');
+}
+function closeEditRoom(){ if(editModalRoom) editModalRoom.classList.remove('show'); }
 if(profileModalRoom){
   profileModalRoom.addEventListener('click', e=>{ if(e.target===profileModalRoom) closeProfileRoom(); });
   profileModalRoom.querySelectorAll('[data-close]').forEach(b=> b.onclick=closeProfileRoom);
-  document.querySelectorAll('#avaGrid button').forEach(b=>{
-    b.onclick=()=>{
-      selectedAvaRoom=b.dataset.ava;
-      renderAvaLargeRoomEl(pAvaLargeRoom, selectedAvaRoom);
-      document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
-      b.classList.add('active');
-    };
-  });
-  // photo upload in room
+  if(openEditBtnRoom) openEditBtnRoom.onclick=openEditRoom;
+  if(editCancelRoom) editCancelRoom.onclick=()=>{ closeEditRoom(); openProfileRoom(); };
+  if(editDoneRoom) editDoneRoom.onclick=()=> document.getElementById('pSave')?.click();
+  if(changePhotoLinkRoom) changePhotoLinkRoom.onclick=()=> document.getElementById('avatarFile').click();
+  if(editModalRoom) editModalRoom.addEventListener('click', e=>{ if(e.target===editModalRoom) closeEditRoom(); });
   const avatarFileRoom=document.getElementById('avatarFile');
-  const uploadAvaBtnRoom=document.getElementById('uploadAvaBtn');
-  if(uploadAvaBtnRoom) uploadAvaBtnRoom.onclick=()=> avatarFileRoom.click();
   if(avatarFileRoom) avatarFileRoom.onchange=()=>{
     const file=avatarFileRoom.files[0];
     if(!file) return;
-    if(file.size>2*1024*1024){ pErrorRoom.textContent='Фото до 2MB'; pErrorRoom.classList.add('show'); return; }
-    if(!file.type.startsWith('image/')){ pErrorRoom.textContent='Только изображения'; pErrorRoom.classList.add('show'); return; }
+    if(file.size>2*1024*1024){ pErrorRoom.textContent='Фото до 2MB'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+    if(!file.type.startsWith('image/')){ pErrorRoom.textContent='Только изображения'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     const reader=new FileReader();
     reader.onload=()=>{
       let dataUrl=reader.result;
+      const apply=(d)=>{
+        selectedAvaRoom=d;
+        const dn=eDisplayNameRoom?.value||localStorage.getItem('rave_display')||'?';
+        renderAvaLargeRoomEl(pAvaLargeRoom, d, dn);
+        renderAvaLargeRoomEl(eAvaLargeRoom, d, dn);
+        pErrorRoom.style.display='none'; pErrorRoom.classList.remove('show');
+      };
       if(dataUrl.length>400*1024){
         const img=new Image();
         img.onload=()=>{
@@ -873,69 +927,99 @@ if(profileModalRoom){
           const ctx=canvas.getContext('2d');
           ctx.drawImage(img,0,0,w,h);
           dataUrl=canvas.toDataURL('image/jpeg',0.75);
-          if(dataUrl.length>500*1024){ pErrorRoom.textContent='Фото слишком большое после сжатия'; pErrorRoom.classList.add('show'); return; }
-          selectedAvaRoom=dataUrl;
-          renderAvaLargeRoomEl(pAvaLargeRoom, selectedAvaRoom);
-          document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
+          if(dataUrl.length>500*1024){ pErrorRoom.textContent='Фото слишком большое после сжатия'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+          apply(dataUrl);
         };
         img.src=dataUrl;
       } else {
-        selectedAvaRoom=dataUrl;
-        renderAvaLargeRoomEl(pAvaLargeRoom, selectedAvaRoom);
-        document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
+        apply(dataUrl);
       }
-      pErrorRoom.classList.remove('show');
     };
     reader.readAsDataURL(file);
     avatarFileRoom.value='';
   };
-  pBioRoom.addEventListener('input', ()=> bioCountRoom.textContent=pBioRoom.value.length);
-  pLogoutRoom.onclick=()=>{ localStorage.removeItem('rave_token'); localStorage.removeItem('rave_user'); location.href='/'; };
+  if(pBioRoom) pBioRoom.addEventListener('input', ()=> { if(bioCountRoom) bioCountRoom.textContent=pBioRoom.value.length; });
+  pLogoutRoom.onclick=()=>{ localStorage.removeItem('rave_token'); localStorage.removeItem('rave_user'); localStorage.removeItem('rave_display'); localStorage.removeItem('rave_email'); location.href='/'; };
   pSaveRoom.onclick=async()=>{
-    pErrorRoom.classList.remove('show');
-    const newName=pUsernameRoom.value.trim();
+    pErrorRoom.style.display='none'; pErrorRoom.classList.remove('show');
+    const newDisplay=(document.getElementById('eDisplayName')?.value||'').trim();
+    const newHandle=(document.getElementById('eUsername')?.value||'').trim().toLowerCase();
     const newBio=pBioRoom.value.trim();
-    if(!newName) { pErrorRoom.textContent='Ник не может быть пустым'; pErrorRoom.classList.add('show'); return; }
+    if(!newDisplay) { pErrorRoom.textContent='Имя не может быть пустым'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+    if(newDisplay.length>20){ pErrorRoom.textContent='Максимум 20 символов'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+    if(!newHandle){ pErrorRoom.textContent='Введите имя пользователя'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+    if(!/^[a-z0-9_]{3,20}$/.test(newHandle)){ pErrorRoom.textContent='Имя пользователя 3-20: a-z, 0-9, _'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     pSaveRoom.disabled=true; pSaveRoom.textContent='Сохранение...';
     try{
-      const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({username:newName, avatar:selectedAvaRoom, bio:newBio}) });
+      const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({displayName:newDisplay, username:newHandle, avatar:selectedAvaRoom, bio:newBio}) });
       const j=await r.json();
       if(!r.ok) throw new Error(j.error||'Ошибка');
       localStorage.setItem('rave_token', j.token);
+      localStorage.setItem('rave_display', j.displayName);
       localStorage.setItem('rave_user', j.username);
       localStorage.setItem('rave_ava', j.avatar);
       localStorage.setItem('rave_bio', j.bio);
-      currentAvatar=j.avatar;
+      currentAvatar=j.avatar; currentDisplayNameRoom=j.displayName; currentUsernameRoom=j.username;
       const btn=document.getElementById('profileBtnRoom');
-      if(btn) renderAvaBtnRoom(btn, j.avatar);
+      if(btn) renderAvaBtnRoom(btn, j.avatar, j.displayName);
+      if(editModalRoom) editModalRoom.classList.remove('show');
       closeProfileRoom();
       location.reload();
-    }catch(e){ pErrorRoom.textContent=e.message; pErrorRoom.classList.add('show'); }
-    finally{ pSaveRoom.disabled=false; pSaveRoom.textContent='Сохранить'; }
+    }catch(e){ pErrorRoom.textContent=e.message; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); }
+    finally{ pSaveRoom.disabled=false; pSaveRoom.textContent='Сохранить'; pSaveRoom.textContent=t('Сохранить'); }
   };
+  // handle check in room edit
+  const eUserStatusRoom=document.getElementById('eUsernameStatus');
+  const eUserInputRoom=document.getElementById('eUsername');
+  if(eUserInputRoom && eUserStatusRoom){
+    let tmr;
+    const runRoomCheck=()=>{
+      clearTimeout(tmr);
+      const v=eUserInputRoom.value.trim().toLowerCase();
+      if(!v){ eUserStatusRoom.textContent=''; return; }
+      if(v.length<3){ eUserStatusRoom.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); eUserStatusRoom.style.color='#ff3b30'; return; }
+      if(!/^[a-z0-9_]{3,20}$/.test(v)){ eUserStatusRoom.textContent=''; return; }
+      eUserStatusRoom.textContent=t('Проверка...'); eUserStatusRoom.style.color='#9a9a9a';
+      tmr=setTimeout(async()=>{
+        try{
+          const r=await fetch('/api/check-username?username='+encodeURIComponent(v), {headers:{Authorization:'Bearer '+token}});
+          const j=await r.json();
+          if(j.available){ eUserStatusRoom.textContent=isEn()?`Username ${v} is available.`:`Имя ${v} доступно.`; eUserStatusRoom.style.color='#4ade80'; }
+          else { if(j.reason==='invalid') eUserStatusRoom.textContent=''; else { eUserStatusRoom.textContent=t('Это имя уже занято.'); eUserStatusRoom.style.color='#ff3b30'; } }
+        }catch{ eUserStatusRoom.textContent=''; }
+      },380);
+    };
+    eUserInputRoom.addEventListener('input', runRoomCheck);
+  }
 }
-// view profile (read-only)
+// view other profile (read-only, same card as own)
 const viewProfileModal=document.getElementById('viewProfileModal');
 const vAvaLarge=document.getElementById('vAvaLarge');
 const vUsername=document.getElementById('vUsername');
+const vHandle=document.getElementById('vHandle');
 const vBio=document.getElementById('vBio');
 function openViewProfile(username){
-  // if own profile -> still view only (edit via top bar)
+  // username here is handle; fetch user data
   fetch(`/api/users/${encodeURIComponent(username)}`).then(r=>r.json()).then(u=>{
-    const ava=u.avatar||presenceAvatars[username]||'😎';
-    if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); }
-    else { vAvaLarge.textContent=ava; vAvaLarge.classList.remove('has-photo'); }
-    vUsername.textContent=u.username;
-    vBio.textContent=u.bio||'— нет описания —';
-    vBio.style.color=u.bio?'#8a8a8a':'#555';
+    const ava=u.avatar||presenceAvatars[username]||'';
+    const disp=u.displayName||u.username||username;
+    const handle=u.username||username;
+    const bio=u.bio||'';
+    if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); vAvaLarge.style.background=''; vAvaLarge.style.color=''; }
+    else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); vAvaLarge.style.backgroundImage='none'; }
+    vUsername.textContent=disp;
+    if(vHandle) vHandle.textContent=handle ? '@'+handle : 'гость';
+    vBio.textContent=bio||'—';
+    vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
     viewProfileModal.classList.add('show');
   }).catch(()=>{
-    // fallback to local map
-    const ava=presenceAvatars[username]||'😎';
+    const ava=presenceAvatars[username]||'';
+    const disp=username;
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); }
-    else { vAvaLarge.textContent=ava; vAvaLarge.classList.remove('has-photo'); }
-    vUsername.textContent=username;
-    vBio.textContent='— нет описания —';
+    else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); }
+    vUsername.textContent=disp;
+    if(vHandle) vHandle.textContent='@'+username;
+    vBio.textContent='—';
     viewProfileModal.classList.add('show');
   });
 }
