@@ -193,7 +193,8 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .profile-ava-large.has-photo { font-size:0; border-color:#fff; }
 
 /* Badge system - всё оформление привязано к бейджу */
-.badge-developer { position:relative; }
+.badge-founder, .badge-developer { position:relative; }
+.badge-founder .profile-ava-large,
 .badge-developer .profile-ava-large { 
   border-color:#e0f2ff !important; 
   box-shadow: 0 0 20px rgba(224,242,255,0.4);
@@ -233,11 +234,14 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   text-transform:uppercase;
   margin-top:6px;
 }
+.badge-founder .badge-text,
+.badge-founder .creator-badge-text,
 .badge-developer .badge-text,
+.badge-developer .creator-badge-text,
 .badge-snow .badge-text {
-  background: linear-gradient(135deg, #e0f2ff, #bae6ff);
-  color:#0a3a52;
-  box-shadow: 0 2px 10px rgba(224,242,255,0.4);
+  background: linear-gradient(135deg, #e0f2ff, #bae6ff) !important;
+  color:#0a3a52 !important;
+  box-shadow: 0 2px 10px rgba(224,242,255,0.4) !important;
 }
 .badge-founders_wife { position:relative; }
 .badge-founders_wife .profile-ava-large {
@@ -303,6 +307,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 }
 
 /* Snowflakes animation - tied to badge */
+.profile-ava-wrap.badge-founder,
 .profile-ava-wrap.badge-developer,
 .profile-ava-wrap.badge-snow,
 .profile-ava-wrap.creator-badge {

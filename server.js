@@ -16,7 +16,7 @@ const JWT_EXPIRES = '30d';
 
 // Badge system - один бейдж на юзера, привязано всё оформление
 const BADGE_PRESETS = {
-  developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true },
+  founder: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
   founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true },
 };
 const ALLOWED_BADGES = Object.keys(BADGE_PRESETS);
@@ -40,19 +40,20 @@ function isCreatorLegacy(userOrUsername) {
 
 function getBadge(user) {
   if (!user) return null;
-  // если у юзера уже есть badge в БД - отдаем его
+  // если у юзера уже есть badge в БД - отдаем его (с алиасом developer -> founder)
   if (user.badge) {
-    const b = String(user.badge).toLowerCase();
+    let b = String(user.badge).toLowerCase();
+    if (b === 'developer') b = 'founder'; // legacy alias
     if (ALLOWED_BADGES.includes(b)) return b;
   }
-  // легаси: старый @owner без badge считаем developer
-  if (isCreatorLegacy(user)) return 'developer';
+  // легаси: старый @owner без badge считаем founder
+  if (isCreatorLegacy(user)) return 'founder';
   return null;
 }
 
 // для совместимости старый вызов isCreator теперь проксирует на getBadge
 function isCreator(userOrUsername) {
-  const b = typeof userOrUsername === 'string' ? (userOrUsername.toLowerCase() === CREATOR_USERNAME.toLowerCase() ? 'developer' : null) : getBadge(userOrUsername);
+  const b = typeof userOrUsername === 'string' ? (userOrUsername.toLowerCase() === CREATOR_USERNAME.toLowerCase() ? 'founder' : null) : getBadge(userOrUsername);
   return !!b;
 }
 
@@ -70,7 +71,9 @@ async function resolveCreatorId() {
         console.log(`[CREATOR] Авто-определен ID для @${CREATOR_USERNAME}: ${CREATOR_ID} (теперь можно менять ник)`);
         // бэкфилл badge для старого owner без badge
         if (!u.badge) {
-          try { await db.setUserBadge(u.id, 'developer'); console.log(`[CREATOR] Выдан badge developer для @${CREATOR_USERNAME}`); } catch {}
+          try { await db.setUserBadge(u.id, 'founder'); console.log(`[CREATOR] Выдан badge founder для @${CREATOR_USERNAME}`); } catch {}
+        } else if (String(u.badge).toLowerCase() === 'developer') {
+          try { await db.setUserBadge(u.id, 'founder'); console.log(`[CREATOR] Мигрирован badge developer -> founder для @${CREATOR_USERNAME}`); } catch {}
         }
       } else {
         console.log(`[CREATOR] Пользователь @${CREATOR_USERNAME} еще не создан, привязка по нику`);
@@ -1067,6 +1070,7 @@ app.put('/api/admin/accounts/:id/badge', async (req, res) => {
   if (badge === '' || badge === null) badge = null;
   if (badge !== null) {
     badge = String(badge).toLowerCase().trim();
+    if (badge === 'developer') badge = 'founder'; // legacy alias
     if (!ALLOWED_BADGES.includes(badge)) return res.status(400).json({ error: 'Неизвестный бейдж. Доступные: ' + ALLOWED_BADGES.join(', ') });
   }
   const id = req.params.id;
