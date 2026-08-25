@@ -245,10 +245,12 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   box-shadow: 0 0 22px rgba(255,182,217,.55), 0 0 40px rgba(255,158,191,.25);
   animation: sakuraGlow 3s ease-in-out infinite;
 }
-.badge-founders_wife .badge-text {
-  background: linear-gradient(135deg, #FFD0E8, #FF9EBF);
-  color:#5a1430;
-  box-shadow: 0 2px 12px rgba(255,158,191,.45), 0 0 20px rgba(255,182,217,.3);
+.badge-founders_wife .badge-text,
+.badge-founders_wife .creator-badge-text {
+  background: linear-gradient(135deg, #FFD0E8, #FF9EBF) !important;
+  color:#5a1430 !important;
+  box-shadow: 0 2px 12px rgba(255,158,191,.45), 0 0 20px rgba(255,182,217,.3) !important;
+  border-color: rgba(255,182,217,.4) !important;
 }
 @keyframes sakuraGlow {
   0%,100% { box-shadow: 0 0 22px rgba(255,182,217,.45), 0 0 40px rgba(255,158,191,.18); }
