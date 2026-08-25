@@ -32,6 +32,7 @@ const T={
 function isEn(){return false;}
 function t(s){return s;}
 function applyTranslations(){
+  if(!isEn()) return;
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const key=el.getAttribute('data-i18n');
     if(T[key])el.textContent=T[key];
