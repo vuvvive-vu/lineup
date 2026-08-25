@@ -195,13 +195,13 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 /* Creator crown */
 .creator-badge { position:relative; }
 .creator-badge .profile-ava-large { 
-  border-color:#ffd700 !important; 
-  box-shadow: 0 0 20px rgba(255,215,0,0.3);
+  border-color:#e0f2ff !important; 
+  box-shadow: 0 0 20px rgba(224,242,255,0.4);
   animation: crownGlow 3s ease-in-out infinite;
 }
 @keyframes crownGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
-  50% { box-shadow: 0 0 30px rgba(255,215,0,0.5); }
+  0%, 100% { box-shadow: 0 0 20px rgba(224,242,255,0.4); }
+  50% { box-shadow: 0 0 30px rgba(224,242,255,0.6); }
 }
 .crown-icon {
   position:absolute;
@@ -212,7 +212,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   height:32px;
   animation: crownFloat 3s ease-in-out infinite;
   z-index:10;
-  filter: drop-shadow(0 2px 8px rgba(255,215,0,0.4));
+  filter: drop-shadow(0 2px 8px rgba(224,242,255,0.5));
 }
 @keyframes crownFloat {
   0%, 100% { transform: translateX(-50%) translateY(0px); }
@@ -220,8 +220,8 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 }
 .creator-badge-text {
   display:inline-block;
-  background: linear-gradient(135deg, #ffd700, #ffed4e);
-  color:#000;
+  background: linear-gradient(135deg, #e0f2ff, #bae6ff);
+  color:#0a3a52;
   padding:4px 12px;
   border-radius:999px;
   font-size:11px;
@@ -229,7 +229,33 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   letter-spacing:0.05em;
   text-transform:uppercase;
   margin-top:6px;
-  box-shadow: 0 2px 10px rgba(255,215,0,0.3);
+  box-shadow: 0 2px 10px rgba(224,242,255,0.4);
+}
+
+/* Snowflakes animation */
+.snowflake {
+  position: absolute;
+  color: #e0f2ff;
+  font-size: 1em;
+  font-family: Arial, sans-serif;
+  text-shadow: 0 0 5px rgba(224,242,255,0.8);
+  animation: fall linear infinite;
+  pointer-events: none;
+  z-index: 999;
+}
+@keyframes fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(360deg);
+    opacity: 0.3;
+  }
+}
+.profile-ava-wrap.creator-badge {
+  position: relative;
+  overflow: visible;
 }
 .ava-grid { display:grid; grid-template-columns: repeat(8, 1fr); gap:8px; margin-top:6px; }
 .ava-grid button { width:36px; height:36px; border-radius:999px; border:1px solid #1e1e1e; background:#000; font-size:18px; display:grid; place-items:center; cursor:pointer; transition: all .15s ease; overflow:hidden; }

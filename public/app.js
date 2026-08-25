@@ -661,14 +661,40 @@ function openProfile(){
     if(j.isCreator) {
       if(crownIcon) crownIcon.style.display = 'block';
       if(creatorBadge) creatorBadge.style.display = 'inline-block';
-      if(avaWrap) avaWrap.classList.add('creator-badge');
+      if(avaWrap) {
+        avaWrap.classList.add('creator-badge');
+        // Add snowflakes
+        createSnowflakes(avaWrap);
+      }
     } else {
       if(crownIcon) crownIcon.style.display = 'none';
       if(creatorBadge) creatorBadge.style.display = 'none';
-      if(avaWrap) avaWrap.classList.remove('creator-badge');
+      if(avaWrap) {
+        avaWrap.classList.remove('creator-badge');
+        // Remove snowflakes
+        avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
+      }
     }
   }).catch(()=>{});
   profileModal.classList.add('show');
+}
+
+function createSnowflakes(container) {
+  // Remove existing snowflakes
+  container.querySelectorAll('.snowflake').forEach(s => s.remove());
+  
+  // Create 15 snowflakes
+  for(let i = 0; i < 15; i++) {
+    const snowflake = document.createElement('div');
+    snowflake.classList.add('snowflake');
+    snowflake.innerHTML = '❄';
+    snowflake.style.left = Math.random() * 100 + '%';
+    snowflake.style.animationDuration = (Math.random() * 3 + 2) + 's';
+    snowflake.style.animationDelay = Math.random() * 5 + 's';
+    snowflake.style.fontSize = (Math.random() * 10 + 10) + 'px';
+    snowflake.style.opacity = Math.random() * 0.6 + 0.4;
+    container.appendChild(snowflake);
+  }
 }
 function closeProfile(){ profileModal.classList.remove('show'); }
 function openEdit(){
