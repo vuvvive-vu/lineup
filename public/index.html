@@ -41,7 +41,7 @@
               <span style="padding:12px 10px 12px 14px;color:var(--muted);font-weight:700;font-size:14px;border-right:1px solid var(--border);user-select:none;">@</span>
               <input id="regUsername" placeholder="vuvvive" maxlength="20" style="border:none;flex:1;background:transparent;border-radius:0;" />
             </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">3-20: a-z, 0-9, _</div>
+            <div id="regUsernameStatus" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
           </div>
           <div class="field">
             <label data-i18n="Почта">Почта</label>
@@ -240,7 +240,7 @@
           <span style="padding:12px 10px 12px 14px;color:var(--muted);font-weight:700;font-size:14px;border-right:1px solid var(--border);user-select:none;">@</span>
           <input id="eUsername" placeholder="username" maxlength="20" style="border:none;flex:1;background:transparent;border-radius:0;" />
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">3-20: a-z, 0-9, _</div>
+        <div id="eUsernameStatus" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
       </div>
       <div class="field">
         <label>О себе</label>
@@ -249,8 +249,8 @@
       </div>
       <div style="font-size:12px;color:var(--muted);margin-top:8px;">почта: <span id="eEmail" style="color:#fff;"></span> (нельзя изменить)</div>
       <div id="pError" class="error"></div>
-      <button id="pSave" class="btn-primary" style="margin-top:14px;">Сохранить</button>
-      <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;">Выйти из аккаунта</button>
+      <button id="pSave" class="btn-primary" style="width:100%;margin-top:14px;padding:14px 20px;border-radius:999px;font-weight:700;font-size:15px;">Сохранить</button>
+      <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;padding:14px 20px;border-radius:999px;font-weight:700;font-size:15px;border:1px solid #232323;">Выйти из аккаунта</button>
       <!-- keep hidden old pUsername compat -->
       <input id="pUsername" hidden />
     </div>

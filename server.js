@@ -458,8 +458,21 @@ app.put('/api/me', async (req, res) => {
   const newToken = makeToken(user.id);
   res.json({ displayName, username, avatar: avatar || '', bio: bio || '', token: newToken });
 });
-app.get('/api/check-username', (req, res) => {
-  res.json({ available: true });
+app.get('/api/check-username', async (req, res) => {
+  let { username } = req.query;
+  username = (username||'').trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.json({ available: false, reason: 'invalid' });
+  const token = req.headers.authorization?.replace('Bearer ','');
+  if (token) {
+    try {
+      const me = await parseToken(token);
+      if (me && me.username && me.username.toLowerCase()===username) return res.json({ available: true, own: true });
+    } catch {}
+  }
+  let exists=null;
+  if (db.isEnabled()) exists = await db.getUserByUsername(username);
+  else exists = [...ephemeralEmailUsers.values()].find(u=>u.username===username) || [...ephemeralUsers.values()].find(u=>u.username===username);
+  res.json({ available: !exists });
 });
 
 app.post('/api/rooms', async (req, res) => {

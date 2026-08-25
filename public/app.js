@@ -596,17 +596,20 @@ function renderAvaLargeElNew(el, ava, fallback){
   if(!el) return;
   if(isPhoto(ava)){
     el.innerHTML=`<img src="${ava}" alt="">`;
-    el.style.background=''; el.textContent='';
+    el.style.background=''; el.style.backgroundColor='';
+    el.style.color='';
     el.classList.add('has-photo');
   } else {
-    const name = fallback || currentDisplayName || currentUsername || '?';
-    el.textContent=letterFor(name);
-    el.style.background=avatarBg(name);
-    el.innerHTML=''; el.appendChild(document.createTextNode(letterFor(name)));
-    el.style.backgroundColor=avatarBg(name);
+    const name = (fallback && fallback.trim()) ? fallback : (currentDisplayName && currentDisplayName.trim() ? currentDisplayName : (currentUsername || '?'));
+    const letter = letterFor(name);
+    const bg = avatarBg(name);
     el.classList.remove('has-photo');
-    // ensure no image
+    el.innerHTML='';
+    el.textContent=letter;
+    el.style.background=''; el.style.backgroundColor=bg;
     el.style.backgroundImage='none';
+    el.style.color='#fff';
+    el.style.borderColor='transparent';
   }
 }
 // patch global renderAvaLargeEl
@@ -744,6 +747,40 @@ pSave.onclick=async()=>{
   }catch(e){ showError(pError, e.message); }
   finally{ pSave.disabled=false; pSave.textContent='Сохранить'; }
 };
+
+// handle availability check
+function setupHandleCheck(input, statusEl){
+  if(!input||!statusEl) return;
+  let t;
+  const run=()=>{
+    clearTimeout(t);
+    const v=input.value.trim().toLowerCase();
+    if(!v){ statusEl.textContent=''; return; }
+    if(!/^[a-z0-9_]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
+    statusEl.textContent='Проверка...';
+    statusEl.style.color='#9a9a9a';
+    t=setTimeout(async()=>{
+      try{
+        const tok=localStorage.getItem('rave_token');
+        const headers={};
+        if(tok) headers['Authorization']='Bearer '+tok;
+        const r=await fetch('/api/check-username?username='+encodeURIComponent(v), {headers});
+        const j=await r.json();
+        if(j.available){
+          statusEl.textContent=`Имя ${v} доступно.`;
+          statusEl.style.color='#4ade80';
+        } else {
+          if(j.reason==='invalid'){ statusEl.textContent=''; }
+          else { statusEl.textContent='Это имя уже занято.'; statusEl.style.color='#ff3b30'; }
+        }
+      }catch{ statusEl.textContent=''; }
+    },380);
+  };
+  input.addEventListener('input', run);
+  input.addEventListener('paste', ()=> setTimeout(run, 10));
+}
+setupHandleCheck(document.getElementById('regUsername'), document.getElementById('regUsernameStatus'));
+setupHandleCheck(document.getElementById('eUsername'), document.getElementById('eUsernameStatus'));
 
 // milana global - smoother & everywhere empty
 let milanaY=0;
