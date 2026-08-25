@@ -16,7 +16,7 @@ async function initDb() {
   try {
     pool = new Pool({
       connectionString: url,
-      ssl: { rejectUnauthorized: false },
+      ssl: url.includes('localhost') ? false : { rejectUnauthorized: true },
       max: 5,
       idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 8000,
@@ -154,7 +154,7 @@ async function getUserByEmail(email) {
 
 async function createAccountWithAuth({ displayName, username, email, password }) {
   const id = genId();
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   const verifyToken = genToken();
   const dname = (displayName || username).slice(0,20);
   const handle = username.toLowerCase();
@@ -200,7 +200,7 @@ async function resetPassword(token, newPassword) {
     [token]
   );
   if (!rows[0]) return null;
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
   await pool.query('UPDATE users SET password_hash=$1, reset_token=null, reset_expires=null WHERE id=$2', [passwordHash, rows[0].id]);
   return rows[0].id;
 }

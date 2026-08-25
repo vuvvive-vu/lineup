@@ -8,7 +8,11 @@ const jwt = require('jsonwebtoken');
 const db = require('./db');
 const { sendVerifyCode, sendResetEmail, detectDevice } = require('./email');
 
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.JWT_SECRET) {
+  console.error('ОШИБКА: JWT_SECRET не установлен в переменных окружения!');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = '30d';
 
 function genCode() {
@@ -21,7 +25,23 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
 
-app.use(require('cors')());
+// CORS configuration - restrict to specific origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://localhost:5173']; // Development defaults
+
+app.use(require('cors')({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -160,6 +180,39 @@ function isValidVideoUrl(platform, url){
   return false;
 }
 
+// Validate base64 image format and size
+function validateBase64Image(dataUrl, maxSizeBytes = 512 * 1024) {
+  if (!dataUrl) return { valid: false, error: 'Пустое изображение' };
+  if (typeof dataUrl !== 'string') return { valid: false, error: 'Неверный формат' };
+  
+  // Check if it's a valid data URL
+  if (!dataUrl.startsWith('data:image/')) return { valid: false, error: 'Только изображения разрешены' };
+  
+  // Extract mime type and base64 data
+  const matches = dataUrl.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/);
+  if (!matches) return { valid: false, error: 'Неверный формат изображения' };
+  
+  const [, mimeType, base64Data] = matches;
+  
+  // Calculate actual byte size (base64 is ~1.37x larger than binary)
+  const byteSize = Math.floor((base64Data.length * 3) / 4);
+  
+  if (byteSize > maxSizeBytes) {
+    return { valid: false, error: `Изображение слишком большое (макс ${Math.floor(maxSizeBytes/1024)}KB)` };
+  }
+  
+  // Check if base64 is valid
+  try {
+    if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+      return { valid: false, error: 'Неверные данные изображения' };
+    }
+  } catch {
+    return { valid: false, error: 'Ошибка валидации' };
+  }
+  
+  return { valid: true, data: dataUrl, mimeType, size: byteSize };
+}
+
 // API - guest: only displayName, no handle
 app.post('/api/auth', async (req, res) => {
   try{
@@ -168,14 +221,23 @@ app.post('/api/auth', async (req, res) => {
     if (!displayName) return res.status(400).json({ error: 'Введи имя' });
     if (displayName.length < 1) return res.status(400).json({ error: 'Имя минимум 1 символ' });
     if (displayName.length > 20) return res.status(400).json({ error: 'Имя максимум 20 символов' });
-    avatar = (avatar||'').toString().slice(0, 512*1024);
+    
+    // Validate avatar if provided
+    if (avatar) {
+      const validation = validateBase64Image(avatar, 512 * 1024);
+      if (!validation.valid) return res.status(400).json({ error: validation.error });
+      avatar = validation.data;
+    } else {
+      avatar = '';
+    }
+    
     bio = (bio||'').toString().slice(0,120);
-    const user = { displayName, avatar: '', bio: '' };
+    const user = { displayName, avatar: avatar || '', bio: '' };
     // guests never use DB, never occupy handle
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, username: null, displayName, avatar: '', bio: '' });
+    ephemeralUsers.set(id, { id, username: null, displayName, avatar: avatar || '', bio: '' });
     const token = makeToken(id);
-    res.json({ token, displayName, username: null, avatar: '', bio: '' });
+    res.json({ token, displayName, username: null, avatar: avatar || '', bio: '' });
   }catch(e){ console.error('/api/auth error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -427,7 +489,20 @@ app.put('/api/me', async (req, res) => {
   } else {
     username = user.username;
   }
-  avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
+  
+  // Validate avatar if provided
+  if (avatar !== undefined) {
+    if (avatar) {
+      const validation = validateBase64Image(avatar, 512 * 1024);
+      if (!validation.valid) return res.status(400).json({ error: validation.error });
+      avatar = validation.data;
+    } else {
+      avatar = '';
+    }
+  } else {
+    avatar = user.avatar;
+  }
+  
   bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
   if (db.isEnabled()) {
     await db.updateUserProfileById(user.id, { displayName, username, avatar, bio });
@@ -526,6 +601,7 @@ wss.on('connection', async (ws, req) => {
   ws.displayName = user.display_name || user.displayName || user.username || 'гость';
   ws.avatar = user.avatar || '';
   ws.code = code;
+  ws.userId = user.id; // Store user ID for cleanup
   ws.isGuest = !user.email && !user.username;
 
   if (rooms[code].bans && rooms[code].bans.includes(ws.username)) {
@@ -562,7 +638,16 @@ wss.on('connection', async (ws, req) => {
         const image = msg.image || null;
         if (!text && !image) return;
         if (text.length > 500) return;
-        if (image && image.length > 2 * 1024 * 1024) return;
+        
+        // Validate image if provided
+        if (image) {
+          const validation = validateBase64Image(image, 2 * 1024 * 1024);
+          if (!validation.valid) {
+            ws.send(JSON.stringify({ type: 'error', text: validation.error }));
+            return;
+          }
+        }
+        
         const chatMsg = { username: ws.username, text, ts: Date.now() };
         if (image) chatMsg.image = image;
         rooms[code].messages.push(chatMsg);
@@ -641,10 +726,14 @@ wss.on('connection', async (ws, req) => {
     if (!set) return;
     const wasHost = rooms[code] && rooms[code].host === ws.username;
     set.delete(ws);
-    // ephemeral user cleanup if no more connections with that username
+    // ephemeral user cleanup if no more connections with that id
     let stillOnline=false;
-    for(const s of roomClients.values()){ for(const c of s){ if(c.username===ws.username) stillOnline=true; } }
-    if(!stillOnline) ephemeralUsers.delete(ws.username);
+    for(const s of roomClients.values()){ 
+      for(const c of s){ 
+        if(c.userId === ws.userId) stillOnline=true; 
+      } 
+    }
+    if(!stillOnline && ws.userId) ephemeralUsers.delete(ws.userId);
     if (set.size === 0) {
       roomClients.delete(code);
       if (rooms[code]) {
@@ -814,8 +903,9 @@ app.use((err, req, res, next) => {
 app.get('/privacy', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','privacy.html'));
 });
+// Redirect old typo URL to correct one
 app.get('/pricavy', (req,res)=>{
-  res.sendFile(path.join(__dirname,'public','privacy.html'));
+  res.redirect(301, '/privacy');
 });
 
 app.get('/faq', (req,res)=>{
