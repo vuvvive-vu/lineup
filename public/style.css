@@ -253,25 +253,30 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   text-shadow: 0 0 8px rgba(224,242,255,0.9), 0 0 12px rgba(186,230,255,0.5);
   pointer-events: none;
   z-index: 5;
-  top: -30px;
+  top: -50px;
   animation-name: fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   will-change: transform, opacity;
+  opacity: 0;
 }
 @keyframes fall {
   0% {
-    transform: translateY(-20px) translateX(0) rotate(0deg);
+    transform: translateY(0) translateX(0) rotate(0deg) scale(0.8);
     opacity: 0;
   }
-  8% {
-    opacity: 0.9;
+  15% {
+    opacity: 0.4;
+    transform: translateY(35px) translateX(calc(var(--drift, 20px) * 0.15)) rotate(50deg) scale(1);
   }
-  92% {
-    opacity: 0.9;
+  30% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.85;
   }
   100% {
-    transform: translateY(220px) translateX(var(--drift, 20px)) rotate(360deg);
+    transform: translateY(320px) translateX(var(--drift, 20px)) rotate(360deg) scale(1);
     opacity: 0;
   }
 }

@@ -683,7 +683,7 @@ function createSnowflakes(container) {
   // Remove existing snowflakes
   container.querySelectorAll('.snowflake').forEach(s => s.remove());
   
-  // Create 12 snowflakes with natural drift
+  // Create 12 snowflakes with natural drift - медленное появление сверху до низа
   for(let i = 0; i < 12; i++) {
     const snowflake = document.createElement('div');
     snowflake.classList.add('snowflake');
@@ -693,22 +693,19 @@ function createSnowflakes(container) {
     const leftPos = Math.random() * 88 + 6;
     snowflake.style.left = leftPos + '%';
     
-    // Slower, smoother (8-12 seconds) - не резко
-    const duration = Math.random() * 4 + 8;
+    // Очень медленно 10-14 секунд чтобы не резко
+    const duration = Math.random() * 4 + 10;
     snowflake.style.animationDuration = duration + 's';
     
-    // Staggered with negative delay to avoid резкого появления всех сразу
-    snowflake.style.animationDelay = (-Math.random() * 8) + 's';
+    // Negative delay = уже в полете, распределение по времени + дополнительная случайность
+    snowflake.style.animationDelay = (-Math.random() * 14) + 's';
     
-    // Varied sizes 10-16px
-    snowflake.style.fontSize = (Math.random() * 6 + 10) + 'px';
+    // Varied sizes 10-15px
+    snowflake.style.fontSize = (Math.random() * 5 + 10) + 'px';
     
-    // Random drift -15 to +30px
-    const drift = (Math.random() * 45 - 15) + 'px';
+    // Мягкий дрифт -10 to +25px
+    const drift = (Math.random() * 35 - 10) + 'px';
     snowflake.style.setProperty('--drift', drift);
-    
-    // Slight opacity variation
-    snowflake.style.opacity = (Math.random() * 0.3 + 0.7).toString();
     
     container.appendChild(snowflake);
   }
