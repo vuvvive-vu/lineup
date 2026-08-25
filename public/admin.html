@@ -16,6 +16,15 @@
 .admin-table th{color:#8a8a8a;font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid #1e1e1e;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
 .admin-table td{padding:9px 10px;border-bottom:1px solid #0f0f0f;vertical-align:middle;}
 .pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#1a1a1a;border:1px solid #232323;}
+.admin-plus{width:28px;height:28px;border-radius:999px;border:1px solid #232323;background:#111;color:#8a8a8a;display:grid;place-items:center;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;}
+.admin-plus:hover{background:#1a1a1a;color:#fff;border-color:#333;transform:scale(1.06);}
+.badge-picker{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.badge-picker.show{display:flex;}
+.badge-picker-card{background:#111;border:1px solid #232323;border-radius:20px;padding:20px;width:100%;max-width:320px;animation:pop .18s ease;}
+.badge-opt{width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:1px solid #1e1e1e;background:#0a0a0a;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .15s;margin-bottom:8px;}
+.badge-opt:hover{border-color:#333;background:#161616;}
+.badge-opt.active{border-color:#bae6ff;background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;}
+.badge-opt small{font-weight:500;opacity:.7;font-size:11px;}
 </style>
 </head>
 <body>
@@ -76,6 +85,19 @@
     </div>
 
     <button id="aLogout" class="btn-ghost" style="margin-top:16px;">Выйти</button>
+  </div>
+</div>
+
+<div id="badgePicker" class="badge-picker">
+  <div class="badge-picker-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 id="pickerTitle" style="font-size:15px;font-weight:800;">Бейджи</h3>
+      <button class="x" onclick="closeBadgePicker()" style="width:32px;height:32px;border-radius:999px;border:1px solid #232323;background:#0a0a0a;color:#fff;display:grid;place-items:center;">✕</button>
+    </div>
+    <div id="pickerCurrent" style="font-size:12px;color:#8a8a8a;margin-bottom:12px;">—</div>
+    <button class="badge-opt" data-badge="developer" onclick="pickBadge('developer')"><span>DEVELOPER</span><small>снег ❄</small></button>
+    <button class="badge-opt" data-badge="" onclick="pickBadge(null)" style="border-style:dashed;"><span>Снять бейдж</span><small>—</small></button>
+    <p style="font-size:11px;color:#5a5a5a;margin-top:10px;line-height:1.4;">К бейджу привязано всё оформление: рамка, свечение, звезда, снежинки.</p>
   </div>
 </div>
 
@@ -167,9 +189,6 @@ async function refreshAccounts(){
       const userListRaw=$('#usersBody')?.textContent||'';
       const isOnline=userListRaw.includes(a.username);
       const badge=a.badge ? `<span class="pill" style="background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;border-color:#bae6ff;font-weight:700;">${esc(a.badge.toUpperCase())}</span>` : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
-      const badgeBtn = a.badge
-        ? `<button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#0a0a0a;color:#e0f2ff;border-color:#1e3a4a;" onclick="setBadge('${esc(a.id)}',null)">Снять бейдж</button>`
-        : `<button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#e0f2ff;color:#0a3a52;border-color:#bae6ff;font-weight:700;" onclick="setBadge('${esc(a.id)}','developer')">DEVELOPER</button>`;
       return `<tr>
         <td>${avaHtml}</td>
         <td><b>${esc(a.username)}</b><div style="font-size:10px;color:#5a5a5a;">${esc(a.id).slice(0,8)}</div></td>
@@ -177,9 +196,9 @@ async function refreshAccounts(){
         <td style="font-size:11px;color:#6a6a6a;">${created}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
           ${badge}
-          ${badgeBtn}
           ${isOnline?'<span class="pill" style="color:#34c759;border-color:#1f6b2a;">онлайн</span>':''}
           <button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="deleteAccount('${esc(a.id)}','${esc(a.username)}')">Удалить</button>
+          <button class="admin-plus" title="Бейджи" onclick="openBadgePicker('${esc(a.id)}','${esc(a.badge||'')}','${esc(a.username)}')">+</button>
         </td>
       </tr>`;
     }).join('');
@@ -220,9 +239,40 @@ async function setBadge(id, badge){
   const r=await fetch(`/api/admin/accounts/${id}/badge`, { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({ badge }) });
   const j=await r.json();
   if(!r.ok) return alert(j.error||'Ошибка');
+  closeBadgePicker();
   refresh();
 }
+let pickerUserId=null;
+function openBadgePicker(id, currentBadge, username){
+  pickerUserId=id;
+  const picker=$('#badgePicker');
+  const cur=$('#pickerCurrent');
+  const title=$('#pickerTitle');
+  title.textContent='Бейджи — @'+username;
+  cur.textContent = currentBadge ? 'Текущий: '+currentBadge.toUpperCase() : 'Нет бейджа';
+  // highlight active
+  picker.querySelectorAll('.badge-opt').forEach(b=>{
+    b.classList.toggle('active', b.dataset.badge === (currentBadge||''));
+  });
+  picker.classList.add('show');
+}
+function closeBadgePicker(){
+  const picker=$('#badgePicker');
+  if(picker) picker.classList.remove('show');
+  pickerUserId=null;
+}
+async function pickBadge(badge){
+  if(!pickerUserId) return;
+  // badge '' means снять
+  const val = badge || null;
+  await setBadge(pickerUserId, val);
+}
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
+// close picker on backdrop
+document.addEventListener('click', e=>{
+  const picker=$('#badgePicker');
+  if(picker && e.target===picker) closeBadgePicker();
+});
 </script>
 </body>
 </html>
