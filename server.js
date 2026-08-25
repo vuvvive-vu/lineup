@@ -60,9 +60,9 @@ async function parseToken(token) {
     if (db.isEnabled()) {
       const u = await db.getUserById(decoded.id);
       if (u) return u;
-      return ephemeralUsers.get(decoded.id) || null;
+      return ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x=>x.id===decoded.id) || null;
     }
-    return ephemeralUsers.get(decoded.id) || null;
+    return ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x=>x.id===decoded.id) || null;
   } catch { return null; }
 }
 function toEmbedUrl(platform, url) {
@@ -160,28 +160,28 @@ function isValidVideoUrl(platform, url){
   return false;
 }
 
-// API - simplified auth: just username, always creates new account
+// API - guest: only displayName, no handle
 app.post('/api/auth', async (req, res) => {
   try{
-    let { username, avatar, bio } = req.body;
-    username = (username||'').trim();
-    if (!username) return res.status(400).json({ error: 'Введи username' });
-    if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
-    if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
+    let { displayName, username, avatar, bio } = req.body;
+    displayName = (displayName || username || '').trim();
+    if (!displayName) return res.status(400).json({ error: 'Введи имя' });
+    if (displayName.length < 1) return res.status(400).json({ error: 'Имя минимум 1 символ' });
+    if (displayName.length > 20) return res.status(400).json({ error: 'Имя максимум 20 символов' });
     avatar = (avatar||'').toString().slice(0, 512*1024);
     bio = (bio||'').toString().slice(0,120);
-    const user = { username, avatar: avatar || '😎', bio: bio || '' };
+    const user = { displayName, avatar: avatar || '', bio: bio || '' };
     if (db.isEnabled()) {
       try{
-        const created = await db.createAccount(user);
+        const created = await db.createAccount({ displayName, avatar: user.avatar, bio: user.bio });
         const token = makeToken(created.id);
-        return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
+        return res.json({ token, displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
       }catch(dbErr){ console.error('DB createAccount failed, fallback to ephemeral:', dbErr.message); }
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
+    ephemeralUsers.set(id, { id, displayName, avatar: user.avatar, bio: user.bio });
     const token = makeToken(id);
-    res.json({ token, username, avatar: user.avatar, bio: user.bio });
+    res.json({ token, displayName, avatar: user.avatar, bio: user.bio });
   }catch(e){ console.error('/api/auth error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -191,32 +191,32 @@ app.post('/api/logout', async (req, res) => {
 
 app.post('/api/register', async (req, res) => {
   try{
-    const { username, avatar, bio } = req.body;
-    let u = (username||'').trim();
-    if (!u) return res.status(400).json({ error: 'Введи username' });
-    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+    const { displayName, username, avatar, bio } = req.body;
+    let d = (displayName || username || '').trim();
+    if (!d) return res.status(400).json({ error: 'Введи имя' });
+    const user = { displayName: d, avatar: avatar||'', bio: bio||'' };
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
-    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio });
   }catch(e){ console.error('/api/register error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 app.post('/api/login', async (req, res) => {
   try{
-    const { username, avatar, bio } = req.body;
-    let u = (username||'').trim();
-    if (!u) return res.status(400).json({ error: 'Введи username' });
-    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+    const { displayName, username, avatar, bio } = req.body;
+    let d = (displayName || username || '').trim();
+    if (!d) return res.status(400).json({ error: 'Введи имя' });
+    const user = { displayName: d, avatar: avatar||'', bio: bio||'' };
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
-    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio });
   }catch(e){ console.error('/api/login error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -228,11 +228,13 @@ app.post('/api/auth/register-email', async (req, res) => {
   try {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     if (!checkRateLimit(ip, 5, 300000)) return res.status(429).json({ error: 'Слишком много регистраций. Подожди 5 минут.' });
-    let { username, email, password } = req.body;
-    username = (username || '').trim();
+    let { displayName, username, email, password } = req.body;
+    displayName = (displayName || '').trim();
+    username = (username || '').trim().toLowerCase();
     email = (email || '').trim().toLowerCase();
     password = password || '';
-    if (!username || username.length < 1 || username.length > 20) return res.status(400).json({ error: 'Username 1-20 символов' });
+    if (!displayName || displayName.length < 1 || displayName.length > 20) return res.status(400).json({ error: 'Имя 1-20 символов' });
+    if (!username || !/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20 символов: a-z, 0-9, _' });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
 
@@ -242,23 +244,24 @@ app.post('/api/auth/register-email', async (req, res) => {
       const existingEmail = await db.getUserByEmail(email);
       if (existingEmail) return res.status(400).json({ error: 'Email уже зарегистрирован' });
       const existingUser = await db.getUserByUsername(username);
-      if (existingUser) return res.status(400).json({ error: 'Этот ник уже занят' });
-      const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
+      if (existingUser) return res.status(400).json({ error: 'Это имя пользователя уже занято' });
+      const { user, verifyToken } = await db.createAccountWithAuth({ displayName, username, email, password });
       await db.setVerifyToken(user.id, code);
       const device = detectDevice(req.headers['user-agent']);
-      const emailSent = await sendVerifyCode(email, code, username, device);
+      const emailSent = await sendVerifyCode(email, code, displayName, device);
       const token = makeToken(user.id);
-      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false, codeSent: emailSent });
+      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email, emailVerified: false, codeSent: emailSent });
     }
 
     // ephemeral mode — auto-verify (no real email delivery)
     if (ephemeralEmailUsers.has(email)) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+    if ([...ephemeralEmailUsers.values()].some(u=>u.username===username)) return res.status(400).json({ error: 'Это имя пользователя уже занято' });
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const passwordHash = await bcrypt.hash(password, 10);
-    ephemeralEmailUsers.set(email, { id, username, email, passwordHash, avatar: '😎', bio: '', emailVerified: false, verifyCode: code });
+    ephemeralEmailUsers.set(email, { id, displayName, username, email, passwordHash, avatar: '', bio: '', emailVerified: false, verifyCode: code });
     console.log(`[AUTH] Код для ${email}: ${code}`);
     const token = makeToken(id);
-    res.json({ token, username, avatar: '😎', bio: '', emailVerified: false, codeSent: false });
+    res.json({ token, displayName, username, avatar: '', bio: '', email, emailVerified: false, codeSent: false });
   } catch (e) {
     console.error('Register error:', e);
     res.status(500).json({ error: 'Ошибка регистрации' });
@@ -278,7 +281,7 @@ app.post('/api/auth/login-email', async (req, res) => {
       const user = await db.verifyPassword(email, password);
       if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
       const token = makeToken(user.id);
-      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
+      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email: user.email, emailVerified: user.email_verified });
     }
 
     // ephemeral mode
@@ -287,7 +290,7 @@ app.post('/api/auth/login-email', async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const token = makeToken(user.id);
-    res.json({ token, username: user.username, avatar: user.avatar, bio: user.bio, emailVerified: user.emailVerified });
+    res.json({ token, displayName: user.displayName, username: user.username, avatar: user.avatar, bio: user.bio, email: user.email, emailVerified: user.emailVerified });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Ошибка входа' });
@@ -398,33 +401,62 @@ app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false });
+  const isGuest = !user.email;
+  res.json({ displayName: user.display_name || user.displayName || user.username, username: user.username || null, avatar: user.avatar || '', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false, isGuest });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const { rows } = await db.pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
-    if (rows[0]) return res.json({ username: rows[0].username, avatar: rows[0].avatar || '😎', bio: rows[0].bio || '' });
+    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    if (rows[0]) return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '' });
   }
-  const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
-  res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
+  const u = [...ephemeralUsers.values()].find(x=> (x.username && x.username.toLowerCase()===req.params.username.toLowerCase()) || x.displayName===req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
+  res.json({ displayName: u.displayName || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '' });
 });
 app.put('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  let { username, avatar, bio } = req.body;
-  username = (username||'').trim() || user.username;
+  let { displayName, username, avatar, bio } = req.body;
+  const isGuest = !user.email;
+  if (isGuest && username) return res.status(403).json({ error: 'Гости не могут менять username' });
+  displayName = displayName !== undefined ? displayName.trim() : (user.display_name || user.displayName || user.username);
+  if (!displayName || displayName.length<1 || displayName.length>20) return res.status(400).json({ error: 'Имя 1-20 символов' });
+  if (!isGuest && username !== undefined) {
+    username = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20: a-z, 0-9, _' });
+    if (username !== (user.username||'').toLowerCase()) {
+      let exists=null;
+      if (db.isEnabled()) exists = await db.getUserByUsername(username);
+      else exists = [...ephemeralEmailUsers.values()].find(u=>u.username===username);
+      if (exists && exists.id !== user.id) return res.status(400).json({ error: 'Это имя пользователя уже занято' });
+    }
+  } else {
+    username = user.username;
+  }
   avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
   bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
   if (db.isEnabled()) {
-    await db.updateUserProfileById(user.id, { username, avatar, bio });
+    await db.updateUserProfileById(user.id, { displayName, username, avatar, bio });
     const updated = await db.getUserById(user.id);
     const newToken = makeToken(user.id);
-    return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+    return res.json({ displayName: updated.display_name, username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
   }
-  ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
+  if (!isGuest) {
+    // email ephemeral
+    const entry = [...ephemeralEmailUsers.entries()].find(([k,v])=>v.id===user.id);
+    if (entry) {
+      const [email, obj] = entry;
+      obj.displayName = displayName;
+      obj.username = username;
+      obj.avatar = avatar || '';
+      obj.bio = bio || '';
+      ephemeralEmailUsers.set(email, obj);
+    }
+  } else {
+    ephemeralUsers.set(user.id, { id: user.id, displayName, avatar: avatar || '', bio: bio || '' });
+  }
   const newToken = makeToken(user.id);
-  res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
+  res.json({ displayName, username, avatar: avatar || '', bio: bio || '', token: newToken });
 });
 app.get('/api/check-username', (req, res) => {
   res.json({ available: true });
@@ -771,6 +803,9 @@ app.use((err, req, res, next) => {
 });
 
 app.get('/privacy', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','privacy.html'));
+});
+app.get('/pricavy', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','privacy.html'));
 });
 

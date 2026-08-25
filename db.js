@@ -59,6 +59,11 @@ async function initSchema() {
   if (!existing.includes('verify_token')) await pool.query('ALTER TABLE users ADD COLUMN verify_token VARCHAR(64)');
   if (!existing.includes('reset_token')) await pool.query('ALTER TABLE users ADD COLUMN reset_token VARCHAR(64)');
   if (!existing.includes('reset_expires')) await pool.query('ALTER TABLE users ADD COLUMN reset_expires TIMESTAMP');
+  if (!existing.includes('display_name')) await pool.query('ALTER TABLE users ADD COLUMN display_name VARCHAR(64)');
+  // ensure username is lowercase unique index
+  try { await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username))'); } catch {}
+  // backfill display_name for old rows
+  try { await pool.query("UPDATE users SET display_name = username WHERE display_name IS NULL OR display_name = ''"); } catch {}
 }
 
 function genId() {
@@ -73,7 +78,7 @@ function genToken() {
 
 async function getUserById(id) {
   const { rows } = await pool.query(
-    'SELECT id, username, email, avatar, bio, email_verified FROM users WHERE id=$1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified FROM users WHERE id=$1',
     [id]
   );
   return rows[0] || null;
@@ -81,18 +86,31 @@ async function getUserById(id) {
 
 async function getUserByUsername(username) {
   const { rows } = await pool.query(
-    'SELECT id, username, email, avatar, bio, email_verified FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1',
     [username]
   );
   return rows[0] || null;
 }
 
-async function createAccount({ username, avatar, bio }) {
+function isValidHandle(s){ return /^[a-z0-9_]{3,20}$/.test(s); }
+
+async function createAccount({ displayName, username, avatar, bio }) {
+  // guest: only displayName, generate fallback username if not provided
+  const handle = username ? username.toLowerCase() : null;
+  const dname = (displayName || username || 'guest').slice(0,20);
   const id = genId();
-  await pool.query(
-    'INSERT INTO users (id, username, avatar, bio) VALUES ($1,$2,$3,$4)',
-    [id, username, avatar || '\uD83D\uDE0E', bio || '']
-  );
+  if (handle) {
+    await pool.query(
+      'INSERT INTO users (id, username, display_name, avatar, bio) VALUES ($1,$2,$3,$4,$5)',
+      [id, handle, dname, avatar || '', bio || '']
+    );
+  } else {
+    // guest fallback - should not hit DB when enabled, but keep for compat
+    await pool.query(
+      'INSERT INTO users (id, username, display_name, avatar, bio) VALUES ($1,$2,$3,$4,$5)',
+      [id, 'guest_'+id.slice(0,6), dname, avatar || '', bio || '']
+    );
+  }
   return getUserById(id);
 }
 
@@ -100,8 +118,17 @@ async function deleteAccount(id) {
   await pool.query('DELETE FROM users WHERE id=$1', [id]);
 }
 
-async function updateUserProfileById(id, { username, avatar, bio }) {
-  await pool.query('UPDATE users SET username=$1, avatar=$2, bio=$3 WHERE id=$4', [username, avatar || '\uD83D\uDE0E', bio || '', id]);
+async function updateUserProfileById(id, { displayName, username, avatar, bio }) {
+  const fields = [];
+  const vals = [];
+  let idx=1;
+  if (displayName !== undefined) { fields.push(`display_name=$${idx++}`); vals.push(displayName.slice(0,20)); }
+  if (username !== undefined) { fields.push(`username=$${idx++}`); vals.push(username.toLowerCase()); }
+  if (avatar !== undefined) { fields.push(`avatar=$${idx++}`); vals.push(avatar || ''); }
+  if (bio !== undefined) { fields.push(`bio=$${idx++}`); vals.push((bio||'').slice(0,120)); }
+  if (!fields.length) return getUserById(id);
+  vals.push(id);
+  await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id=$${idx}`, vals);
   return getUserById(id);
 }
 
@@ -111,7 +138,7 @@ async function countUsers() {
 }
 
 async function getAllUsers() {
-  const { rows } = await pool.query('SELECT id, username, email, avatar, bio, email_verified, created_at FROM users ORDER BY created_at DESC');
+  const { rows } = await pool.query('SELECT id, username, display_name, email, avatar, bio, email_verified, created_at FROM users ORDER BY created_at DESC');
   return rows;
 }
 
@@ -119,19 +146,21 @@ async function getAllUsers() {
 
 async function getUserByEmail(email) {
   const { rows } = await pool.query(
-    'SELECT id, username, email, password_hash, avatar, bio, email_verified, verify_token, reset_token, reset_expires FROM users WHERE email=$1 LIMIT 1',
+    'SELECT id, username, display_name, email, password_hash, avatar, bio, email_verified, verify_token, reset_token, reset_expires FROM users WHERE email=$1 LIMIT 1',
     [email]
   );
   return rows[0] || null;
 }
 
-async function createAccountWithAuth({ username, email, password }) {
+async function createAccountWithAuth({ displayName, username, email, password }) {
   const id = genId();
   const passwordHash = await bcrypt.hash(password, 10);
   const verifyToken = genToken();
+  const dname = (displayName || username).slice(0,20);
+  const handle = username.toLowerCase();
   await pool.query(
-    'INSERT INTO users (id, username, email, password_hash, verify_token) VALUES ($1,$2,$3,$4,$5)',
-    [id, username, email, passwordHash, verifyToken]
+    'INSERT INTO users (id, username, display_name, email, password_hash, verify_token) VALUES ($1,$2,$3,$4,$5,$6)',
+    [id, handle, dname, email, passwordHash, verifyToken]
   );
   return { user: await getUserById(id), verifyToken };
 }
@@ -194,5 +223,5 @@ module.exports = {
   countUsers, getAllUsers,
   setVerifyToken, verifyEmail, verifyEmailByCode,
   setResetToken, resetPassword, verifyPassword,
-  genToken, genId
+  genToken, genId, isValidHandle
 };

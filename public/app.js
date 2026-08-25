@@ -25,7 +25,18 @@ function showError(el, msg){
 function hideError(el){ el.classList.remove('show'); }
 
 function token(){ return localStorage.getItem('rave_token'); }
-function setToken(t, u, ava, bio){ localStorage.setItem('rave_token', t); localStorage.setItem('rave_user', u); if(ava) localStorage.setItem('rave_ava', ava); if(bio!==undefined) localStorage.setItem('rave_bio', bio); }
+function setToken(t, displayName, username, ava, bio){
+  if (bio===undefined){
+    bio=ava; ava=username; username=displayName; displayName=username;
+  }
+  localStorage.setItem('rave_token', t);
+  if(displayName) localStorage.setItem('rave_display', displayName);
+  if(username) localStorage.setItem('rave_user', username);
+  if(ava!==undefined) localStorage.setItem('rave_ava', ava||'');
+  if(bio!==undefined) localStorage.setItem('rave_bio', bio||'');
+}
+function getDisplayName(){ return localStorage.getItem('rave_display') || localStorage.getItem('rave_user') || 'гость'; }
+function getUsername(){ return localStorage.getItem('rave_user') || ''; }
 async function logout(){
   const t = token();
   if(t){
@@ -33,12 +44,14 @@ async function logout(){
   }
   localStorage.removeItem('rave_token');
   localStorage.removeItem('rave_user');
+  localStorage.removeItem('rave_display');
+  localStorage.removeItem('rave_email');
   localStorage.removeItem('rave_ava');
   localStorage.removeItem('rave_bio');
   location.reload();
 }
 
-let currentAvatar='😎', currentBio='', currentUsername='';
+let currentAvatar='', currentBio='', currentUsername='', currentDisplayName='';
 function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
 function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
 const T={
@@ -125,8 +138,8 @@ async function checkAuth(){
     const r = await fetch('/api/me', { headers:{ Authorization:'Bearer '+t }});
     if(!r.ok) throw new Error();
     const j = await r.json();
-    currentAvatar=j.avatar||localStorage.getItem('rave_ava')||'😎'; currentBio=j.bio||''; currentUsername=j.username;
-    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio);
+    currentAvatar=j.avatar||localStorage.getItem('rave_ava')||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||j.username||localStorage.getItem('rave_display')||currentUsername;
+    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||'');
     if(!j.emailVerified && j.email){
       showAuth();
       inVerification=true;
@@ -139,7 +152,7 @@ async function checkAuth(){
       document.getElementById('authError').style.display='none';
       authSuccessEl.style.display='';
     } else {
-      showLobby(j.username, currentAvatar);
+      showLobby(currentDisplayName, currentAvatar);
     }
   }catch{ showAuth(); }
 }
@@ -168,13 +181,15 @@ function renderAvaLargeEl(el, ava){
   else { el.textContent=ava; el.classList.remove('has-photo'); }
 }
 
-function showLobby(username, avatar){
-  avatar=avatar||localStorage.getItem('rave_ava')||'😎';
+function showLobby(displayName, avatar){
+  avatar=avatar||localStorage.getItem('rave_ava')||'';
+  const nameForLetter = displayName || getDisplayName() || 'Г';
   authScreen.style.display='none';
   lobby.classList.add('show');
-  const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : avatar;
-  const avaCls = isPhoto(avatar) ? ' has-photo' : '';
-  navRight.innerHTML = `<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button><button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль">${avaHtml}</button><button class="btn-ghost" id="logoutBtn">${isEn()?'Logout':'Выйти'}</button>`;
+  const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : letterFor(nameForLetter);
+  const avaCls = isPhoto(avatar) ? ' has-photo letter-avatar' : ' letter-avatar';
+  const bg = isPhoto(avatar) ? '' : ` style="background:${avatarBg(nameForLetter)};color:#fff;"`;
+  navRight.innerHTML = `<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button><button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">${isEn()?'Logout':'Выйти'}</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
   $('#langToggle').onclick = toggleLang;
@@ -192,6 +207,7 @@ const tabEmail=document.getElementById('tabEmail');
 const tabQuick=document.getElementById('tabQuick');
 const emailFields=document.getElementById('emailFields');
 const regUsernameField=document.getElementById('regUsernameField');
+const regDisplayNameField=document.getElementById('regDisplayNameField');
 const authEmailEl=document.getElementById('authEmail');
 const authPasswordEl=document.getElementById('authPassword');
 const authBtnEl=document.getElementById('authBtn');
@@ -240,7 +256,8 @@ if(switchToReg){
   switchToReg.onclick=(e)=>{
     e.preventDefault();
     authMode='login';
-    regUsernameField.style.display='none';
+    if(regUsernameField) regUsernameField.style.display='none';
+    if(regDisplayNameField) regDisplayNameField.style.display='none';
     authBtnEl.textContent=t('Войти');
     authSwitchEl.innerHTML=t('Нет аккаунта?')+' <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">'+t('Зарегистрироваться')+'</a>';
     const authTitle=document.getElementById('authTitle');
@@ -250,7 +267,8 @@ if(switchToReg){
     document.getElementById('switchToLogin').onclick=(e)=>{
       e.preventDefault();
       authMode='register';
-      regUsernameField.style.display='';
+      if(regUsernameField) regUsernameField.style.display='';
+      if(regDisplayNameField) regDisplayNameField.style.display='';
       authBtnEl.textContent=t('Зарегистрироваться');
       authSwitchEl.innerHTML=t('Уже есть аккаунт?')+' <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">'+t('Войти')+'</a>';
       document.getElementById('switchToReg').onclick=switchToReg.onclick;
@@ -295,13 +313,16 @@ if(authBtnEl){
     authBtnEl.disabled=true;
     try{
       if(authMode==='register'){
-        const username=(document.getElementById('regUsername')?.value||'').trim();
-        if(!username) return showError(authError,'Введите ник');
-        if(username.length>20) return showError(authError,'Ник максимум 20 символов');
-        const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password})});
+        const displayName=(document.getElementById('regDisplayName')?.value||'').trim();
+        const username=(document.getElementById('regUsername')?.value||'').trim().toLowerCase();
+        if(!displayName) return showError(authError,'Введите имя');
+        if(displayName.length>20) return showError(authError,'Имя максимум 20 символов');
+        if(!username) return showError(authError,'Введите имя пользователя');
+        if(!/^[a-z0-9_]{3,20}$/.test(username)) return showError(authError,'Имя пользователя 3-20: a-z, 0-9, _');
+        const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName,username,email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
-        currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
+        currentAvatar=j.avatar||''; currentBio=j.bio||''; currentUsername=j.username; currentDisplayName=j.displayName||displayName;
         if(!j.emailVerified){
           window._pendingToken=j.token;
           window._pendingVerifyEmail=email;
@@ -310,18 +331,20 @@ if(authBtnEl){
           authBtnEl.parentElement.style.display='none';
           authSwitchEl.style.display='none';
           forgotLink.style.display='none';
+          const dField=document.getElementById('regDisplayNameField'); if(dField) dField.style.display='none';
           if(regUsernameField) regUsernameField.style.display='none';
           document.getElementById('authError').style.display='none';
           authSuccessEl.style.display='';
         } else {
-          setToken(j.token,j.username,j.avatar,j.bio);
-          showLobby(j.username,currentAvatar);
+          setToken(j.token,j.displayName||displayName,j.username,j.avatar,j.bio);
+          localStorage.setItem('rave_email', j.email||email);
+          showLobby(j.displayName||displayName,currentAvatar);
         }
       } else {
         const r=await fetch('/api/auth/login-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
-        currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
+        currentAvatar=j.avatar||''; currentBio=j.bio||''; currentUsername=j.username; currentDisplayName=j.displayName||j.username;
         if(!j.emailVerified){
           window._pendingToken=j.token;
           window._pendingVerifyEmail=email;
@@ -333,8 +356,9 @@ if(authBtnEl){
           document.getElementById('authError').style.display='none';
           authSuccessEl.style.display='';
         } else {
-          setToken(j.token,j.username,j.avatar,j.bio);
-          showLobby(j.username,currentAvatar);
+          setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio);
+          localStorage.setItem('rave_email', j.email||email);
+          showLobby(j.displayName||j.username,currentAvatar);
         }
       }
     }catch(e){ showError(authError,e.message); }
@@ -374,9 +398,10 @@ if(verifyCodeBtn){
       const j=await r.json();
       if(!r.ok) throw new Error(j.error||'Ошибка');
       inVerification=false;
-      setToken(window._pendingToken,currentUsername,currentAvatar,currentBio);
+      setToken(window._pendingToken,currentDisplayName||currentUsername,currentUsername,currentAvatar,currentBio);
+      if(window._pendingVerifyEmail) localStorage.setItem('rave_email', window._pendingVerifyEmail);
       window._pendingToken=null;
-      showLobby(currentUsername,currentAvatar);
+      showLobby(currentDisplayName||currentUsername,currentAvatar);
     }catch(e){ verifyCodeError.textContent=e.message; verifyCodeError.style.display=''; }
     finally{ verifyCodeBtn.disabled=false; }
   };
@@ -413,19 +438,21 @@ const quickAuthBtn=document.getElementById('quickAuthBtn');
 if(quickAuthBtn){
   quickAuthBtn.onclick=async()=>{
     hideError(authError);
-    const username=usernameEl.value.trim();
-    if(!username) return showError(authError,'Введи ник');
+    const displayName=usernameEl.value.trim();
+    if(!displayName) return showError(authError,'Введи имя');
+    if(displayName.length>20) return showError(authError,'Имя максимум 20 символов');
     quickAuthBtn.disabled=true;
     try{
-      const ava=localStorage.getItem('rave_ava')||'😎';
+      const ava=localStorage.getItem('rave_ava')||'';
       const bio=localStorage.getItem('rave_bio')||'';
-      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,avatar:ava,bio})});
+      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName,avatar:ava,bio})});
       const txt=await r.text();
       let j; try{ j=JSON.parse(txt); }catch{ throw new Error(txt||'Ошибка сервера'); }
       if(!r.ok) throw new Error(j.error||'Ошибка');
-      setToken(j.token,j.username,j.avatar,j.bio);
-      currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
-      showLobby(j.username,currentAvatar);
+      setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio);
+      currentAvatar=j.avatar||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||displayName;
+      localStorage.removeItem('rave_email');
+      showLobby(j.displayName||displayName,currentAvatar);
     }catch(e){ showError(authError,e.message); }
     finally{ quickAuthBtn.disabled=false; }
   };
@@ -537,50 +564,109 @@ $('#joinBtn').onclick = async ()=>{
 };
 $('#joinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#joinBtn').click(); });
 
-// --- profile ---
+// --- profile (view + edit) ---
 const profileModal=$('#profileModal');
+const editModal=$('#editModal');
 const pAvaLarge=$('#pAvaLarge');
+const eAvaLarge=document.getElementById('eAvaLarge');
 const pUsername=$('#pUsername');
+const eUsername=document.getElementById('eUsername');
+const eDisplayName=document.getElementById('eDisplayName');
 const pBio=$('#pBio');
 const pError=$('#pError');
 const pSave=$('#pSave');
 const pLogout=$('#pLogout');
 const bioCount=$('#bioCount');
 const avatarFile=$('#avatarFile');
-const uploadAvaBtn=$('#uploadAvaBtn');
+const changePhotoLink=document.getElementById('changePhotoLink');
+const openEditBtn=document.getElementById('openEditBtn');
+const editCancel=document.getElementById('editCancel');
+const editDone=document.getElementById('editDone');
+const pViewDisplayName=document.getElementById('pViewDisplayName');
+const pViewUsername=document.getElementById('pViewUsername');
+const pViewBio=document.getElementById('pViewBio');
 let selectedAva='';
 
+function letterFor(name){ return (name||'?').trim()[0]?.toUpperCase() || '?'; }
+function avatarBg(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return `hsl(${h}, 62%, 42%)`; }
+
+// override render helpers for letter avatar
+const _origRenderAvaLargeEl = typeof renderAvaLargeEl !== 'undefined' ? renderAvaLargeEl : null;
+function renderAvaLargeElNew(el, ava, fallback){
+  if(!el) return;
+  if(isPhoto(ava)){
+    el.innerHTML=`<img src="${ava}" alt="">`;
+    el.style.background=''; el.textContent='';
+    el.classList.add('has-photo');
+  } else {
+    const name = fallback || currentDisplayName || currentUsername || '?';
+    el.textContent=letterFor(name);
+    el.style.background=avatarBg(name);
+    el.innerHTML=''; el.appendChild(document.createTextNode(letterFor(name)));
+    el.style.backgroundColor=avatarBg(name);
+    el.classList.remove('has-photo');
+    // ensure no image
+    el.style.backgroundImage='none';
+  }
+}
+// patch global renderAvaLargeEl
+if (typeof window !== 'undefined') window.renderAvaLargeEl = renderAvaLargeElNew;
+
 function openProfile(){
-  const ava=localStorage.getItem('rave_ava')||currentAvatar||'😎';
+  // fetch fresh me to show correct data
+  const ava=localStorage.getItem('rave_ava')||currentAvatar||'';
   const bio=localStorage.getItem('rave_bio')||currentBio||'';
-  const uname=localStorage.getItem('rave_user')||currentUsername||'';
+  const disp=localStorage.getItem('rave_display')||currentDisplayName||currentUsername||'';
+  const handle=localStorage.getItem('rave_user')||currentUsername||'';
+  const email = localStorage.getItem('rave_email') || ''; // may not be stored, fallback via checkAuth
+  // guest detection: no handle? Actually guest has display but no handle? For guest handle is maybe empty
+  const isGuest = !handle || handle.startsWith('guest_') || !localStorage.getItem('rave_token') || false; // will refine via /api/me isGuest
   selectedAva=ava;
-  renderAvaLargeEl(pAvaLarge, ava);
-  pUsername.value=uname;
-  pBio.value=bio;
-  bioCount.textContent=bio.length;
+  if(pViewDisplayName) pViewDisplayName.textContent=disp||'?';
+  if(pViewUsername) pViewUsername.textContent= handle ? '@'+handle : 'гость';
+  if(pViewBio) pViewBio.textContent=bio||'—';
+  // avatar view
+  renderAvaLargeElNew(pAvaLarge, ava, disp);
+  renderAvaLargeElNew(eAvaLarge, ava, disp);
   hideError(pError);
-  document.querySelectorAll('#avaGrid button').forEach(b=>{
-    b.classList.toggle('active', !isPhoto(ava) && b.dataset.ava===ava);
-  });
+  // show edit button only for own & not guest (check isGuest via email handle)
+  // we rely on last checkAuth isGuest flag - fetch quick
+  fetch('/api/me', { headers:{ Authorization:'Bearer '+token() }}).then(r=>r.json()).then(j=>{
+    const guest = j.isGuest;
+    if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
+  }).catch(()=>{ if(openEditBtn) openEditBtn.style.display=''; });
   profileModal.classList.add('show');
 }
 function closeProfile(){ profileModal.classList.remove('show'); }
+function openEdit(){
+  const ava=localStorage.getItem('rave_ava')||currentAvatar||'';
+  const bio=localStorage.getItem('rave_bio')||currentBio||'';
+  const disp=localStorage.getItem('rave_display')||currentDisplayName||'';
+  const handle=localStorage.getItem('rave_user')||currentUsername||'';
+  selectedAva=ava;
+  if(eDisplayName) eDisplayName.value=disp;
+  if(eUsername) eUsername.value=handle;
+  if(pBio) pBio.value=bio;
+  if(bioCount) bioCount.textContent=bio.length;
+  const eEmail=document.getElementById('eEmail');
+  if(eEmail){
+    const em = localStorage.getItem('rave_email')||''; // we will store on login
+    eEmail.textContent = em || '—';
+  }
+  renderAvaLargeElNew(eAvaLarge, ava, disp);
+  hideError(pError);
+  profileModal.classList.remove('show');
+  if(editModal) editModal.classList.add('show');
+}
+function closeEdit(){ if(editModal) editModal.classList.remove('show'); }
 profileModal.addEventListener('click', e=>{ if(e.target===profileModal) closeProfile(); });
-
-document.querySelectorAll('#avaGrid button').forEach(b=>{
-  b.onclick=()=>{
-    selectedAva=b.dataset.ava;
-    renderAvaLargeEl(pAvaLarge, selectedAva);
-    document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
-    b.classList.add('active');
-  };
-});
-pBio.addEventListener('input', ()=> bioCount.textContent=pBio.value.length);
-pLogout.onclick=logout;
-
-// photo upload
-uploadAvaBtn.onclick=()=> avatarFile.click();
+if(editModal) editModal.addEventListener('click', e=>{ if(e.target===editModal) closeEdit(); });
+if(openEditBtn) openEditBtn.onclick=openEdit;
+if(editCancel) editCancel.onclick=()=>{ closeEdit(); openProfile(); };
+if(editDone) editDone.onclick=()=> document.getElementById('pSave')?.click();
+if(changePhotoLink) changePhotoLink.onclick=()=> avatarFile.click();
+if(pBio) pBio.addEventListener('input', ()=> { if(bioCount) bioCount.textContent=pBio.value.length; });
+if(pLogout) pLogout.onclick=logout;
 avatarFile.onchange=()=>{
   const file=avatarFile.files[0];
   if(!file) return;
@@ -589,6 +675,12 @@ avatarFile.onchange=()=>{
   const reader=new FileReader();
   reader.onload=()=>{
     let dataUrl=reader.result;
+    const apply=(d)=>{
+      selectedAva=d;
+      renderAvaLargeElNew(pAvaLarge, d, eDisplayName?.value || currentDisplayName);
+      renderAvaLargeElNew(eAvaLarge, d, eDisplayName?.value || currentDisplayName);
+      hideError(pError);
+    };
     if(dataUrl.length>400*1024){
       const img=new Image();
       img.onload=()=>{
@@ -601,17 +693,12 @@ avatarFile.onchange=()=>{
         ctx.drawImage(img,0,0,w,h);
         dataUrl=canvas.toDataURL('image/jpeg',0.75);
         if(dataUrl.length>500*1024){ showError(pError,'Фото слишком большое после сжатия'); return; }
-        selectedAva=dataUrl;
-        renderAvaLargeEl(pAvaLarge, selectedAva);
-        document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
+        apply(dataUrl);
       };
       img.src=dataUrl;
     } else {
-      selectedAva=dataUrl;
-      renderAvaLargeEl(pAvaLarge, selectedAva);
-      document.querySelectorAll('#avaGrid button').forEach(x=> x.classList.remove('active'));
+      apply(dataUrl);
     }
-    hideError(pError);
   };
   reader.readAsDataURL(file);
   avatarFile.value='';
@@ -619,29 +706,41 @@ avatarFile.onchange=()=>{
 
 pSave.onclick=async()=>{
   hideError(pError);
-  const newName=pUsername.value.trim();
+  const newDisplay=(document.getElementById('eDisplayName')?.value||'').trim();
+  const newHandle=(document.getElementById('eUsername')?.value||'').trim().toLowerCase();
   const newBio=pBio.value.trim();
-  if(!newName) return showError(pError,'Ник не может быть пустым');
-  if(newName.length>20) return showError(pError,'Максимум 20 символов');
+  if(!newDisplay) return showError(pError,'Имя не может быть пустым');
+  if(newDisplay.length>20) return showError(pError,'Максимум 20 символов');
+  if(!newHandle) return showError(pError,'Введите имя пользователя');
+  if(!/^[a-z0-9_]{3,20}$/.test(newHandle)) return showError(pError,'Имя пользователя 3-20: a-z, 0-9, _');
   pSave.disabled=true; pSave.textContent='Сохранение...';
   try{
     const r=await fetch('/api/me', {
       method:'PUT',
       headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token() },
-      body: JSON.stringify({ username:newName, avatar:selectedAva, bio:newBio })
+      body: JSON.stringify({ displayName:newDisplay, username:newHandle, avatar:selectedAva, bio:newBio })
     });
     const j=await r.json();
     if(!r.ok) throw new Error(j.error||'Ошибка');
     localStorage.setItem('rave_token', j.token);
+    localStorage.setItem('rave_display', j.displayName);
     localStorage.setItem('rave_user', j.username);
     localStorage.setItem('rave_ava', j.avatar);
     localStorage.setItem('rave_bio', j.bio);
-    currentAvatar=j.avatar; currentBio=j.bio; currentUsername=j.username;
+    currentAvatar=j.avatar; currentBio=j.bio; currentUsername=j.username; currentDisplayName=j.displayName;
     const avaBtn=document.getElementById('profileBtn');
-    if(avaBtn) renderAvaBtn(avaBtn, j.avatar);
+    if(avaBtn){
+      if(isPhoto(j.avatar)) avaBtn.innerHTML=`<img src="${j.avatar}" alt="">`, avaBtn.classList.add('has-photo');
+      else { avaBtn.textContent=letterFor(j.displayName); avaBtn.style.background=avatarBg(j.displayName); avaBtn.classList.remove('has-photo'); }
+    }
     const bEl=document.querySelector('.nav-right b');
-    if(bEl) bEl.textContent=j.username;
+    if(bEl) bEl.textContent=j.displayName;
+    if(editModal) editModal.classList.remove('show');
     closeProfile();
+    // update view if still open
+    if(pViewDisplayName) pViewDisplayName.textContent=j.displayName;
+    if(pViewUsername) pViewUsername.textContent='@'+j.username;
+    if(pViewBio) pViewBio.textContent=j.bio||'—';
   }catch(e){ showError(pError, e.message); }
   finally{ pSave.disabled=false; pSave.textContent='Сохранить'; }
 };

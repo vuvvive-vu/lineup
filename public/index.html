@@ -31,9 +31,17 @@
       <!-- Email auth -->
       <div id="tabEmail">
         <div id="emailFields">
+          <div class="field" id="regDisplayNameField">
+            <label>Имя</label>
+            <input id="regDisplayName" placeholder="например, Валентин" maxlength="20" />
+          </div>
           <div class="field" id="regUsernameField">
-            <label data-i18n="Ник">Ник</label>
-            <input id="regUsername" placeholder="твой ник" maxlength="20" data-i18n-placeholder="твой ник" />
+            <label>Имя пользователя</label>
+            <div class="handle-input" style="display:flex;align-items:center;background:#0a0a0a;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+              <span style="padding:12px 10px 12px 14px;color:var(--muted);font-weight:700;font-size:14px;border-right:1px solid var(--border);user-select:none;">@</span>
+              <input id="regUsername" placeholder="vuvvive" maxlength="20" style="border:none;flex:1;background:transparent;border-radius:0;" />
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">3-20: a-z, 0-9, _</div>
           </div>
           <div class="field">
             <label data-i18n="Почта">Почта</label>
@@ -50,11 +58,11 @@
         </div>
         <p class="hint" id="authSwitch"><span data-i18n="Уже есть аккаунт?">Уже есть аккаунт?</span> <a href="#" id="switchToReg" style="color:#fff;font-weight:600;" data-i18n="Войти">Войти</a></p>
       </div>
-      <!-- Quick auth (old style) -->
+      <!-- Quick auth (guest) -->
       <div id="tabQuick" style="display:none;">
         <div class="field">
-          <label data-i18n="Ник">Ник</label>
-          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" data-i18n-placeholder="например, anomalyco" />
+          <label>Имя</label>
+          <input id="username" placeholder="например, Валентин" autocomplete="username" maxlength="20" />
         </div>
         <button id="quickAuthBtn" class="btn-primary" data-i18n="Войти">Войти</button>
         </div>
@@ -182,36 +190,69 @@
     </div>
   </div>
 
-  <!-- PROFILE MODAL -->
+  <!-- PROFILE VIEW MODAL -->
   <div id="profileModal" class="modal-bg">
-    <div class="modal profile-modal">
-      <div class="modal-head">
-        <h3>Профиль</h3>
-        <button class="x" data-close="profileModal">✕</button>
+    <div class="modal profile-view-modal" style="max-width:380px;background:#0a0a0a;border:1px solid #232323;border-radius:24px;padding:0;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;">
+        <button class="x" data-close="profileModal" style="width:40px;height:40px;border-radius:999px;background:#161616;border:1px solid #232323;display:grid;place-items:center;">←</button>
+        <button id="openEditBtn" class="btn-ghost" style="border-radius:999px;padding:8px 16px;font-weight:700;display:none;">Изм.</button>
       </div>
-      <div class="profile-ava-wrap">
-        <div class="profile-ava-large" id="pAvaLarge">😎</div>
-        <div style="font-size:12px;color:var(--muted);">Выбери аватар или загрузи фото</div>
-        <div class="ava-grid" id="avaGrid">
-          <button data-ava="😎">😎</button><button data-ava="🦊">🦊</button><button data-ava="🐱">🐱</button><button data-ava="🚀">🚀</button><button data-ava="👑">👑</button><button data-ava="🎬">🎬</button><button data-ava="🍿">🍿</button><button data-ava="❤️">❤️</button>
-          <button data-ava="😈">😈</button><button data-ava="👾">👾</button><button data-ava="🌙">🌙</button><button data-ava="🔥">🔥</button><button data-ava="⚡">⚡</button><button data-ava="💀">💀</button><button data-ava="🌸">🌸</button><button data-ava="🍓">🍓</button>
+      <div style="text-align:center;padding:4px 24px 12px;">
+        <div id="pAvaLarge" class="profile-ava-large" style="width:96px;height:96px;margin:0 auto;font-size:36px;"></div>
+        <div id="pViewDisplayName" style="font-size:22px;font-weight:800;margin-top:14px;letter-spacing:-0.02em;"></div>
+        <div id="pViewOnline" style="font-size:13px;color:#9a9a9a;margin-top:4px;">в сети</div>
+      </div>
+      <div id="profileInfoCard" style="margin:16px;background:#161616;border:1px solid #232323;border-radius:20px;overflow:hidden;">
+        <div class="info-row" style="padding:14px 16px;border-bottom:1px solid #232323;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;">имя пользователя</div>
+          <div id="pViewUsername" style="font-size:15px;color:#4ade80;font-weight:600;margin-top:2px;">@...</div>
         </div>
-        <button class="btn-ghost" id="uploadAvaBtn" style="margin-top:10px;font-size:12px;padding:8px 16px;">📷 Загрузить фото</button>
+        <div class="info-row" style="padding:14px 16px;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;">о себе</div>
+          <div id="pViewBio" style="font-size:14px;color:#e5e5e5;margin-top:2px;white-space:pre-wrap;word-break:break-word;min-height:18px;">—</div>
+        </div>
+      </div>
+      <div style="height:12px;"></div>
+    </div>
+  </div>
+
+  <!-- PROFILE EDIT MODAL -->
+  <div id="editModal" class="modal-bg">
+    <div class="modal profile-modal" style="max-width:380px;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn-ghost" id="editCancel" style="border-radius:999px;padding:8px 14px;">Отмена</button>
+        <h3 style="font-size:16px;">Профиль</h3>
+        <button class="btn-ghost" id="editDone" style="border-radius:999px;padding:8px 14px;font-weight:700;">Готово</button>
+      </div>
+      <div class="profile-ava-wrap" style="margin-top:8px;">
+        <div class="profile-ava-large" id="eAvaLarge" style="width:96px;height:96px;font-size:36px;"></div>
+        <div id="changePhotoLink" style="font-size:14px;color:#4ade80;cursor:pointer;margin-top:10px;font-weight:600;">Изменить фотографию</div>
         <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">до 2MB • PNG, JPG, WEBP</div>
       </div>
-      <div class="field">
-        <label>Ник</label>
-        <input id="pUsername" placeholder="твой ник" maxlength="20" data-i18n-placeholder="твой ник" />
+      <div class="field" style="margin-top:18px;">
+        <label>Имя</label>
+        <input id="eDisplayName" placeholder="ваше имя" maxlength="20" />
       </div>
       <div class="field">
-        <label>Описание</label>
+        <label>Имя пользователя</label>
+        <div class="handle-input" style="display:flex;align-items:center;background:#0a0a0a;border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+          <span style="padding:12px 10px 12px 14px;color:var(--muted);font-weight:700;font-size:14px;border-right:1px solid var(--border);user-select:none;">@</span>
+          <input id="eUsername" placeholder="username" maxlength="20" style="border:none;flex:1;background:transparent;border-radius:0;" />
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">3-20: a-z, 0-9, _</div>
+      </div>
+      <div class="field">
+        <label>О себе</label>
         <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3" data-i18n-placeholder="пару слов о себе..."></textarea>
         <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px;"><span id="bioCount">0</span>/120</div>
       </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">почта: <span id="eEmail" style="color:#fff;"></span> (нельзя изменить)</div>
       <div id="pError" class="error"></div>
-      <button id="pSave" class="btn-primary">Сохранить</button>
+      <button id="pSave" class="btn-primary" style="margin-top:14px;">Сохранить</button>
       <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;">Выйти из аккаунта</button>
+      <!-- keep hidden old pUsername compat -->
+      <input id="pUsername" hidden />
     </div>
   </div>
 
