@@ -420,7 +420,8 @@ if(quickAuthBtn){
       const ava=localStorage.getItem('rave_ava')||'😎';
       const bio=localStorage.getItem('rave_bio')||'';
       const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,avatar:ava,bio})});
-      const j=await r.json();
+      const txt=await r.text();
+      let j; try{ j=JSON.parse(txt); }catch{ throw new Error(txt||'Ошибка сервера'); }
       if(!r.ok) throw new Error(j.error||'Ошибка');
       setToken(j.token,j.username,j.avatar,j.bio);
       currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
