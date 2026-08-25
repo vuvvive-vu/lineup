@@ -4,6 +4,9 @@ const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
+const { sendVerifyCode, sendResetEmail } = require('./email');
+
+function genCode() { return Math.floor(100000 + Math.random() * 900000).toString(); }
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +38,7 @@ let rooms = loadJson(ROOMS_FILE, {});
 
 // ephemeral users (fallback mode only, when DB is not connected)
 const ephemeralUsers = new Map();
+const ephemeralEmailUsers = new Map(); // email -> { id, username, email, passwordHash, avatar, bio, emailVerified }
 
 // init DB if DATABASE_URL is set (Render env var)
 db.initDb().catch(e => console.error('DB init error:', e.message));
@@ -112,169 +116,289 @@ function isValidVideoUrl(platform, url){
 
 // API - simplified auth: just username, always creates new account
 app.post('/api/auth', async (req, res) => {
-  try {
-    let { username, avatar, bio } = req.body;
-    username = (username||'').trim();
-    if (!username) return res.status(400).json({ error: 'Введи username' });
-    if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
-    if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
-    avatar = (avatar||'').toString().slice(0, 512*1024);
-    bio = (bio||'').toString().slice(0,120);
-    const user = { username, avatar: avatar || '😎', bio: bio || '' };
-    if (db.isEnabled()) {
-      const created = await db.createAccount(user);
-      const token = makeToken(created.id);
-      return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
-    }
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
-    const token = makeToken(id);
-    res.json({ token, username, avatar: user.avatar, bio: user.bio });
-  } catch (e) {
-    console.error('Auth error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера: ' + e.message });
+  let { username, avatar, bio } = req.body;
+  username = (username||'').trim();
+  if (!username) return res.status(400).json({ error: 'Введи username' });
+  if (username.length < 1) return res.status(400).json({ error: 'Username минимум 1 символ' });
+  if (username.length > 20) return res.status(400).json({ error: 'Username максимум 20 символов' });
+  avatar = (avatar||'').toString().slice(0, 512*1024);
+  bio = (bio||'').toString().slice(0,120);
+  const user = { username, avatar: avatar || '😎', bio: bio || '' };
+  if (db.isEnabled()) {
+    const created = await db.createAccount(user);
+    const token = makeToken(created.id);
+    return res.json({ token, username: created.username, avatar: created.avatar, bio: created.bio });
   }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  const token = makeToken(id);
+  res.json({ token, username, avatar: user.avatar, bio: user.bio });
 });
 
 app.post('/api/logout', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ','');
-    const user = await parseToken(token);
-    if (user && user.id) {
-      if (db.isEnabled()) {
-        await db.deleteAccount(user.id);
-      } else {
-        ephemeralUsers.delete(user.id);
-      }
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = await parseToken(token);
+  if (user && user.id) {
+    if (db.isEnabled()) {
+      await db.deleteAccount(user.id);
+    } else {
+      ephemeralUsers.delete(user.id);
     }
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('Logout error:', e.message);
-    res.json({ ok: true });
   }
+  res.json({ ok: true });
 });
 
 app.post('/api/register', async (req, res) => {
-  try {
-    const { username, avatar, bio } = req.body;
-    let u = (username||'').trim();
-    if (!u) return res.status(400).json({ error: 'Введи username' });
-    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
-    if (db.isEnabled()) {
-      const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
-    }
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
-    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
-  } catch (e) {
-    console.error('Register error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+  const { username, avatar, bio } = req.body;
+  let u = (username||'').trim();
+  if (!u) return res.status(400).json({ error: 'Введи username' });
+  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+  if (db.isEnabled()) {
+    const created = await db.createAccount(user);
+    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
   }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
 });
 app.post('/api/login', async (req, res) => {
+  const { username, avatar, bio } = req.body;
+  let u = (username||'').trim();
+  if (!u) return res.status(400).json({ error: 'Введи username' });
+  const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+  if (db.isEnabled()) {
+    const created = await db.createAccount(user);
+    return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+  }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  ephemeralUsers.set(id, { id, ...user });
+  res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+});
+
+// --- Email auth routes ---
+
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+
+app.post('/api/auth/register-email', async (req, res) => {
   try {
-    const { username, avatar, bio } = req.body;
-    let u = (username||'').trim();
-    if (!u) return res.status(400).json({ error: 'Введи username' });
-    const user = { username: u, avatar: avatar||'😎', bio: bio||'' };
+    let { username, email, password } = req.body;
+    username = (username || '').trim();
+    email = (email || '').trim().toLowerCase();
+    password = password || '';
+    if (!username || username.length < 1 || username.length > 20) return res.status(400).json({ error: 'Username 1-20 символов' });
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
+    if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+
+    const code = genCode();
+
     if (db.isEnabled()) {
-      const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), username: created.username, avatar: created.avatar, bio: created.bio });
+      const existing = await db.getUserByEmail(email);
+      if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+      const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
+      await db.setVerifyToken(user.id, code);
+      const emailSent = await sendVerifyCode(email, code);
+      const token = makeToken(user.id);
+      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false, codeSent: emailSent });
     }
+
+    // ephemeral mode — auto-verify (no real email delivery)
+    if (ephemeralEmailUsers.has(email)) return res.status(400).json({ error: 'Email уже зарегистрирован' });
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, ...user });
-    res.json({ token: makeToken(id), username: u, avatar: user.avatar, bio: user.bio });
+    const passwordHash = await bcrypt.hash(password, 10);
+    ephemeralEmailUsers.set(email, { id, username, email, passwordHash, avatar: '😎', bio: '', emailVerified: false, verifyCode: code });
+    console.log(`[AUTH] Код для ${email}: ${code}`);
+    const token = makeToken(id);
+    res.json({ token, username, avatar: '😎', bio: '', emailVerified: false, codeSent: false });
   } catch (e) {
-    console.error('Login error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Register error:', e);
+    res.status(500).json({ error: 'Ошибка регистрации' });
   }
 });
-app.get('/api/me', async (req, res) => {
+
+app.post('/api/auth/login-email', async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ','');
-    const user = await parseToken(token);
-    if (!user) return res.status(401).json({ error: 'Не авторизован' });
-    res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
+    let { email, password } = req.body;
+    email = (email || '').trim().toLowerCase();
+    password = password || '';
+    if (!email || !password) return res.status(400).json({ error: 'Введите email и пароль' });
+
+    if (db.isEnabled()) {
+      const user = await db.verifyPassword(email, password);
+      if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+      const token = makeToken(user.id);
+      return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: user.email_verified });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
+    if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
+    const token = makeToken(user.id);
+    res.json({ token, username: user.username, avatar: user.avatar, bio: user.bio, emailVerified: user.emailVerified });
   } catch (e) {
-    console.error('Get me error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Ошибка входа' });
   }
+});
+
+app.post('/api/auth/verify-code', async (req, res) => {
+  try {
+    let { email, code } = req.body;
+    email = (email || '').trim().toLowerCase();
+    code = (code || '').trim();
+    if (!email || !code) return res.status(400).json({ error: 'Введите email и код' });
+
+    if (db.isEnabled()) {
+      const user = await db.getUserByEmail(email);
+      if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
+      if (user.email_verified) return res.json({ success: true, message: 'Почта уже подтверждена' });
+      const ok = await db.verifyEmailByCode(email, code);
+      if (!ok) return res.status(400).json({ error: 'Неверный или просроченный код' });
+      return res.json({ success: true });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
+    if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
+    if (user.emailVerified) return res.json({ success: true, message: 'Почта уже подтверждена' });
+    if (user.verifyCode !== code) return res.status(400).json({ error: 'Неверный код' });
+    user.emailVerified = true;
+    user.verifyCode = null;
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Verify code error:', e);
+    res.status(500).json({ error: 'Ошибка верификации' });
+  }
+});
+
+app.post('/api/auth/forgot', async (req, res) => {
+  try {
+    let { email } = req.body;
+    email = (email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Введите email' });
+
+    const code = genCode();
+
+    if (db.isEnabled()) {
+      const user = await db.getUserByEmail(email);
+      if (user) {
+        const expires = new Date(Date.now() + 3600000);
+        await db.pool.query('UPDATE users SET reset_token=$1, reset_expires=$2 WHERE id=$3', [code, expires, user.id]);
+        await sendResetEmail(email, code);
+      }
+      return res.json({ ok: true, message: 'Если аккаунт с таким email существует, код отправлен' });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
+    if (user) {
+      user.resetCode = code;
+      user.resetExpires = Date.now() + 3600000;
+      await sendResetEmail(email, code);
+    }
+    res.json({ ok: true, message: 'Если аккаунт с таким email существует, код отправлен' });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/auth/reset', async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) return res.status(400).json({ error: 'Требуется email, код и пароль' });
+    if (password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+
+    if (db.isEnabled()) {
+      const user = await db.getUserByEmail(email);
+      if (!user || user.reset_token !== code || !user.reset_expires || user.reset_expires < new Date()) {
+        return res.status(400).json({ error: 'Неверный или просроченный код' });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      await db.pool.query('UPDATE users SET password_hash=$1, reset_token=null, reset_expires=null WHERE id=$2', [hash, user.id]);
+      return res.json({ ok: true });
+    }
+
+    // ephemeral mode
+    const user = ephemeralEmailUsers.get(email);
+    if (user && user.resetCode === code && user.resetExpires > Date.now()) {
+      user.passwordHash = await bcrypt.hash(password, 10);
+      user.resetCode = null;
+      user.resetExpires = null;
+      return res.json({ ok: true });
+    }
+    res.status(400).json({ error: 'Неверный или просроченный код' });
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.get('/api/me', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = await parseToken(token);
+  if (!user) return res.status(401).json({ error: 'Не авторизован' });
+  res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false });
 });
 app.get('/api/users/:username', async (req, res) => {
-  try {
-    if (db.isEnabled()) {
-      const user = await db.getUserByUsername(req.params.username);
-      if (user) return res.json({ username: user.username, avatar: user.avatar || '😎', bio: user.bio || '' });
-    }
-    const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
-    res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
-  } catch (e) {
-    console.error('Get user error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+  if (db.isEnabled()) {
+    const { rows } = await pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    if (rows[0]) return res.json({ username: rows[0].username, avatar: rows[0].avatar || '😎', bio: rows[0].bio || '' });
   }
+  const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };
+  res.json({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '' });
 });
 app.put('/api/me', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ','');
-    const user = await parseToken(token);
-    if (!user) return res.status(401).json({ error: 'Не авторизован' });
-    let { username, avatar, bio } = req.body;
-    username = (username||'').trim() || user.username;
-    avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
-    bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
-    if (db.isEnabled()) {
-      await db.updateUserProfileById(user.id, { username, avatar, bio });
-      const updated = await db.getUserById(user.id);
-      const newToken = makeToken(user.id);
-      return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
-    }
-    ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = await parseToken(token);
+  if (!user) return res.status(401).json({ error: 'Не авторизован' });
+  let { username, avatar, bio } = req.body;
+  username = (username||'').trim() || user.username;
+  avatar = avatar !== undefined ? avatar.toString().slice(0, 512*1024) : user.avatar;
+  bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
+  if (db.isEnabled()) {
+    await db.updateUserProfileById(user.id, { username, avatar, bio });
+    const updated = await db.getUserById(user.id);
     const newToken = makeToken(user.id);
-    res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
-  } catch (e) {
-    console.error('Update me error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+    return res.json({ username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
   }
+  ephemeralUsers.set(user.id, { id: user.id, username, avatar: avatar || '😎', bio: bio || '' });
+  const newToken = makeToken(user.id);
+  res.json({ username, avatar: avatar || '😎', bio: bio || '', token: newToken });
 });
 app.get('/api/check-username', (req, res) => {
   res.json({ available: true });
 });
 
 app.post('/api/rooms', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ','');
-    const user = await parseToken(token);
-    if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
-    let { platform, videoUrl, title } = req.body;
-    if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
-    platform = platform.toLowerCase();
-    if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
-    if (!isValidVideoUrl(platform, videoUrl)) {
-      const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
-      return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
-    }
-    const embedUrl = toEmbedUrl(platform, videoUrl);
-    let code;
-    do { code = genCode(); } while (rooms[code]);
-    const room = {
-      code,
-      title: title?.trim() || 'Без названия',
-      platform,
-      videoUrl,
-      embedUrl,
-      host: user.username,
-      createdAt: new Date().toISOString(),
-      messages: [],
-      bans: []
-    };
-    rooms[code] = room;
-    saveJson(ROOMS_FILE, rooms);
-    res.json({ code, room });
-  } catch (e) {
-    console.error('Create room error:', e.message);
-    res.status(500).json({ error: 'Ошибка сервера' });
+  const token = req.headers.authorization?.replace('Bearer ','');
+  const user = await parseToken(token);
+  if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
+  let { platform, videoUrl, title } = req.body;
+  if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
+  platform = platform.toLowerCase();
+  if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
+  if (!isValidVideoUrl(platform, videoUrl)) {
+    const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
+    return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
   }
+  const embedUrl = toEmbedUrl(platform, videoUrl);
+  let code;
+  do { code = genCode(); } while (rooms[code]);
+  const room = {
+    code,
+    title: title?.trim() || 'Без названия',
+    platform,
+    videoUrl,
+    embedUrl,
+    host: user.username,
+    createdAt: new Date().toISOString(),
+    messages: [],
+    bans: []
+  };
+  rooms[code] = room;
+  saveJson(ROOMS_FILE, rooms);
+  res.json({ code, room });
 });
 
 app.get('/api/rooms/:code', (req, res) => {
@@ -580,6 +704,14 @@ app.get('/privacy', (req,res)=>{
 
 app.get('/faq', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','faq.html'));
+});
+
+app.get('/verify', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','verify.html'));
+});
+
+app.get('/reset', (req,res)=>{
+  res.sendFile(path.join(__dirname,'public','reset.html'));
 });
 
 app.get('*', (req,res)=>{

@@ -21,14 +21,81 @@
   <!-- AUTH -->
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
-      <h1>Вход</h1>
-      <p>Введи ник и смотри любые фильмы и сериалы без рекламы и прочей ерунды!</p>
-      <div id="authError" class="error"></div>
-      <div class="field">
-        <label>Username</label>
-        <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
+      <h1 id="authTitle">Вход</h1>
+      <p id="authSubtitle">Войдите в аккаунт чтобы продолжить.</p>
+      <div class="tabs" id="authTabs">
+        <button class="active" data-tab="email">Почта</button>
+        <button data-tab="quick">Быстро</button>
       </div>
-      <button id="authBtn" class="btn-primary">Войти</button>
+      <div id="authError" class="error"></div>
+      <!-- Email auth -->
+      <div id="tabEmail">
+        <div id="emailFields">
+          <div class="field" id="regUsernameField" style="display:none;">
+            <label>Username</label>
+            <input id="regUsername" placeholder="твой ник" maxlength="20" />
+          </div>
+          <div class="field">
+            <label>Почта</label>
+            <input id="authEmail" type="email" placeholder="mail@example.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label>Пароль</label>
+            <input id="authPassword" type="password" placeholder="минимум 6 символов" autocomplete="current-password" />
+          </div>
+        </div>
+        <button id="authBtn" class="btn-primary">Войти</button>
+        <div style="text-align:right;margin-top:8px;">
+          <a href="#" id="forgotLink" style="font-size:12px;color:#6a6a6a;">Забыли пароль?</a>
+        </div>
+        <p class="hint" id="authSwitch">Нет аккаунта? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Зарегистрироваться</a></p>
+      </div>
+      <!-- Quick auth (old style) -->
+      <div id="tabQuick" style="display:none;">
+        <div class="field">
+          <label>Username</label>
+          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
+        </div>
+        <button id="quickAuthBtn" class="btn-primary">Войти</button>
+        </div>
+      <!-- Forgot password -->
+      <div id="forgotForm" style="display:none;">
+        <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите email — отправим ссылку для сброса пароля</p>
+        <div class="field">
+          <label>Email</label>
+          <input id="forgotEmail" type="email" placeholder="mail@example.com" />
+        </div>
+        <button id="forgotBtn" class="btn-primary">Отправить</button>
+        <p class="hint"><a href="#" id="backToLogin" style="color:#fff;">Назад ко входу</a></p>
+      </div>
+      <!-- Success message -->
+      <div id="authSuccess" style="display:none;text-align:center;">
+        <p style="font-size:14px;color:#9a9a9a;">Проверьте почту — мы отправили код подтверждения.</p>
+        <div class="field" style="margin-top:16px;">
+          <label>Код из письма</label>
+          <input id="verifyCodeInput" type="text" placeholder="123456" maxlength="6" inputmode="numeric" style="text-align:center;font-size:24px;letter-spacing:8px;" />
+        </div>
+        <p id="verifyCodeError" style="color:#ff6b6b;font-size:13px;display:none;"></p>
+        <button id="verifyCodeBtn" class="btn-primary" style="margin-top:12px;">Подтвердить</button>
+      </div>
+      <!-- Reset password form (code) -->
+      <div id="resetForm" style="display:none;">
+        <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите код из письма и новый пароль</p>
+        <div class="field">
+          <label>Email</label>
+          <input id="resetEmail" type="email" placeholder="mail@example.com" />
+        </div>
+        <div class="field">
+          <label>Код</label>
+          <input id="resetCode" type="text" placeholder="123456" maxlength="6" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label>Новый пароль</label>
+          <input id="resetPassword" type="password" placeholder="минимум 6 символов" />
+        </div>
+        <button id="resetBtn" class="btn-primary">Сбросить пароль</button>
+        <p class="hint"><a href="#" id="backToLogin2" style="color:#fff;">Назад ко входу</a></p>
+      </div>
     </div>
   </div>
 

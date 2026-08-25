@@ -4,7 +4,6 @@ const lobby = $('#lobby');
 const navRight = $('#navRight');
 const authError = $('#authError');
 const usernameEl = $('#username');
-const authBtn = $('#authBtn');
 
 // welcome modal
 const welcomeModal = document.getElementById('welcomeModal');
@@ -42,36 +41,10 @@ async function logout(){
 let currentAvatar='😎', currentBio='', currentUsername='';
 function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
 function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
-const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Username','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK / RuTube / YouTube and share the link/code with friends.'}};
+const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Username','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK, RuTube or YouTube and share the link/code with friends.'}};
 function t(s){ return (isEn()?T.en:T.ru)[s]||s; }
 function toggleLang(){ setLang(!isEn()); location.reload(); }
-function translatePage(){
-  if(!isEn()) return;
-  const h1=document.querySelector('.hero h1'); if(h1) h1.textContent='Watch movies and series together with togetherly.';
-  const hp=document.querySelector('.hero p'); if(hp) hp.textContent='Create a room, pick a video from VK / RuTube / YouTube and share the link/code with friends.';
-  const h3s=document.querySelectorAll('.card h3');
-  if(h3s[0]) h3s[0].textContent='Create room';
-  if(h3s[1]) h3s[1].textContent='Join by code';
-  const ps=document.querySelectorAll('.card p');
-  if(ps[0]) ps[0].textContent='Choose a platform — VK, RuTube or YouTube — paste a video link and share the room link/code with a friend.';
-  if(ps[1]) ps[1].textContent='Got a link or code from a friend? Paste it and jump straight into the room.';
-  const btns=document.querySelectorAll('.card .btn-primary');
-  if(btns[0]) btns[0].textContent='Create room';
-  if(btns[1]) btns[1].textContent='Join room';
-  const aboutH2=document.querySelector('.about-section h2'); if(aboutH2) aboutH2.textContent='About us';
-  const aboutP=document.querySelector('.about-section p'); if(aboutP) aboutP.textContent='Togetherly is a convenient platform for watching any media content from available platforms in a player. The service grows every day, adding new features for your comfort!';
-  const contactH3=document.querySelector('.about-section h3'); if(contactH3) contactH3.textContent='Contact developer';
-  const privacyLink=document.querySelector('a[href="/privacy"]'); if(privacyLink) privacyLink.textContent='Privacy Policy';
-  const faqLink=document.querySelector('a[href="/faq"]'); if(faqLink) faqLink.textContent='FAQ';
-  document.querySelectorAll('#authScreen .auth-card h1').forEach(h=>h.textContent='Login');
-  document.querySelectorAll('#authScreen .auth-card p').forEach(p=>p.textContent='Enter a username and watch any movies and series without ads or other nonsense!');
-  if(authBtn) authBtn.textContent='Login';
-  document.querySelectorAll('.modal-head h3').forEach(h=>{
-    if(h.textContent==='Войти в комнату') h.textContent='Join room';
-    if(h.textContent==='Создать комнату') h.textContent='Create room';
-    if(h.textContent==='Профиль') h.textContent='Profile';
-  });
-}
+
 async function checkAuth(){
   const t = token();
   if(!t){ showAuth(); return; }
@@ -84,21 +57,30 @@ async function checkAuth(){
     showLobby(j.username, currentAvatar);
   }catch{ showAuth(); }
 }
+
 function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
   navRight.innerHTML=`<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">EN</button>`;
   $('#langToggle').onclick=toggleLang;
+  // show verified/success params
+  const params=new URLSearchParams(location.search);
+  if(params.get('verified')==='1'){
+    const s=$('#authSuccess'); if(s) s.style.display='block';
+    window.history.replaceState({},'',location.pathname);
+  }
 }
+
 function isPhoto(ava){ return ava && ava.startsWith('data:image/'); }
 function renderAvaBtn(btn, ava){
   if(isPhoto(ava)){ btn.innerHTML=`<img src="${ava}" alt="ava">`; btn.classList.add('has-photo'); }
   else { btn.textContent=ava; btn.classList.remove('has-photo'); }
 }
 function renderAvaLargeEl(el, ava){
-  if(isPhoto(ava)){ el.innerHTML=`<img src="${ava}" alt="ava">`; el.classList.add('has-photo'); }
-  else { el.textContent=ava; el.classList.remove('has-photo'); el.innerHTML=ava; }
+  if(isPhoto(ava)){ el.innerHTML=`<img src="${ava}" alt="">`; el.classList.add('has-photo'); }
+  else { el.textContent=ava; el.classList.remove('has-photo'); }
 }
+
 function showLobby(username, avatar){
   avatar=avatar||localStorage.getItem('rave_ava')||'😎';
   authScreen.style.display='none';
@@ -110,29 +92,234 @@ function showLobby(username, avatar){
   $('#profileBtn').onclick = openProfile;
   $('#langToggle').onclick = toggleLang;
 }
+
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 checkAuth();
-translatePage();
 
-authBtn.onclick = async ()=>{
-  hideError(authError);
-  const username = usernameEl.value.trim();
-  if(!username) return showError(authError,'Введи username');
-  if(username.length>20) return showError(authError,'Максимум 20 символов');
-  authBtn.disabled = true;
-  try{
-    const ava=localStorage.getItem('rave_ava')||'😎';
-    const bio=localStorage.getItem('rave_bio')||'';
-    const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username, avatar: ava, bio})});
-    const j = await r.json();
-    if(!r.ok) throw new Error(j.error||'Ошибка');
-    setToken(j.token, j.username, j.avatar, j.bio);
-    currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
-    showLobby(j.username, currentAvatar);
-  }catch(e){ showError(authError, e.message); }
-  finally{ authBtn.disabled=false; }
-};
-usernameEl.addEventListener('keydown', e=>{ if(e.key==='Enter') authBtn.click(); });
+// --- Auth tabs ---
+let authMode='login'; // login or register
+const authTabs=document.getElementById('authTabs');
+const tabEmail=document.getElementById('tabEmail');
+const tabQuick=document.getElementById('tabQuick');
+const emailFields=document.getElementById('emailFields');
+const regUsernameField=document.getElementById('regUsernameField');
+const authEmailEl=document.getElementById('authEmail');
+const authPasswordEl=document.getElementById('authPassword');
+const authBtnEl=document.getElementById('authBtn');
+const authSwitchEl=document.getElementById('authSwitch');
+const forgotForm=document.getElementById('forgotForm');
+const forgotLink=document.getElementById('forgotLink');
+const backToLogin=document.getElementById('backToLogin');
+const forgotBtnEl=document.getElementById('forgotBtn');
+const forgotEmailEl=document.getElementById('forgotEmail');
+const authSuccessEl=document.getElementById('authSuccess');
+const switchToReg=document.getElementById('switchToReg');
+
+if(authTabs){
+  const authTitle=document.getElementById('authTitle');
+  const authSubtitle=document.getElementById('authSubtitle');
+  function updateAuthTitles(){
+    if(authMode==='register'){
+      if(authTitle) authTitle.textContent='Регистрация';
+      if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить';
+    } else {
+      if(authTitle) authTitle.textContent='Вход';
+      if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
+    }
+  }
+  authTabs.querySelectorAll('button').forEach(btn=>{
+    btn.onclick=()=>{
+      authTabs.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      if(btn.dataset.tab==='email'){
+        tabEmail.style.display=''; tabQuick.style.display='none';
+        updateAuthTitles();
+      } else {
+        tabEmail.style.display='none'; tabQuick.style.display='';
+        if(authTitle) authTitle.textContent='Режим гостя';
+        if(authSubtitle) authSubtitle.textContent='Быстрый вход по нику';
+      }
+    };
+  });
+}
+
+if(switchToReg){
+  switchToReg.onclick=(e)=>{
+    e.preventDefault();
+    authMode='register';
+    regUsernameField.style.display='';
+    authBtnEl.textContent='Зарегистрироваться';
+    authSwitchEl.innerHTML='Есть аккаунт? <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">Войти</a>';
+    const authTitle=document.getElementById('authTitle');
+    const authSubtitle=document.getElementById('authSubtitle');
+    if(authTitle) authTitle.textContent='Регистрация';
+    if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить';
+    document.getElementById('switchToLogin').onclick=(e)=>{
+      e.preventDefault();
+      authMode='login';
+      regUsernameField.style.display='none';
+      authBtnEl.textContent='Войти';
+      authSwitchEl.innerHTML='Нет аккаунта? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Зарегистрироваться</a>';
+      document.getElementById('switchToReg').onclick=switchToReg.onclick;
+      if(authTitle) authTitle.textContent='Вход';
+      if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
+    };
+  };
+}
+
+if(forgotLink){
+  forgotLink.onclick=(e)=>{
+    e.preventDefault();
+    tabEmail.style.display='none';
+    forgotForm.style.display='';
+    authSuccessEl.style.display='none';
+  };
+}
+if(backToLogin){
+  backToLogin.onclick=(e)=>{
+    e.preventDefault();
+    forgotForm.style.display='none';
+    tabEmail.style.display='';
+  };
+}
+const backToLogin2=document.getElementById('backToLogin2');
+if(backToLogin2){
+  backToLogin2.onclick=(e)=>{
+    e.preventDefault();
+    document.getElementById('resetForm').style.display='none';
+    tabEmail.style.display='';
+  };
+}
+
+// Email login/register
+if(authBtnEl){
+  authBtnEl.onclick=async()=>{
+    hideError(authError);
+    const email=authEmailEl.value.trim();
+    const password=authPasswordEl.value;
+    if(!email) return showError(authError,'Введите email');
+    if(!password) return showError(authError,'Введите пароль');
+    authBtnEl.disabled=true;
+    try{
+      if(authMode==='register'){
+        const username=(document.getElementById('regUsername')?.value||'').trim();
+        if(!username) return showError(authError,'Введите username');
+        if(username.length>20) return showError(authError,'Username максимум 20 символов');
+        const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password})});
+        const j=await r.json();
+        if(!r.ok) throw new Error(j.error||'Ошибка');
+        setToken(j.token,j.username,j.avatar,j.bio);
+        currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
+        if(!j.emailVerified){
+          authEmailEl.parentElement.parentElement.style.display='none';
+          authBtnEl.parentElement.style.display='none';
+          authSwitchEl.style.display='none';
+          forgotLink.style.display='none';
+          if(regUsernameField) regUsernameField.style.display='none';
+          document.getElementById('authError').style.display='none';
+          authSuccessEl.style.display='';
+          window._pendingVerifyEmail=email;
+        } else {
+          showLobby(j.username,currentAvatar);
+        }
+      } else {
+        const r=await fetch('/api/auth/login-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+        const j=await r.json();
+        if(!r.ok) throw new Error(j.error||'Ошибка');
+        setToken(j.token,j.username,j.avatar,j.bio);
+        currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
+        showLobby(j.username,currentAvatar);
+      }
+    }catch(e){ showError(authError,e.message); }
+    finally{ authBtnEl.disabled=false; }
+  };
+}
+
+// Forgot password
+if(forgotBtnEl){
+  forgotBtnEl.onclick=async()=>{
+    hideError(authError);
+    const email=forgotEmailEl.value.trim();
+    if(!email) return showError(authError,'Введите email');
+    forgotBtnEl.disabled=true;
+    try{
+      await fetch('/api/auth/forgot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+      forgotForm.style.display='none';
+      document.getElementById('resetForm').style.display='';
+      document.getElementById('resetEmail').value=email;
+    }catch(e){ showError(authError,e.message); }
+    finally{ forgotBtnEl.disabled=false; }
+  };
+}
+
+// Verify code after registration
+const verifyCodeBtn=document.getElementById('verifyCodeBtn');
+const verifyCodeInput=document.getElementById('verifyCodeInput');
+const verifyCodeError=document.getElementById('verifyCodeError');
+if(verifyCodeBtn){
+  verifyCodeBtn.onclick=async()=>{
+    verifyCodeError.style.display='none';
+    const code=verifyCodeInput.value.trim();
+    if(!code||code.length!==6) return(()=>{ verifyCodeError.textContent='Введите 6-значный код'; verifyCodeError.style.display=''; })();
+    verifyCodeBtn.disabled=true;
+    try{
+      const r=await fetch('/api/auth/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:window._pendingVerifyEmail,code})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||'Ошибка');
+      showLobby(currentUsername,currentAvatar);
+    }catch(e){ verifyCodeError.textContent=e.message; verifyCodeError.style.display=''; }
+    finally{ verifyCodeBtn.disabled=false; }
+  };
+  verifyCodeInput.addEventListener('keydown',e=>{if(e.key==='Enter') verifyCodeBtn.click(); });
+}
+
+// Reset password with code
+const resetBtn=document.getElementById('resetBtn');
+if(resetBtn){
+  resetBtn.onclick=async()=>{
+    hideError(authError);
+    const email=document.getElementById('resetEmail').value.trim();
+    const code=document.getElementById('resetCode').value.trim();
+    const password=document.getElementById('resetPassword').value;
+    if(!email||!code) return showError(authError,'Введите email и код');
+    if(!password||password.length<6) return showError(authError,'Пароль минимум 6 символов');
+    resetBtn.disabled=true;
+    try{
+      const r=await fetch('/api/auth/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code,password})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||'Ошибка');
+      document.getElementById('resetForm').style.display='none';
+      authSuccessEl.querySelector('p').textContent='Пароль сброшен! Теперь войдите';
+      authSuccessEl.querySelector('div').textContent='✅';
+      authSuccessEl.style.display='';
+      setTimeout(()=>{ authSuccessEl.style.display='none'; },3000);
+    }catch(e){ showError(authError,e.message); }
+    finally{ resetBtn.disabled=false; }
+  };
+}
+
+// Quick auth (old style)
+const quickAuthBtn=document.getElementById('quickAuthBtn');
+if(quickAuthBtn){
+  quickAuthBtn.onclick=async()=>{
+    hideError(authError);
+    const username=usernameEl.value.trim();
+    if(!username) return showError(authError,'Введи username');
+    quickAuthBtn.disabled=true;
+    try{
+      const ava=localStorage.getItem('rave_ava')||'😎';
+      const bio=localStorage.getItem('rave_bio')||'';
+      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,avatar:ava,bio})});
+      const j=await r.json();
+      if(!r.ok) throw new Error(j.error||'Ошибка');
+      setToken(j.token,j.username,j.avatar,j.bio);
+      currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
+      showLobby(j.username,currentAvatar);
+    }catch(e){ showError(authError,e.message); }
+    finally{ quickAuthBtn.disabled=false; }
+  };
+  usernameEl.addEventListener('keydown',e=>{if(e.key==='Enter') quickAuthBtn.click(); });
+}
 
 // modals
 const joinModal = $('#joinModal');
