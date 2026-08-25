@@ -4,10 +4,11 @@ const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
 
 async function sendEmail({ to, subject, html }) {
   if (!RESEND_API_KEY) {
-    console.log(`[EMAIL] (нет API ключа) Кому: ${to} | Тема: ${subject}`);
+    console.log(`[EMAIL] ❌ (нет API ключа) Кому: ${to} | Тема: ${subject}`);
     return false;
   }
   try {
+    console.log(`[EMAIL] 📧 Попытка отправки на ${to}...`);
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -18,13 +19,15 @@ async function sendEmail({ to, subject, html }) {
     });
     if (!res.ok) {
       const err = await res.text();
-      console.error('[EMAIL] Ошибка:', err);
+      console.error('[EMAIL] ❌ Ошибка от Resend API:', err);
+      console.error('[EMAIL] ❌ STATUS:', res.status, res.statusText);
       return false;
     }
-    console.log(`[EMAIL] Отправлено: ${to} | ${subject}`);
+    const result = await res.json();
+    console.log(`[EMAIL] ✅ Успешно отправлено: ${to} | ${subject} | ID: ${result.id}`);
     return true;
   } catch (e) {
-    console.error('[EMAIL] Ошибка отправки:', e.message);
+    console.error('[EMAIL] ❌ Ошибка отправки:', e.message);
     return false;
   }
 }

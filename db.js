@@ -16,7 +16,7 @@ async function initDb() {
   try {
     pool = new Pool({
       connectionString: url,
-      ssl: url.includes('localhost') ? false : { rejectUnauthorized: true },
+      ssl: { rejectUnauthorized: false },
       max: 5,
       idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 8000,

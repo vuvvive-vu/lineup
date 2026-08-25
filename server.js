@@ -8,11 +8,10 @@ const jwt = require('jsonwebtoken');
 const db = require('./db');
 const { sendVerifyCode, sendResetEmail, detectDevice } = require('./email');
 
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.JWT_SECRET) {
-  console.error('ОШИБКА: JWT_SECRET не установлен в переменных окружения!');
-  process.exit(1);
+  console.warn('⚠️  JWT_SECRET не установлен, используется временный ключ (токены будут невалидны после рестарта)');
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = '30d';
 
 function genCode() {

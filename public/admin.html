@@ -85,41 +85,6 @@ const loginBox=$('#loginBox'), dash=$('#dash'), aError=$('#aError');
 let token=localStorage.getItem('admin_token')||'';
 if(token) tryLoginWithToken();
 
-// Toast notifications
-function toast(message, type = 'success') {
-  const t = document.createElement('div');
-  t.className = `toast toast-${type}`;
-  t.textContent = message;
-  document.body.appendChild(t);
-  setTimeout(() => {
-    t.classList.add('removing');
-    setTimeout(() => t.remove(), 250);
-  }, 3000);
-}
-
-// Beautiful confirm dialog
-function showConfirm(message, title = 'Подтверждение') {
-  return new Promise((resolve) => {
-    const modal = document.createElement('div');
-    modal.className = 'modal-bg';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-      <div class="auth-card" style="max-width:380px;animation:pop .2s ease;">
-        <h1 style="font-size:18px;margin-bottom:12px;">${title}</h1>
-        <p style="color:#9a9a9a;margin-bottom:20px;font-size:14px;">${message}</p>
-        <div style="display:flex;gap:10px;">
-          <button class="btn-ghost" id="cancelBtn" style="flex:1;padding:12px;">Отмена</button>
-          <button class="btn-primary" id="confirmBtn" style="flex:1;padding:12px;">Подтвердить</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    modal.querySelector('#confirmBtn').onclick = () => { modal.remove(); resolve(true); };
-    modal.querySelector('#cancelBtn').onclick = () => { modal.remove(); resolve(false); };
-    modal.onclick = (e) => { if(e.target === modal) { modal.remove(); resolve(false); } };
-  });
-}
-
 $('#aLogin').onclick=async()=>{
   const pass=$('#aPass').value;
   if(!pass) return showErr('Введи пароль');
@@ -130,7 +95,6 @@ $('#aLogin').onclick=async()=>{
     token=j.token;
     localStorage.setItem('admin_token', token);
     showDash();
-    toast('Вход выполнен ✅', 'success');
   }catch(e){ showErr(e.message); }
 };
 function showErr(m){ aError.textContent=m; aError.classList.add('show'); }
@@ -221,32 +185,27 @@ $('#bcBtn').onclick=async()=>{
   if(!t) return;
   await fetch('/api/admin/broadcast',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({text:t})});
   $('#bcText').value='';
-  toast('Отправлено всем комнатам 📢', 'success');
+  alert('Отправлено');
 };
 async function closeRoom(code){
-  if(!await showConfirm(`Закрыть комнату ${code}? Все участники будут отключены.`)) return;
+  if(!confirm(`Закрыть комнату ${code}?`)) return;
   await fetch(`/api/admin/rooms/${code}/close`,{method:'POST',headers:{Authorization:'Bearer '+token}});
-  toast('Комната закрыта', 'success');
   refresh();
 }
 async function clearChat(code){
-  if(!await showConfirm(`Очистить чат в комнате ${code}?`)) return;
   await fetch(`/api/admin/rooms/${code}/clear`,{method:'POST',headers:{Authorization:'Bearer '+token}});
-  toast('Чат очищен', 'success');
   refresh();
 }
 async function kickUser(username){
-  if(!await showConfirm(`Кикнуть ${username} из всех комнат?`, 'Кик пользователя')) return;
+  if(!confirm(`Кикнуть ${username}?`)) return;
   await fetch(`/api/admin/users/${encodeURIComponent(username)}/kick`,{method:'POST',headers:{Authorization:'Bearer '+token}});
-  toast(`${username} кикнут`, 'success');
   refresh();
 }
 async function deleteAccount(id,username){
-  if(!await showConfirm(`Удалить аккаунт ${username}? Это действие необратимо!`, '⚠️ Удаление аккаунта')) return;
+  if(!confirm(`Удалить аккаунт ${username}?`)) return;
   const r=await fetch(`/api/admin/accounts/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
   const j=await r.json();
-  if(!r.ok) return toast(j.error||'Ошибка', 'error');
-  toast(`Аккаунт ${username} удалён`, 'success');
+  if(!r.ok) return alert(j.error||'Ошибка');
   refresh();
 }
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
