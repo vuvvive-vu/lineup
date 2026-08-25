@@ -912,16 +912,29 @@ function createSnowflakesRoom(container) {
   // Remove existing snowflakes
   container.querySelectorAll('.snowflake').forEach(s => s.remove());
   
-  // Create 15 snowflakes
-  for(let i = 0; i < 15; i++) {
+  // Create 12 snowflakes with natural drift
+  for(let i = 0; i < 12; i++) {
     const snowflake = document.createElement('div');
     snowflake.classList.add('snowflake');
     snowflake.innerHTML = '❄';
-    snowflake.style.left = Math.random() * 100 + '%';
-    snowflake.style.animationDuration = (Math.random() * 3 + 2) + 's';
-    snowflake.style.animationDelay = Math.random() * 5 + 's';
-    snowflake.style.fontSize = (Math.random() * 10 + 10) + 'px';
-    snowflake.style.opacity = Math.random() * 0.6 + 0.4;
+    
+    const leftPos = Math.random() * 88 + 6;
+    snowflake.style.left = leftPos + '%';
+    
+    // Slower, smoother (8-12 seconds)
+    const duration = Math.random() * 4 + 8;
+    snowflake.style.animationDuration = duration + 's';
+    
+    // Negative delay = continuous without резкого появления
+    snowflake.style.animationDelay = (-Math.random() * 8) + 's';
+    
+    snowflake.style.fontSize = (Math.random() * 6 + 10) + 'px';
+    
+    const drift = (Math.random() * 45 - 15) + 'px';
+    snowflake.style.setProperty('--drift', drift);
+    
+    snowflake.style.opacity = (Math.random() * 0.3 + 0.7).toString();
+    
     container.appendChild(snowflake);
   }
 }
@@ -1079,11 +1092,17 @@ function openViewProfile(username){
     if(isCreator) {
       if(vCrownIcon) vCrownIcon.style.display = 'block';
       if(vCreatorBadge) vCreatorBadge.style.display = 'inline-block';
-      if(vAvaWrap) vAvaWrap.classList.add('creator-badge');
+      if(vAvaWrap) {
+        vAvaWrap.classList.add('creator-badge');
+        createSnowflakesRoom(vAvaWrap);
+      }
     } else {
       if(vCrownIcon) vCrownIcon.style.display = 'none';
       if(vCreatorBadge) vCreatorBadge.style.display = 'none';
-      if(vAvaWrap) vAvaWrap.classList.remove('creator-badge');
+      if(vAvaWrap) {
+        vAvaWrap.classList.remove('creator-badge');
+        vAvaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
+      }
     }
     
     viewProfileModal.classList.add('show');
@@ -1105,7 +1124,10 @@ function openViewProfile(username){
     const vAvaWrap = document.getElementById('vAvaWrap');
     if(vCrownIcon) vCrownIcon.style.display = 'none';
     if(vCreatorBadge) vCreatorBadge.style.display = 'none';
-    if(vAvaWrap) vAvaWrap.classList.remove('creator-badge');
+    if(vAvaWrap) {
+      vAvaWrap.classList.remove('creator-badge');
+      vAvaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
+    }
     
     viewProfileModal.classList.add('show');
   });
