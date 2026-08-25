@@ -216,6 +216,7 @@ function validateBase64Image(dataUrl, maxSizeBytes = 512 * 1024) {
 app.post('/api/auth', async (req, res) => {
   try{
     let { displayName, username, avatar, bio } = req.body;
+    console.log('[AUTH] Гостевой вход:', { displayName, username, avatarType: typeof avatar, avatarLength: avatar?.length });
     displayName = (displayName || username || '').trim();
     if (!displayName) return res.status(400).json({ error: 'Введи имя' });
     if (displayName.length < 1) return res.status(400).json({ error: 'Имя минимум 1 символ' });
@@ -223,10 +224,15 @@ app.post('/api/auth', async (req, res) => {
     
     // Validate avatar if provided
     if (avatar && avatar.length > 0) {
+      console.log('[AUTH] Валидация аватара...');
       const validation = validateBase64Image(avatar, 512 * 1024);
-      if (!validation.valid) return res.status(400).json({ error: validation.error });
+      if (!validation.valid) {
+        console.log('[AUTH] ❌ Валидация провалилась:', validation.error);
+        return res.status(400).json({ error: validation.error });
+      }
       avatar = validation.data;
     } else {
+      console.log('[AUTH] Аватар пустой, пропускаем валидацию');
       avatar = '';
     }
     
