@@ -224,13 +224,22 @@ app.post('/api/auth', async (req, res) => {
     
     // Validate avatar if provided
     if (avatar && avatar.length > 0) {
-      console.log('[AUTH] Валидация аватара...');
-      const validation = validateBase64Image(avatar, 512 * 1024);
-      if (!validation.valid) {
-        console.log('[AUTH] ❌ Валидация провалилась:', validation.error);
-        return res.status(400).json({ error: validation.error });
+      // Skip validation for emoji (short strings without data:image prefix)
+      if (!avatar.startsWith('data:image/') && avatar.length < 10) {
+        console.log('[AUTH] Аватар - эмодзи, пропускаем валидацию');
+        // Keep emoji as is
+      } else if (avatar.startsWith('data:image/')) {
+        console.log('[AUTH] Валидация base64 изображения...');
+        const validation = validateBase64Image(avatar, 512 * 1024);
+        if (!validation.valid) {
+          console.log('[AUTH] ❌ Валидация провалилась:', validation.error);
+          return res.status(400).json({ error: validation.error });
+        }
+        avatar = validation.data;
+      } else {
+        console.log('[AUTH] Неизвестный формат аватара, очищаем');
+        avatar = '';
       }
-      avatar = validation.data;
     } else {
       console.log('[AUTH] Аватар пустой, пропускаем валидацию');
       avatar = '';
@@ -498,9 +507,16 @@ app.put('/api/me', async (req, res) => {
   // Validate avatar if provided
   if (avatar !== undefined) {
     if (avatar && avatar.length > 0) {
-      const validation = validateBase64Image(avatar, 512 * 1024);
-      if (!validation.valid) return res.status(400).json({ error: validation.error });
-      avatar = validation.data;
+      // Skip validation for emoji (short strings without data:image prefix)
+      if (!avatar.startsWith('data:image/') && avatar.length < 10) {
+        // Keep emoji as is
+      } else if (avatar.startsWith('data:image/')) {
+        const validation = validateBase64Image(avatar, 512 * 1024);
+        if (!validation.valid) return res.status(400).json({ error: validation.error });
+        avatar = validation.data;
+      } else {
+        avatar = '';
+      }
     } else {
       avatar = '';
     }
@@ -646,10 +662,13 @@ wss.on('connection', async (ws, req) => {
         
         // Validate image if provided
         if (image && image.length > 0) {
-          const validation = validateBase64Image(image, 2 * 1024 * 1024);
-          if (!validation.valid) {
-            ws.send(JSON.stringify({ type: 'error', text: validation.error }));
-            return;
+          // Only validate if it's actually a base64 image
+          if (image.startsWith('data:image/')) {
+            const validation = validateBase64Image(image, 2 * 1024 * 1024);
+            if (!validation.valid) {
+              ws.send(JSON.stringify({ type: 'error', text: validation.error }));
+              return;
+            }
           }
         }
         
