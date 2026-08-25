@@ -14,11 +14,46 @@ if (!process.env.JWT_SECRET) {
 }
 const JWT_EXPIRES = '30d';
 
-// Creator username (founder badge)
-const CREATOR_USERNAME = 'owner'; // Измени на свой username
+// Creator badge - привязка к ID (ник можно менять)
+const CREATOR_USERNAME = process.env.CREATOR_USERNAME || 'owner';
+let CREATOR_ID = process.env.CREATOR_ID || null;
+const CREATOR_EMAIL = process.env.CREATOR_EMAIL || null;
 
-function isCreator(username) {
-  return username && username.toLowerCase() === CREATOR_USERNAME.toLowerCase();
+function isCreator(userOrUsername) {
+  if (!userOrUsername) return false;
+  // если передана строка (старый вызов) - проверка по нику
+  if (typeof userOrUsername === 'string') {
+    return userOrUsername.toLowerCase() === CREATOR_USERNAME.toLowerCase();
+  }
+  const u = userOrUsername;
+  // 1. Проверка по ID (самый надежный - не меняется при смене ника)
+  if (CREATOR_ID && u.id && String(u.id) === String(CREATOR_ID)) return true;
+  // 2. Проверка по почте
+  if (CREATOR_EMAIL && u.email && u.email.toLowerCase() === CREATOR_EMAIL.toLowerCase()) return true;
+  // 3. Fallback по username
+  if (u.username && u.username.toLowerCase() === CREATOR_USERNAME.toLowerCase()) return true;
+  return false;
+}
+
+// Авто-определение CREATOR_ID по username при старте (если не задан в env)
+async function resolveCreatorId() {
+  if (CREATOR_ID) {
+    console.log(`[CREATOR] ID задан из env: ${CREATOR_ID}`);
+    return;
+  }
+  try {
+    if (db.isEnabled()) {
+      const u = await db.getUserByUsername(CREATOR_USERNAME);
+      if (u && u.id) {
+        CREATOR_ID = String(u.id);
+        console.log(`[CREATOR] Авто-определен ID для @${CREATOR_USERNAME}: ${CREATOR_ID} (теперь можно менять ник)`);
+      } else {
+        console.log(`[CREATOR] Пользователь @${CREATOR_USERNAME} еще не создан, привязка по нику`);
+      }
+    }
+  } catch (e) {
+    console.log('[CREATOR] Не удалось определить ID:', e.message);
+  }
 }
 
 function genCode() {
@@ -295,7 +330,7 @@ app.post('/api/login', async (req, res) => {
         username: created.username, 
         avatar: created.avatar, 
         bio: created.bio,
-        isCreator: isCreator(created.username)
+        isCreator: isCreator(created)
       });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -343,7 +378,7 @@ app.post('/api/auth/register-email', async (req, res) => {
         email, 
         emailVerified: false, 
         codeSent: emailSent,
-        isCreator: isCreator(user.username)
+        isCreator: isCreator(user)
       });
     }
 
@@ -383,7 +418,7 @@ app.post('/api/auth/login-email', async (req, res) => {
         bio: user.bio || '', 
         email: user.email, 
         emailVerified: user.email_verified,
-        isCreator: isCreator(user.username)
+        isCreator: isCreator(user)
       });
     }
 
@@ -401,7 +436,7 @@ app.post('/api/auth/login-email', async (req, res) => {
       bio: user.bio, 
       email: user.email, 
       emailVerified: user.emailVerified,
-      isCreator: isCreator(user.username)
+      isCreator: isCreator(user)
     });
   } catch (e) {
     console.error('Login error:', e);
@@ -522,18 +557,18 @@ app.get('/api/me', async (req, res) => {
     email: user.email || null, 
     emailVerified: user.email_verified || false, 
     isGuest,
-    isCreator: isCreator(user.username)
+    isCreator: isCreator(user)
   });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, email FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
     if (rows[0]) return res.json({ 
       displayName: rows[0].display_name, 
       username: rows[0].username, 
       avatar: rows[0].avatar || '', 
       bio: rows[0].bio || '',
-      isCreator: isCreator(rows[0].username)
+      isCreator: isCreator(rows[0])
     });
   }
   const u = [...ephemeralUsers.values()].find(x=> (x.username && x.username.toLowerCase()===req.params.username.toLowerCase()) || x.displayName===req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
@@ -542,7 +577,7 @@ app.get('/api/users/:username', async (req, res) => {
     username: u.username || null, 
     avatar: u.avatar || '', 
     bio: u.bio || '',
-    isCreator: isCreator(u.username)
+    isCreator: isCreator(u)
   });
 });
 app.put('/api/me', async (req, res) => {
@@ -588,17 +623,23 @@ app.put('/api/me', async (req, res) => {
   }
   
   bio = bio !== undefined ? bio.toString().slice(0,120) : user.bio;
+  const wasCreator = isCreator(user);
   if (db.isEnabled()) {
     await db.updateUserProfileById(user.id, { displayName, username, avatar, bio });
     const updated = await db.getUserById(user.id);
     const newToken = makeToken(user.id);
+    // если создатель сменил ник - запомнить новый ID и обновить fallback
+    if (wasCreator) {
+      CREATOR_ID = String(updated.id);
+      console.log(`[CREATOR] Ник сменен @${user.username} -> @${updated.username}, новый ID закэширован: ${CREATOR_ID}. Добавь CREATOR_ID=${CREATOR_ID} в env на Render для сохранения после рестарта!`);
+    }
     return res.json({ 
       displayName: updated.display_name, 
       username: updated.username, 
       avatar: updated.avatar, 
       bio: updated.bio, 
       token: newToken,
-      isCreator: isCreator(updated.username)
+      isCreator: isCreator(updated)
     });
   }
   if (!isGuest) {
@@ -1018,6 +1059,14 @@ app.get('*', (req,res)=>{
   res.sendFile(path.join(__dirname,'public','index.html'));
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`togetherly running on http://localhost:${PORT}`);
+  // resolve creator ID after DB ready
+  setTimeout(resolveCreatorId, 1500);
 });
+
+// also try resolve when DB connects
+if (db.isEnabled()) {
+  // db already initialized in require, but ensure after delay
+  setTimeout(resolveCreatorId, 3000);
+}
