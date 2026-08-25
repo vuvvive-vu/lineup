@@ -17,7 +17,7 @@ const JWT_EXPIRES = '30d';
 // Badge system - один бейдж на юзера, привязано всё оформление
 const BADGE_PRESETS = {
   developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true },
-  // будущие: founder, vip и т.д. добавишь сюда
+  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true },
 };
 const ALLOWED_BADGES = Object.keys(BADGE_PRESETS);
 

@@ -96,6 +96,7 @@
     </div>
     <div id="pickerCurrent" style="font-size:12px;color:#8a8a8a;margin-bottom:12px;">—</div>
     <button class="badge-opt" data-badge="developer" onclick="pickBadge('developer')"><span>DEVELOPER</span><small>снег ❄</small></button>
+    <button class="badge-opt" data-badge="founders_wife" onclick="pickBadge('founders_wife')" style="border-color:#FFB6D9;"><span>FOUNDER'S WIFE</span><small style="color:#FF8FB9;">лепестки 🌸</small></button>
     <button class="badge-opt" data-badge="" onclick="pickBadge(null)" style="border-style:dashed;"><span>Снять бейдж</span><small>—</small></button>
     <p style="font-size:11px;color:#5a5a5a;margin-top:10px;line-height:1.4;">К бейджу привязано всё оформление: рамка, свечение, звезда, снежинки.</p>
   </div>
@@ -188,7 +189,9 @@ async function refreshAccounts(){
       const created=a.created ? new Date(a.created).toLocaleDateString('ru') : '—';
       const userListRaw=$('#usersBody')?.textContent||'';
       const isOnline=userListRaw.includes(a.username);
-      const badge=a.badge ? `<span class="pill" style="background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;border-color:#bae6ff;font-weight:700;">${esc(a.badge.toUpperCase())}</span>` : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
+      const isWife = a.badge === 'founders_wife';
+      const badgeStyle = isWife ? 'background:linear-gradient(135deg,#FFD0E8,#FF9EBF);color:#5a1430;border-color:#FF9EBF;' : 'background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;border-color:#bae6ff;';
+      const badge=a.badge ? `<span class="pill" style="${badgeStyle}font-weight:700;">${esc(a.badge.toUpperCase())}</span>` : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
       return `<tr>
         <td>${avaHtml}</td>
         <td><b>${esc(a.username)}</b><div style="font-size:10px;color:#5a5a5a;">${esc(a.id).slice(0,8)}</div></td>

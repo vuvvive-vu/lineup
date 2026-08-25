@@ -6,31 +6,57 @@ const me = localStorage.getItem('rave_user')||'гость';
 if(!token) location.href='/?needAuth=1';
 
 const BADGE_PRESETS_CLIENT_R = {
-  developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true }
+  developer: { label: 'DEVELOPER', theme: 'snow', icon: 'crown', glow: true, snow: true },
+  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true }
 };
 function getBadgeLocalR(){ const b=localStorage.getItem('rave_badge'); if(b) return b.toLowerCase(); if(localStorage.getItem('rave_isCreator')==='1') return 'developer'; return null; }
 function setBadgeLocalR(badge){ if(badge){ localStorage.setItem('rave_badge', String(badge).toLowerCase()); localStorage.setItem('rave_isCreator','1'); } else { localStorage.removeItem('rave_badge'); localStorage.setItem('rave_isCreator','0'); } }
 function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
   if(!avaWrap) return;
+  const heartIcon = avaWrap.querySelector('.heart-icon');
   const cur=avaWrap.dataset.badge||null;
-  if(cur===badge && badge && avaWrap.querySelectorAll('.snowflake').length>=10){
-    if(crownIcon) crownIcon.style.display=badge?'block':'none';
+  if(cur===badge && badge && (avaWrap.querySelectorAll('.snowflake').length>=10 || avaWrap.querySelectorAll('.petal').length>=8)){
+    if(crownIcon) crownIcon.style.display=(badge==='developer'?'block':'none');
+    if(heartIcon) heartIcon.style.display=(badge==='founders_wife'?'block':'none');
     if(badgeEl) badgeEl.style.display=badge && !isGuest?'inline-block':'none';
     return;
   }
-  avaWrap.classList.remove('creator-badge','badge-developer','badge-snow');
+  avaWrap.classList.remove('creator-badge','badge-developer','badge-founders_wife','badge-snow');
   avaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
+  avaWrap.querySelectorAll('.petal').forEach(s=>s.remove());
   delete avaWrap.dataset.badge;
   if(crownIcon) crownIcon.style.display='none';
+  if(heartIcon) heartIcon.style.display='none';
   if(badgeEl){ badgeEl.style.display='none'; badgeEl.textContent='DEVELOPER'; }
   if(isGuest || !badge) return;
   const cfg=BADGE_PRESETS_CLIENT_R[badge]; if(!cfg) return;
   avaWrap.dataset.badge=badge;
   if(badge==='developer') avaWrap.classList.add('badge-developer','badge-snow');
+  else if(badge==='founders_wife') avaWrap.classList.add('badge-founders_wife');
   else { avaWrap.classList.add('badge-'+badge); if(cfg.snow) avaWrap.classList.add('badge-snow'); }
   if(cfg.icon==='crown' && crownIcon) crownIcon.style.display='block';
+  if(cfg.icon==='heart' && heartIcon) heartIcon.style.display='block';
   if(badgeEl){ badgeEl.textContent=cfg.label||badge.toUpperCase(); badgeEl.style.display='inline-block'; }
   if(cfg.snow) createSnowflakesRoom(avaWrap);
+  if(cfg.petals) createPetalsRoom(avaWrap);
+}
+
+function createPetalsRoom(container){
+  container.querySelectorAll('.petal').forEach(s=>s.remove());
+  for(let i=0;i<10;i++){
+    const petal=document.createElement('div');
+    petal.classList.add('petal');
+    petal.innerHTML='<svg viewBox="0 0 24 14" width="18" height="11" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="12" cy="7" rx="9" ry="5.5" fill="url(#petalGR'+i+')" transform="rotate(-18 12 7)"/><defs><linearGradient id="petalGR'+i+'" x1="4" y1="2" x2="18" y2="12"><stop stop-color="#FFD0E8"/><stop offset="1" stop-color="#FF8FB9"/></linearGradient></defs></svg>';
+    const leftPos=Math.random()*88+6;
+    petal.style.left=leftPos+'%';
+    const duration=Math.random()*4+10;
+    petal.style.animationDuration=duration+'s';
+    petal.style.animationDelay=(-Math.random()*14)+'s';
+    const drift=(Math.random()*40-12)+'px';
+    petal.style.setProperty('--drift', drift);
+    petal.style.transform='rotate('+(Math.random()*30-15)+'deg)';
+    container.appendChild(petal);
+  }
 }
 
 const T={
