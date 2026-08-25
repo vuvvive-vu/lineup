@@ -348,6 +348,7 @@ app.post('/api/auth/forgot', async (req, res) => {
     }
     res.json({ ok: true, message: 'Если аккаунт с таким email существует, код отправлен' });
   } catch (e) {
+    console.error('Forgot error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
@@ -360,7 +361,7 @@ app.post('/api/auth/reset', async (req, res) => {
 
     if (db.isEnabled()) {
       const user = await db.getUserByEmail(email);
-      if (!user || user.reset_token !== code || !user.reset_expires || user.reset_expires < new Date()) {
+      if (!user || String(user.reset_token) !== String(code) || !user.reset_expires || new Date(user.reset_expires) < new Date()) {
         return res.status(400).json({ error: 'Неверный или просроченный код' });
       }
       const hash = await bcrypt.hash(password, 10);
@@ -378,6 +379,7 @@ app.post('/api/auth/reset', async (req, res) => {
     }
     res.status(400).json({ error: 'Неверный или просроченный код' });
   } catch (e) {
+    console.error('Reset error:', e);
     res.status(500).json({ error: 'Ошибка' });
   }
 });
@@ -390,7 +392,7 @@ app.get('/api/me', async (req, res) => {
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const { rows } = await pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    const { rows } = await db.pool.query('SELECT id, username, avatar, bio FROM users WHERE username=$1 ORDER BY created_at DESC LIMIT 1', [req.params.username]);
     if (rows[0]) return res.json({ username: rows[0].username, avatar: rows[0].avatar || '😎', bio: rows[0].bio || '' });
   }
   const u = ephemeralUsers.get(req.params.username) || { username: req.params.username, avatar: '😎', bio: '' };

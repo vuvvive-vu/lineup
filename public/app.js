@@ -218,7 +218,10 @@ if(authTabs){
   }
   authTabs.querySelectorAll('button').forEach(btn=>{
     btn.onclick=()=>{
-      if(inVerification) return; // don't switch during code verification
+      if(inVerification) return;
+      if(forgotForm && forgotForm.style.display!=='none') return;
+      const rf=document.getElementById('resetForm');
+      if(rf && rf.style.display!=='none') return;
       authTabs.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       if(btn.dataset.tab==='email'){

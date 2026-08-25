@@ -119,7 +119,7 @@ async function getAllUsers() {
 
 async function getUserByEmail(email) {
   const { rows } = await pool.query(
-    'SELECT id, username, email, password_hash, avatar, bio, email_verified FROM users WHERE email=$1 LIMIT 1',
+    'SELECT id, username, email, password_hash, avatar, bio, email_verified, verify_token, reset_token, reset_expires FROM users WHERE email=$1 LIMIT 1',
     [email]
   );
   return rows[0] || null;
@@ -186,6 +186,8 @@ async function verifyPassword(email, password) {
 
 module.exports = {
   isEnabled, initDb,
+  get pool(){ return pool; },
+  get poolRef(){ return pool; },
   getUserById, getUserByUsername, getUserByEmail,
   createAccount, createAccountWithAuth,
   deleteAccount, updateUserProfileById,
