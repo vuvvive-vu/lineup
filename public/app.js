@@ -46,7 +46,7 @@ const T={
   'Регистрация':'Registration','Вход':'Login','Режим гостя':'Guest mode',
   'Зарегистрируйтесь чтобы продолжить.':'Sign up to continue.',
   'Войдите в аккаунт чтобы продолжить.':'Log in to your account to continue.',
-  'Быстрый вход по нику':'Quick login by nickname',
+  'Быстрый вход по нику.':'Quick login by nickname',
   'Почта':'Email','Быстро':'Quick',
   'Ник':'Nickname','Пароль':'Password','Войти':'Log in','Зарегистрироваться':'Sign up',
   'Забыли пароль?':'Forgot password?',
@@ -230,7 +230,7 @@ if(authTabs){
       } else {
         tabEmail.style.display='none'; tabQuick.style.display='';
         if(authTitle) authTitle.textContent=t('Режим гостя');
-        if(authSubtitle) authSubtitle.textContent=t('Быстрый вход по нику');
+        if(authSubtitle) authSubtitle.textContent=t('Быстрый вход по нику.');
       }
     };
   });

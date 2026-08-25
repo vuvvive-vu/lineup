@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>togetherly — FAQ</title>
+<title>togetherly - FAQ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -12,12 +12,12 @@
   .legal-wrap { max-width:780px; margin:0 auto; padding:100px 24px 80px; animation: pageIn .4s ease both; }
   @keyframes pageIn { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:translateY(0)} }
   .legal-wrap h1 { font-size:28px; font-weight:800; letter-spacing:-0.03em; margin-bottom:8px; }
-  .legal-wrap .updated { color:var(--muted); font-size:13px; margin-bottom:32px; }
-  .lang-toggle { display:inline-flex; background:#0a0a0a; border:1px solid var(--border); border-radius:999px; padding:3px; margin-bottom:28px; }
-  .lang-toggle button { padding:8px 18px; border-radius:999px; border:none; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; transition: all .15s; font-family:inherit; }
+  .legal-wrap .updated { color:var(-muted); font-size:13px; margin-bottom:32px; }
+  .lang-toggle { display:inline-flex; background:#0a0a0a; border:1px solid var(-border); border-radius:999px; padding:3px; margin-bottom:28px; }
+  .lang-toggle button { padding:8px 18px; border-radius:999px; border:none; background:transparent; color:var(-muted); font-weight:600; font-size:13px; cursor:pointer; transition: all .15s; font-family:inherit; }
   .lang-toggle button.active { background:#fff; color:#000; }
   .lang-toggle button { outline:none; }
-  .faq-item { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px 24px; margin-bottom:12px; animation: fadeUp .5s ease both; }
+  .faq-item { background:var(-card); border:1px solid var(-border); border-radius:16px; padding:20px 24px; margin-bottom:12px; animation: fadeUp .5s ease both; }
   .faq-item:nth-child(2){ animation-delay:.04s; }
   .faq-item:nth-child(3){ animation-delay:.08s; }
   .faq-item:nth-child(4){ animation-delay:.12s; }
@@ -30,11 +30,11 @@
   .faq-item:nth-child(11){ animation-delay:.4s; }
   @keyframes fadeUp { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
   .faq-item h3 { font-size:15px; font-weight:700; margin-bottom:8px; }
-  .faq-item p { color:var(--muted); font-size:13.5px; line-height:1.7; }
-  .faq-item ul { color:var(--muted); font-size:13.5px; line-height:1.7; padding-left:20px; margin-top:6px; }
+  .faq-item p { color:var(-muted); font-size:13.5px; line-height:1.7; }
+  .faq-item ul { color:var(-muted); font-size:13.5px; line-height:1.7; padding-left:20px; margin-top:6px; }
   .faq-item li { margin-bottom:4px; }
   .faq-item code { background:#1a1a1a; padding:2px 6px; border-radius:6px; font-size:12px; color:#fff; }
-  .back-link { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; margin-bottom:24px; transition: color .15s; }
+  .back-link { display:inline-flex; align-items:center; gap:6px; color:var(-muted); font-size:13px; margin-bottom:24px; transition: color .15s; }
   .back-link:hover { color:#fff; }
   [data-lang="en"] { display:none; }
   body.lang-en [data-lang="ru"] { display:none; }
@@ -57,64 +57,79 @@
       <button data-btn="en">EN</button>
     </div>
 
-    <!-- ======================= RU ======================= -->
+    <!- ======================= RU ======================= ->
     <div data-lang="ru">
       <h1>Часто задаваемые вопросы</h1>
-      <p class="updated">Последнее обновление: 24 августа 2026 г.</p>
+      <p class="updated">Последнее обновление: 25 августа 2026 г.</p>
+
+      <div class="faq-item">
+        <h3>Чем регистрация через почту отличается от быстрого входа?</h3>
+        <p>Вы можете войти двумя способами. <strong>Регистрация через почту</strong> - основной способ: вы указываете ник, почту и пароль, подтверждаете почту кодом из письма и получаете постоянный аккаунт с возможностью восстановления доступа. <strong>Быстрый вход</strong> - вход только по нику без почты и пароля. Это временный гостевой аккаунт, который не сохраняется при очистке браузера и не восстанавливается.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Как подтвердить почту? Что делать, если код не приходит?</h3>
+        <p>После регистрации вы получите письмо с 6-значным кодом на указанную почту. Введите его на экране подтверждения, чтобы завершить регистрацию. Если письмо не пришло, проверьте папку «Спам» и убедитесь, что вы указали верный адрес. На отправку кодов действуют лимиты для защиты от спама - при частых попытках попробуйте позже.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Как сбросить пароль?</h3>
+        <p>На экране входа нажмите «Забыли пароль?», укажите Вашу почту - вы получите код для сброса. Введите код и новый пароль, и вы сможете войти с новым паролем.</p>
+      </div>
 
       <div class="faq-item">
         <h3>Как создать комнату?</h3>
-        <p>Нажми «Создать комнату» на главной, выбери площадку (VK, RuTube или YouTube), вставь ссылку на видео и нажми «Создать и войти». После этого поделись кодом или ссылкой на комнату с друзьями.</p>
+        <p>Нажмите «Создать комнату» на главной, выберите площадку (VK, RuTube или YouTube), вставьте ссылку на видео и нажмите «Создать и войти». После этого поделитесь кодом или ссылкой на комнату с друзьями.</p>
       </div>
 
       <div class="faq-item">
         <h3>Как войти по коду?</h3>
-        <p>Получи код от друга (6 символов, например <code>7X9KQ2</code>), нажми «Войти в комнату» и вставь код или полную ссылку. Ссылка выглядит так: <code>https://togetherly.online/room.html?code=7X9KQ2</code></p>
+        <p>Получите код от друга (6 символов, например <code>7X9KQ2</code>), нажмите «Войти в комнату» и вставьте код или полную ссылку. Ссылка выглядит так: <code>https://togetherly.online/room.html?code=7X9KQ2</code></p>
       </div>
 
       <div class="faq-item">
         <h3>Какие площадки поддерживаются?</h3>
         <ul>
-          <li><strong>VK</strong> — обычная ссылка на видео (<code>vk.com/video-123_456</code>)</li>
-          <li><strong>YouTube</strong> — стандартная ссылка (<code>youtube.com/watch?v=...</code> или <code>youtu.be/...</code>)</li>
-          <li><strong>Rutube</strong> — ссылка на видео (<code>rutube.ru/video/...</code>)</li>
+          <li><strong>VK</strong> - обычная ссылка на видео (<code>vk.com/video-123_456</code>)</li>
+          <li><strong>YouTube</strong> - стандартная ссылка (<code>youtube.com/watch?v=...</code> или <code>youtu.be/...</code>)</li>
+          <li><strong>Rutube</strong> - ссылка на видео (<code>rutube.ru/video/...</code>)</li>
         </ul>
       </div>
 
       <div class="faq-item">
         <h3>Как работает синхронизация?</h3>
-        <p>Тот, кто создал комнату (хост), управляет воспроизведением. Когда хост нажимает play/pause/перемотку, все остальные участники автоматически синхронизируются. Гости не могут управлять видео independently.</p>
+        <p>Тот, кто создал комнату (хост), управляет воспроизведением. Когда хост нажимает play/pause/перемотку, все остальные участники автоматически синхронизируются.</p>
       </div>
 
       <div class="faq-item">
         <h3>Что такое профиль?</h3>
-        <p>Профиль состоит из ника, аватара (эмодзи или фото) и краткого описания (био до 120 символов). Профиль можно настроить через меню в шапке. Имя, аватар и био видят другие участники в списке участников комнаты.</p>
+        <p>Профиль состоит из ника, аватара (эмодзи или фото) и краткого описания (био до 120 символов). Вы можете настроить профиль через меню в шапке. Имя, аватар и био видят другие участники в списке участников комнаты.</p>
       </div>
 
       <div class="faq-item">
         <h3>Можно ли удалить аккаунт?</h3>
-        <p>Аккаунт удаляется автоматически при выходе из аккаунта. Все данные (ник, аватар, био) удаляются из базы данных. При повторном входе создаётся новый аккаунт.</p>
+        <p>Да. Вы можете удалить свой аккаунт, обратившись в поддержку по адресу <a href="mailto:support@togetherly.online" style="color:#fff;">support@togetherly.online</a>. При выходе из аккаунта данные не удаляются - аккаунт сохраняется, и вы сможете войти снова. Гостевые аккаунты (быстрый вход) являются временными.</p>
       </div>
 
       <div class="faq-item">
         <h3>Кто видит мои сообщения?</h3>
-        <p>Сообщения в чате видны всем участникам комнаты в реальном времени. Сообщения хранятся на сервере в файле и удаляются при опустошении комнаты (когда все выйдут).</p>
+        <p>Сообщения в чате видны всем участникам комнаты в реальном времени. Сообщения хранятся на сервере и удаляются при опустошении комнаты (когда все выйдут).</p>
       </div>
 
       <div class="faq-item">
         <h3>Есть ли ограничения?</h3>
         <ul>
-          <li>Сообщения — до 500 символов</li>
-          <li>Хранение сообщений — до 200 на комнату</li>
-          <li>Аватар — до 2 МБ (сжимается до ~500 КБ)</li>
-          <li>Био — до 120 символов</li>
-          <li>Ник — до 20 символов</li>
+          <li>Сообщения - до 500 символов</li>
+          <li>Хранение сообщений - до 200 на комнату</li>
+          <li>Аватар - до 2 МБ (сжимается до ~500 КБ)</li>
+          <li>Био - до 120 символов</li>
+          <li>Ник - до 20 символов</li>
         </ul>
       </div>
 
       <div class="faq-item">
         <h3>Нужен ли пароль?</h3>
-        <p>Нет. Авторизация работает только по нику. Каждый вход создаёт временный аккаунт, который удаляется при выходе. Паролей, email и телефонов не требуется.</p>
+        <p>Для входа через почту - да, пароль обязателен. Для быстрого входа пароль не требуется - достаточно указать ник.</p>
       </div>
 
       <div class="faq-item">
@@ -124,14 +139,29 @@
 
       <div class="faq-item">
         <h3>Можно ли смотреть с телефона?</h3>
-        <p>Да, Togetherly адаптирован для мобильных устройств. Интерфейс работает на любых экранах — от смартфона до десктопа.</p>
+        <p>Да, Togetherly адаптирован для мобильных устройств. Интерфейс работает на любых экранах - от смартфона до десктопа.</p>
       </div>
     </div>
 
-    <!-- ======================= EN ======================= -->
+    <!- ======================= EN ======================= ->
     <div data-lang="en">
       <h1>Frequently Asked Questions</h1>
-      <p class="updated">Last updated: August 24, 2026</p>
+      <p class="updated">Last updated: August 25, 2026</p>
+
+      <div class="faq-item">
+        <h3>What is the difference between email registration and quick login?</h3>
+        <p>You can sign in in two ways. <strong>Email registration</strong> is the main method: You enter a username, email and password, confirm your email with a code and get a permanent account you can recover. <strong>Quick login</strong> is a guest login by username only, without email or password. It is temporary and is not restored after you clear your browser.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How do I verify my email? What if the code doesn't arrive?</h3>
+        <p>After registration You will receive an email with a 6-digit code. Enter it on the verification screen to complete registration. If You don't see the email, please check Your Spam folder and make sure the address is correct. Limits apply to code sending to protect against spam - please try again later if You made many attempts.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How do I reset my password?</h3>
+        <p>On the sign-in screen click "Forgot password?", enter Your email - You will receive a reset code. Enter the code and a new password to sign in with the new password.</p>
+      </div>
 
       <div class="faq-item">
         <h3>How to create a room?</h3>
@@ -146,15 +176,15 @@
       <div class="faq-item">
         <h3>Which platforms are supported?</h3>
         <ul>
-          <li><strong>VK</strong> — regular video link (<code>vk.com/video-123_456</code>)</li>
-          <li><strong>YouTube</strong> — standard link (<code>youtube.com/watch?v=...</code> or <code>youtu.be/...</code>)</li>
-          <li><strong>Rutube</strong> — video link (<code>rutube.ru/video/...</code>)</li>
+          <li><strong>VK</strong> - regular video link (<code>vk.com/video-123_456</code>)</li>
+          <li><strong>YouTube</strong> - standard link (<code>youtube.com/watch?v=...</code> or <code>youtu.be/...</code>)</li>
+          <li><strong>Rutube</strong> - video link (<code>rutube.ru/video/...</code>)</li>
         </ul>
       </div>
 
       <div class="faq-item">
         <h3>How does synchronization work?</h3>
-        <p>The person who created the room (host) controls playback. When the host presses play/pause/seek, all other participants automatically sync. Guests cannot control video independently.</p>
+        <p>The person who created the room (host) controls playback. When the host presses play/pause/seek, all other participants automatically sync.</p>
       </div>
 
       <div class="faq-item">
@@ -164,28 +194,28 @@
 
       <div class="faq-item">
         <h3>Can I delete my account?</h3>
-        <p>Your account is automatically deleted when you log out. All data (username, avatar, bio) is removed from the database. A new account is created when you log in again.</p>
+        <p>Yes. You can delete Your account by contacting support at <a href="mailto:support@togetherly.online" style="color:#fff;">support@togetherly.online</a>. Signing out does not delete Your account - it is saved and You can sign in again. Guest accounts (quick login) are temporary.</p>
       </div>
 
       <div class="faq-item">
         <h3>Who can see my messages?</h3>
-        <p>Chat messages are visible to all room participants in real time. Messages are stored on the server in a file and deleted when the room becomes empty (when everyone leaves).</p>
+        <p>Chat messages are visible to all room participants in real time. Messages are stored on the server and deleted when the room becomes empty (when everyone leaves).</p>
       </div>
 
       <div class="faq-item">
         <h3>Are there any limitations?</h3>
         <ul>
-          <li>Messages — up to 500 characters</li>
-          <li>Message storage — up to 200 per room</li>
-          <li>Avatar — up to 2 MB (compressed to ~500 KB)</li>
-          <li>Bio — up to 120 characters</li>
-          <li>Username — up to 20 characters</li>
+          <li>Messages - up to 500 characters</li>
+          <li>Message storage - up to 200 per room</li>
+          <li>Avatar - up to 2 MB (compressed to ~500 KB)</li>
+          <li>Bio - up to 120 characters</li>
+          <li>Username - up to 20 characters</li>
         </ul>
       </div>
 
       <div class="faq-item">
         <h3>Do I need a password?</h3>
-        <p>No. Authentication works by username only. Each login creates a temporary account that is deleted when you log out. No passwords, emails, or phone numbers are required.</p>
+        <p>For email sign-in - yes, a password is required. For quick login no password is needed - just enter a username.</p>
       </div>
 
       <div class="faq-item">
@@ -195,7 +225,7 @@
 
       <div class="faq-item">
         <h3>Can I watch on my phone?</h3>
-        <p>Yes, Togetherly is optimized for mobile devices. The interface works on any screen — from smartphone to desktop.</p>
+        <p>Yes, Togetherly is optimized for mobile devices. The interface works on any screen - from smartphone to desktop.</p>
       </div>
     </div>
   </div>

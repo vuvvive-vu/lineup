@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>togetherly — Privacy Policy</title>
+<title>togetherly - Privacy Policy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -12,9 +12,9 @@
   .legal-wrap { max-width:780px; margin:0 auto; padding:100px 24px 80px; animation: pageIn .4s ease both; }
   @keyframes pageIn { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:translateY(0)} }
   .legal-wrap h1 { font-size:28px; font-weight:800; letter-spacing:-0.03em; margin-bottom:8px; }
-  .legal-wrap .updated { color:var(--muted); font-size:13px; margin-bottom:32px; }
-  .lang-toggle { display:inline-flex; background:#0a0a0a; border:1px solid var(--border); border-radius:999px; padding:3px; margin-bottom:28px; }
-  .lang-toggle button { padding:8px 18px; border-radius:999px; border:none; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; transition: all .15s; font-family:inherit; }
+  .legal-wrap .updated { color:var(-muted); font-size:13px; margin-bottom:32px; }
+  .lang-toggle { display:inline-flex; background:#0a0a0a; border:1px solid var(-border); border-radius:999px; padding:3px; margin-bottom:28px; }
+  .lang-toggle button { padding:8px 18px; border-radius:999px; border:none; background:transparent; color:var(-muted); font-weight:600; font-size:13px; cursor:pointer; transition: all .15s; font-family:inherit; }
   .lang-toggle button.active { background:#fff; color:#000; }
   .legal-section { margin-bottom:36px; animation: fadeUp .5s ease both; }
   .legal-section:nth-child(2){ animation-delay:.06s; }
@@ -27,18 +27,18 @@
   @keyframes fadeUp { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
   .legal-section h2 { font-size:18px; font-weight:700; margin-bottom:10px; letter-spacing:-0.01em; }
   .legal-section h3 { font-size:14px; font-weight:600; margin-bottom:6px; color:#ccc; }
-  .legal-section p, .legal-section li { color:var(--muted); font-size:13.5px; line-height:1.7; }
+  .legal-section p, .legal-section li { color:var(-muted); font-size:13.5px; line-height:1.7; }
   .legal-section ul { padding-left:20px; margin-top:6px; }
   .legal-section li { margin-bottom:4px; }
   .legal-section a { color:#fff; text-decoration:underline; text-underline-offset:2px; }
   .legal-section a:hover { opacity:.8; }
-  .toc { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px 24px; margin-bottom:36px; }
-  .toc h3 { font-size:14px; font-weight:700; margin-bottom:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .toc { background:var(-card); border:1px solid var(-border); border-radius:16px; padding:20px 24px; margin-bottom:36px; }
+  .toc h3 { font-size:14px; font-weight:700; margin-bottom:10px; color:var(-muted); text-transform:uppercase; letter-spacing:0.05em; }
   .toc ul { list-style:none; padding:0; }
   .toc li { margin-bottom:6px; }
-  .toc a { color:var(--muted); font-size:13.5px; transition: color .15s; }
+  .toc a { color:var(-muted); font-size:13.5px; transition: color .15s; }
   .toc a:hover { color:#fff; }
-  .back-link { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; margin-bottom:24px; transition: color .15s; }
+  .back-link { display:inline-flex; align-items:center; gap:6px; color:var(-muted); font-size:13px; margin-bottom:24px; transition: color .15s; }
   .back-link:hover { color:#fff; }
   [data-lang="en"] { display:none; }
   body.lang-en [data-lang="ru"] { display:none; }
@@ -62,10 +62,10 @@
       <button data-btn="en">EN</button>
     </div>
 
-    <!-- ======================= RU ======================= -->
+    <!- ======================= RU ======================= ->
     <div data-lang="ru">
       <h1>Политика конфиденциальности</h1>
-      <p class="updated">Последнее обновление: 24 августа 2026 г.</p>
+      <p class="updated">Последнее обновление: 25 августа 2026 г.</p>
 
       <div class="toc">
         <h3>Содержание</h3>
@@ -75,7 +75,7 @@
           <li><a href="#ru-storage">3. Хранение данных</a></li>
           <li><a href="#ru-third">4. Третьи стороны</a></li>
           <li><a href="#ru-security">5. Безопасность</a></li>
-          <li><a href="#ru-rights">6. Ваши права</a></li>
+          <li><a href="#ru-rights">6. ваши права</a></li>
           <li><a href="#ru-contact">7. Контакты</a></li>
         </ul>
       </div>
@@ -84,44 +84,46 @@
         <h2>1. Что мы собираем</h2>
         <p>Togetherly собирает только минимально необходимые данные для работы сервиса:</p>
         <ul>
-          <li><strong>Имя пользователя (ник)</strong> — отображаемое имя, указываемое при входе. Не является уникальным идентификатором аккаунта.</li>
-          <li><strong>Аватар</strong> — эмодзи или загруженное фото (преобразованное в base64, сжатое до 256px, не более ~500 КБ).</li>
-          <li><strong>Биография</strong> — произвольный текст до 120 символов.</li>
-          <li><strong>Сообщения чата</strong> — текстовые сообщения до 500 символов. Хранятся в активных комнатах (до 200 сообщений) и удаляются при выходе всех участников.</li>
-          <li><strong>Реакции</strong> — эмодзи-реакции на сообщения (до 4 символов).</li>
+          <li><strong>Имя пользователя (ник)</strong> - отображаемое имя, которое вы указываете при входе.</li>
+          <li><strong>Электронная почта</strong> - используется только для регистрации через почту, подтверждения и восстановления доступа. Для быстрого входа не требуется.</li>
+          <li><strong>Пароль</strong> - хранится только в виде хеша, мы не видим ваш исходный пароль.</li>
+          <li><strong>Аватар</strong> - эмодзи или загруженное фото (сжатое до 256px, не более ~500 КБ).</li>
+          <li><strong>Биография</strong> - произвольный текст до 120 символов.</li>
+          <li><strong>Сообщения чата</strong> - текстовые сообщения до 500 символов. Хранятся в активных комнатах (до 200 сообщений) и удаляются при выходе всех участников.</li>
+          <li><strong>Реакции</strong> - эмодзи-реакции на сообщения.</li>
         </ul>
-        <p><strong>Важно:</strong> каждый вход в сервис создаёт новый временный аккаунт. При выходе из аккаунта все данные (ник, аватар, био) автоматически удаляются из базы данных.</p>
       </div>
 
       <div class="legal-section" id="ru-how">
         <h2>2. Как мы используем данные</h2>
         <ul>
           <li>Имя пользователя, аватар и био отображаются другим участникам в профиле и списке участников комнаты.</li>
+          <li>Адрес почты используется только для отправки кода подтверждения и кода для сброса пароля.</li>
           <li>Сообщения чата видны всем участникам комнаты в реальном времени.</li>
-          <li>Мы <strong>не</strong> используем данные для таргетированной рекламы, аналитики или продажи третьим сторонам.</li>
-          <li>Мы <strong>не</strong> собираем адреса электронной почты, номера телефонов или любую другую личную идентифицирующую информацию.</li>
+          <li>Мы <strong>не</strong> используем ваши данные для таргетированной рекламы, аналитики или продажи третьим сторонам.</li>
         </ul>
       </div>
 
       <div class="legal-section" id="ru-storage">
         <h2>3. Хранение данных</h2>
         <ul>
-          <li><strong>Аккаунты</strong> хранятся в базе данных PostgreSQL на серверах Render.com (США) и <strong>автоматически удаляются при выходе</strong> из аккаунта.</li>
-          <li><strong>Сообщения чата</strong> хранятся локально на сервере в файле и удаляются при опустошении комнаты.</li>
-          <li><strong>Токены авторизации</strong> хранятся только в браузере пользователя (localStorage) и не передаются на сервер в зашифрованном виде.</li>
-          <li>Данные <strong>не дублируются</strong> и не передаются в сторонние хранилища.</li>
+          <li><strong>Аккаунты, созданные через почту</strong>, хранятся в базе данных PostgreSQL (Supabase) на постоянной основе и не удаляются при выходе из аккаунта.</li>
+          <li><strong>Гостевые аккаунты (быстрый вход)</strong> являются временными и хранятся только в памяти сервера.</li>
+          <li><strong>Сообщения чата</strong> хранятся на сервере и удаляются при опустошении комнаты.</li>
+          <li><strong>Токены авторизации</strong> хранятся только в браузере (localStorage) в виде JWT.</li>
         </ul>
       </div>
 
       <div class="legal-section" id="ru-third">
         <h2>4. Третьи стороны</h2>
-        <p>Togetherly загружает скрипты следующих сервисов исключительно для воспроизведения видео:</p>
+        <p>Togetherly использует следующие сервисы:</p>
         <ul>
-          <li><strong>YouTube</strong> — YouTube IFrame API для воспроизведения видео.</li>
-          <li><strong>VK</strong> — VK Video Player API для воспроизведения видео.</li>
-          <li><strong>Rutube</strong> — встраивание видео через iframe.</li>
+          <li><strong>Resend / Amazon SES</strong> - для отправки писем с кодами подтверждения.</li>
+          <li><strong>YouTube</strong> - YouTube IFrame API для воспроизведения видео.</li>
+          <li><strong>VK</strong> - VK Video API для воспроизведения видео.</li>
+          <li><strong>Rutube</strong> - встраивание видео через iframe.</li>
         </ul>
-        <p>Эти сервисы могут собирать данные в соответствии с собственными политиками конфиденциальности. Мы не несём ответственности за их практики сбора данных.</p>
+        <p>Видео-сервисы могут собирать данные в соответствии с собственными политиками конфиденциальности. Мы не несём ответственности за их практики.</p>
       </div>
 
       <div class="legal-section" id="ru-security">
@@ -129,18 +131,19 @@
         <p>Мы принимаем разумные меры для защиты ваших данных:</p>
         <ul>
           <li>Данные передаются по протоколу HTTPS.</li>
+          <li>Пароли хранятся только в виде хеша.</li>
           <li>Доступ к базе данных ограничен серверным окружением.</li>
-          <li>Админ-панель защищена паролем.</li>
+          <li>Действуют лимиты на отправку кодов для защиты от спама.</li>
         </ul>
-        <p>Авторизация в Togetherly работает по имени пользователя <strong>без пароля</strong>. Каждый вход создаёт новый временный аккаунт, который автоматически удаляется при выходе. Ник не является уникальным — несколько пользователей могут использовать один и тот же ник одновременно.</p>
+        <p>Для защиты вашего аккаунта используйте надёжный пароль и не передавайте коды из писем третьим лицам.</p>
       </div>
 
       <div class="legal-section" id="ru-rights">
-        <h2>6. Ваши права</h2>
+        <h2>6. ваши права</h2>
         <ul>
-          <li><strong>Автоматическое удаление</strong> — ваш аккаунт автоматически удаляется из базы данных при выходе из аккаунта.</li>
-          <li><strong>Право на редактирование</strong> — вы можете изменить ник, аватар и био в любое время через настройки профиля.</li>
-          <li><strong>Право на доступ</strong> — вы можете запросить информацию о сохранённых данных по адресу <a href="mailto:support@togetherly.online">support@togetherly.online</a>.</li>
+          <li><strong>Право на редактирование</strong> - вы можете изменить ник, аватар и био в любое время через настройки профиля.</li>
+          <li><strong>Право на удаление</strong> - вы можете запросить удаление своего аккаунта, обратившись по адресу <a href="mailto:support@togetherly.online">support@togetherly.online</a>.</li>
+          <li><strong>Право на доступ</strong> - вы можете запросить информацию о сохранённых данных по тому же адресу.</li>
         </ul>
       </div>
 
@@ -150,10 +153,10 @@
       </div>
     </div>
 
-    <!-- ======================= EN ======================= -->
+    <!- ======================= EN ======================= ->
     <div data-lang="en">
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: August 24, 2026</p>
+      <p class="updated">Last updated: August 25, 2026</p>
 
       <div class="toc">
         <h3>Contents</h3>
@@ -172,63 +175,66 @@
         <h2>1. What We Collect</h2>
         <p>Togetherly collects only the minimum data necessary to operate the service:</p>
         <ul>
-          <li><strong>Username</strong> — a display name you choose when logging in. It is not a unique account identifier.</li>
-          <li><strong>Avatar</strong> — either a preset emoji or an uploaded photo (converted to base64, compressed to 256px, max ~500 KB).</li>
-          <li><strong>Bio</strong> — free-text up to 120 characters.</li>
-          <li><strong>Chat messages</strong> — plain text up to 500 characters. Stored in active rooms (up to 200 messages) and deleted when all participants leave.</li>
-          <li><strong>Reactions</strong> — emoji reactions on messages (up to 4 characters).</li>
+          <li><strong>Username</strong> - a display name You choose when signing in.</li>
+          <li><strong>Email</strong> - used only for email registration, verification and password recovery. Not required for quick login.</li>
+          <li><strong>Password</strong> - stored only as a hash, we never see Your original password.</li>
+          <li><strong>Avatar</strong> - either a preset emoji or an uploaded photo (compressed to 256px, max ~500 KB).</li>
+          <li><strong>Bio</strong> - free-text up to 120 characters.</li>
+          <li><strong>Chat messages</strong> - plain text up to 500 characters. Stored in active rooms (up to 200 messages) and deleted when all participants leave.</li>
+          <li><strong>Reactions</strong> - emoji reactions on messages.</li>
         </ul>
-        <p><strong>Important:</strong> each login creates a new temporary account. When you log out, all your data (username, avatar, bio) is automatically deleted from the database.</p>
       </div>
 
       <div class="legal-section" id="en-how">
         <h2>2. How We Use Data</h2>
         <ul>
-          <li>Your username, avatar, and bio are displayed to other users in your profile and room participant lists.</li>
+          <li>Your username, avatar, and bio are displayed to other users in Your profile and room participant lists.</li>
+          <li>Your email is used only to send a verification code and a password reset code.</li>
           <li>Chat messages are visible to all room participants in real time.</li>
           <li>We do <strong>not</strong> use data for targeted advertising, analytics, or selling to third parties.</li>
-          <li>We do <strong>not</strong> collect email addresses, phone numbers, or any other personally identifiable information.</li>
         </ul>
       </div>
 
       <div class="legal-section" id="en-storage">
         <h2>3. Data Storage</h2>
         <ul>
-          <li><strong>Accounts</strong> are stored in a PostgreSQL database on Render.com servers (USA) and <strong>automatically deleted when you log out</strong>.</li>
-          <li><strong>Chat messages</strong> are stored locally on the server in a file and deleted when a room becomes empty.</li>
-          <li><strong>Auth tokens</strong> are stored only in the user's browser (localStorage) and are not sent to the server in encrypted form.</li>
-          <li>Data is <strong>not duplicated</strong> or transferred to third-party storage.</li>
+          <li><strong>Email accounts</strong> are stored in a PostgreSQL database (Supabase) permanently and are not deleted when You sign out.</li>
+          <li><strong>Guest accounts (quick login)</strong> are temporary and stored only in server memory.</li>
+          <li><strong>Chat messages</strong> are stored on the server and deleted when a room becomes empty.</li>
+          <li><strong>Auth tokens</strong> are stored only in Your browser (localStorage) as a JWT.</li>
         </ul>
       </div>
 
       <div class="legal-section" id="en-third">
         <h2>4. Third-Party Services</h2>
-        <p>Togetherly loads scripts from the following services solely for video playback:</p>
+        <p>Togetherly uses the following services:</p>
         <ul>
-          <li><strong>YouTube</strong> — YouTube IFrame API for video playback.</li>
-          <li><strong>VK</strong> — VK Video Player API for video playback.</li>
-          <li><strong>Rutube</strong> — video embedding via iframe.</li>
+          <li><strong>Resend / Amazon SES</strong> - to send verification emails.</li>
+          <li><strong>YouTube</strong> - YouTube IFrame API for video playback.</li>
+          <li><strong>VK</strong> - VK Video API for video playback.</li>
+          <li><strong>Rutube</strong> - video embedding via iframe.</li>
         </ul>
         <p>These services may collect data in accordance with their own privacy policies. We are not responsible for their data collection practices.</p>
       </div>
 
       <div class="legal-section" id="en-security">
         <h2>5. Security</h2>
-        <p>We take reasonable measures to protect your data:</p>
+        <p>We take reasonable measures to protect Your data:</p>
         <ul>
           <li>Data is transmitted over HTTPS.</li>
+          <li>Passwords are stored only as hashes.</li>
           <li>Database access is restricted to the server environment.</li>
-          <li>The admin panel is password-protected.</li>
+          <li>Limits apply to code sending to protect against spam.</li>
         </ul>
-        <p>Togetherly authentication works by username <strong>without a password</strong>. Each login creates a new temporary account that is automatically deleted when you log out. Usernames are not unique — multiple users can use the same username simultaneously.</p>
+        <p>Please use a strong password and do not share codes from emails with third parties.</p>
       </div>
 
       <div class="legal-section" id="en-rights">
         <h2>6. Your Rights</h2>
         <ul>
-          <li><strong>Automatic deletion</strong> — your account is automatically deleted from the database when you log out.</li>
-          <li><strong>Right to edit</strong> — you can change your username, avatar, and bio at any time through profile settings.</li>
-          <li><strong>Right to access</strong> — you can request information about stored data at <a href="mailto:support@togetherly.online">support@togetherly.online</a>.</li>
+          <li><strong>Right to edit</strong> - You can change Your username, avatar, and bio at any time through profile settings.</li>
+          <li><strong>Right to delete</strong> - You can request deletion of Your account at <a href="mailto:support@togetherly.online">support@togetherly.online</a>.</li>
+          <li><strong>Right to access</strong> - You can request information about stored data at the same address.</li>
         </ul>
       </div>
 
@@ -238,10 +244,10 @@
       </div>
     </div>
 
-    <!-- ======================= TERMS (RU) ======================= -->
+    <!- ======================= TERMS (RU) ======================= ->
     <div data-lang="ru" style="margin-top:48px;">
       <h1>Условия использования</h1>
-      <p class="updated">Последнее обновление: 24 августа 2026 г.</p>
+      <p class="updated">Последнее обновление: 25 августа 2026 г.</p>
 
       <div class="legal-section">
         <h2>1. Принятие условий</h2>
@@ -250,8 +256,8 @@
 
       <div class="legal-section">
         <h2>2. Описание сервиса</h2>
-        <p>Togetherly — это платформа для совместного просмотра видео с друзьями. Пользователи могут создавать комнаты, делиться ссылками на видео и смотреть их синхронно в реальном времени.</p>
-        <p>Каждый вход в сервис создаёт временный аккаунт, который автоматически удаляется при выходе. Ник не является уникальным и не защищён паролем.</p>
+        <p>Togetherly - это платформа для совместного просмотра видео с друзьями. Вы можете создать комнату, поделиться ссылкой на видео и смотреть его синхронно в реальном времени.</p>
+        <p>Вы можете войти через регистрацию с подтверждением почты или через быстрый гостевой вход по нику.</p>
       </div>
 
       <div class="legal-section">
@@ -290,20 +296,20 @@
       </div>
     </div>
 
-    <!-- ======================= TERMS (EN) ======================= -->
+    <!- ======================= TERMS (EN) ======================= ->
     <div data-lang="en" style="margin-top:48px;">
       <h1>Terms of Service</h1>
-      <p class="updated">Last updated: August 24, 2026</p>
+      <p class="updated">Last updated: August 25, 2026</p>
 
       <div class="legal-section">
         <h2>1. Acceptance of Terms</h2>
-        <p>By using Togetherly, you agree to these terms. If you do not agree with any of the terms, please stop using the service.</p>
+        <p>By using Togetherly, You agree to these terms. If You do not agree with any of the terms, please stop using the service.</p>
       </div>
 
       <div class="legal-section">
         <h2>2. Service Description</h2>
-        <p>Togetherly is a platform for watching videos together with friends. Users can create rooms, share video links, and watch them synchronously in real time.</p>
-        <p>Each login creates a temporary account that is automatically deleted when you log out. Usernames are not unique and are not protected by passwords.</p>
+        <p>Togetherly is a platform for watching videos together with friends. You can create rooms, share video links, and watch them synchronously in real time.</p>
+        <p>You can sign in via email registration with verification or via quick guest login by username.</p>
       </div>
 
       <div class="legal-section">
@@ -333,7 +339,7 @@
 
       <div class="legal-section">
         <h2>6. Changes</h2>
-        <p>We reserve the right to change these terms of service. We will notify you of significant changes through the service interface.</p>
+        <p>We reserve the right to change these terms of service. We will notify You of significant changes through the service interface.</p>
       </div>
 
       <div class="legal-section">
