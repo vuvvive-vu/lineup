@@ -719,8 +719,9 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
   const currentBadge = avaWrap.dataset.badge || null;
   // если тот же бейдж и частицы уже есть - не пересоздаём
   if (currentBadge === badge && badge && (avaWrap.querySelectorAll('.snowflake').length >= 10 || avaWrap.querySelectorAll('.petal').length >= 8)) {
-    if (crownIcon) crownIcon.style.display = (badge==='developer'?'block':'none');
-    if (heartIcon) heartIcon.style.display = (badge==='founders_wife'?'block':'none');
+    const cfgEarly = BADGE_PRESETS_CLIENT[badge];
+    if (crownIcon) crownIcon.style.display = (cfgEarly && cfgEarly.icon==='crown' ? 'block' : 'none');
+    if (heartIcon) heartIcon.style.display = (cfgEarly && cfgEarly.icon==='heart' ? 'block' : 'none');
     if (badgeEl) badgeEl.style.display = badge && !isGuest ? 'inline-block' : 'none';
     return;
   }
@@ -731,7 +732,7 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
   delete avaWrap.dataset.badge;
   if (crownIcon) crownIcon.style.display = 'none';
   if (heartIcon) heartIcon.style.display = 'none';
-  if (badgeEl) { badgeEl.style.display = 'none'; badgeEl.textContent = 'DEVELOPER'; }
+  if (badgeEl) { badgeEl.style.display = 'none'; badgeEl.textContent = 'FOUNDER'; }
   if (isGuest || !badge) return;
   const cfg = BADGE_PRESETS_CLIENT[badge];
   if (!cfg) return;
