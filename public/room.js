@@ -24,6 +24,9 @@ const T={
 "Отмена":"Cancel","Готово":"Done","Изменить фотографию":"Change photo","Изм.":"Edit","в сети":"online",
 "например, Валентин":"e.g. Valentin","ваше имя":"your name",
 "Это имя уже занято.":"This username is taken.","Имя пользователя должно содержать не меньше 3 символов.":"Username must be at least 3 characters.",
+"Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.":"You can use a-z, 0-9 and -_. Minimum length - 3 characters.",
+"Имя пользователя 3-20: a-z, 0-9, -_":"Username 3-20: a-z, 0-9, -_",
+"Имя пользователя 3-20: a-z, 0-9, -_":"Username 3-20: a-z, 0-9, -_",
 "Проверка...":"Checking...",
 };
 function isEn(){return localStorage.getItem('rave_lang')==='en';}
@@ -890,6 +893,7 @@ function openEditRoom(){
   pErrorRoom.classList.remove('show'); pErrorRoom.style.display='none';
   profileModalRoom.classList.remove('show');
   if(editModalRoom) editModalRoom.classList.add('show');
+  setTimeout(()=>{ const st=document.getElementById('eUsernameStatus'); if(eUsernameRoom && st) eUsernameRoom.dispatchEvent(new Event('input')); }, 50);
 }
 function closeEditRoom(){ if(editModalRoom) editModalRoom.classList.remove('show'); }
 if(profileModalRoom){
@@ -948,7 +952,7 @@ if(profileModalRoom){
     if(!newDisplay) { pErrorRoom.textContent='Имя не может быть пустым'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     if(newDisplay.length>20){ pErrorRoom.textContent='Максимум 20 символов'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     if(!newHandle){ pErrorRoom.textContent='Введите имя пользователя'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
-    if(!/^[a-z0-9_]{3,20}$/.test(newHandle)){ pErrorRoom.textContent='Имя пользователя 3-20: a-z, 0-9, _'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
+    if(!/^[a-z0-9_-]{3,20}$/.test(newHandle)){ pErrorRoom.textContent='Имя пользователя 3-20: a-z, 0-9, -_'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     pSaveRoom.disabled=true; pSaveRoom.textContent='Сохранение...';
     try{
       const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({displayName:newDisplay, username:newHandle, avatar:selectedAvaRoom, bio:newBio}) });
@@ -976,9 +980,9 @@ if(profileModalRoom){
     const runRoomCheck=()=>{
       clearTimeout(tmr);
       const v=eUserInputRoom.value.trim().toLowerCase();
-      if(!v){ eUserStatusRoom.textContent=''; return; }
+      if(!v){ eUserStatusRoom.textContent=t('Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); eUserStatusRoom.style.color='#9a9a9a'; return; }
       if(v.length<3){ eUserStatusRoom.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); eUserStatusRoom.style.color='#ff3b30'; return; }
-      if(!/^[a-z0-9_]{3,20}$/.test(v)){ eUserStatusRoom.textContent=''; return; }
+      if(!/^[a-z0-9_-]{3,20}$/.test(v)){ eUserStatusRoom.textContent=''; return; }
       eUserStatusRoom.textContent=t('Проверка...'); eUserStatusRoom.style.color='#9a9a9a';
       tmr=setTimeout(async()=>{
         try{

@@ -92,7 +92,7 @@ async function getUserByUsername(username) {
   return rows[0] || null;
 }
 
-function isValidHandle(s){ return /^[a-z0-9_]{3,20}$/.test(s); }
+function isValidHandle(s){ return /^[a-z0-9_-]{3,20}$/.test(s); }
 
 async function createAccount({ displayName, username, avatar, bio }) {
   // guest: only displayName, generate fallback username if not provided

@@ -96,6 +96,11 @@ const T={
   'Отмена':'Cancel','Готово':'Done','Изменить фотографию':'Change photo','Изм.':'Edit','в сети':'online',
   'например, Валентин':'e.g. Valentin','ваше имя':'your name',
   'Это имя уже занято.':'This username is taken.','Имя пользователя должно содержать не меньше 3 символов.':'Username must be at least 3 characters.',
+  'Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.':'You can use a-z, 0-9 and -_. Minimum length - 3 characters.',
+  'Имя пользователя 3-20: a-z, 0-9, -_':'Username 3-20: a-z, 0-9, -_',
+  'Имя пользователя 3-20: a-z, 0-9, -_':'Username 3-20: a-z, 0-9, -_',
+  'Имя пользователя 3-20 символов: a-z, 0-9, _':'Username 3-20 characters: a-z, 0-9, -_',
+  'Имя пользователя 3-20 символов: a-z, 0-9, -_':'Username 3-20 characters: a-z, 0-9, -_',
   'Проверка...':'Checking...',
   // Room
   'Профиль':'Profile','Описание':'Description','Сохранить':'Save',
@@ -326,7 +331,7 @@ if(authBtnEl){
         if(!displayName) return showError(authError,'Введите имя');
         if(displayName.length>20) return showError(authError,'Имя максимум 20 символов');
         if(!username) return showError(authError,'Введите имя пользователя');
-        if(!/^[a-z0-9_]{3,20}$/.test(username)) return showError(authError,'Имя пользователя 3-20: a-z, 0-9, _');
+        if(!/^[a-z0-9_-]{3,20}$/.test(username)) return showError(authError,'Имя пользователя 3-20: a-z, 0-9, -_');
         const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({displayName,username,email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
@@ -668,6 +673,8 @@ function openEdit(){
   hideError(pError);
   profileModal.classList.remove('show');
   if(editModal) editModal.classList.add('show');
+  // trigger handle check to show current status
+  setTimeout(()=>{ const st=document.getElementById('eUsernameStatus'); if(eUsername && st){ eUsername.dispatchEvent(new Event('input')); } }, 50);
 }
 function closeEdit(){ if(editModal) editModal.classList.remove('show'); }
 profileModal.addEventListener('click', e=>{ if(e.target===profileModal) closeProfile(); });
@@ -723,7 +730,7 @@ pSave.onclick=async()=>{
   if(!newDisplay) return showError(pError,'Имя не может быть пустым');
   if(newDisplay.length>20) return showError(pError,'Максимум 20 символов');
   if(!newHandle) return showError(pError,'Введите имя пользователя');
-  if(!/^[a-z0-9_]{3,20}$/.test(newHandle)) return showError(pError,'Имя пользователя 3-20: a-z, 0-9, _');
+  if(!/^[a-z0-9_-]{3,20}$/.test(newHandle)) return showError(pError,'Имя пользователя 3-20: a-z, 0-9, -_');
   pSave.disabled=true; pSave.textContent='Сохранение...';
   try{
     const r=await fetch('/api/me', {
@@ -763,9 +770,9 @@ function setupHandleCheck(input, statusEl){
   const run=()=>{
     clearTimeout(t);
     const v=input.value.trim().toLowerCase();
-    if(!v){ statusEl.textContent=''; return; }
+    if(!v){ statusEl.textContent=t('Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); statusEl.style.color='#9a9a9a'; return; }
     if(v.length < 3){ statusEl.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); statusEl.style.color='#ff3b30'; return; }
-    if(!/^[a-z0-9_]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
+    if(!/^[a-z0-9_-]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
     statusEl.textContent=t('Проверка...');
     statusEl.style.color='#9a9a9a';
     t=setTimeout(async()=>{

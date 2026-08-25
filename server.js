@@ -234,7 +234,7 @@ app.post('/api/auth/register-email', async (req, res) => {
     email = (email || '').trim().toLowerCase();
     password = password || '';
     if (!displayName || displayName.length < 1 || displayName.length > 20) return res.status(400).json({ error: 'Имя 1-20 символов' });
-    if (!username || !/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20 символов: a-z, 0-9, _' });
+    if (!username || !/^[a-z0-9_-]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20 символов: a-z, 0-9, -_' });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Некорректный email' });
     if (!password || password.length < 6) return res.status(400).json({ error: 'Пароль минимум 6 символов' });
 
@@ -423,7 +423,7 @@ app.put('/api/me', async (req, res) => {
   if (!displayName || displayName.length<1 || displayName.length>20) return res.status(400).json({ error: 'Имя 1-20 символов' });
   if (!isGuest && username !== undefined) {
     username = username.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20: a-z, 0-9, _' });
+    if (!/^[a-z0-9_-]{3,20}$/.test(username)) return res.status(400).json({ error: 'Имя пользователя 3-20: a-z, 0-9, -_' });
     if (username !== (user.username||'').toLowerCase()) {
       let exists=null;
       if (db.isEnabled()) exists = await db.getUserByUsername(username);
@@ -461,7 +461,7 @@ app.put('/api/me', async (req, res) => {
 app.get('/api/check-username', async (req, res) => {
   let { username } = req.query;
   username = (username||'').trim().toLowerCase();
-  if (!/^[a-z0-9_]{3,20}$/.test(username)) return res.json({ available: false, reason: 'invalid' });
+  if (!/^[a-z0-9_-]{3,20}$/.test(username)) return res.json({ available: false, reason: 'invalid' });
   const token = req.headers.authorization?.replace('Bearer ','');
   if (token) {
     try {
