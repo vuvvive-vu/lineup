@@ -136,15 +136,6 @@ app.post('/api/auth', async (req, res) => {
 });
 
 app.post('/api/logout', async (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ','');
-  const user = await parseToken(token);
-  if (user && user.id) {
-    if (db.isEnabled()) {
-      await db.deleteAccount(user.id);
-    } else {
-      ephemeralUsers.delete(user.id);
-    }
-  }
   res.json({ ok: true });
 });
 
