@@ -170,18 +170,12 @@ app.post('/api/auth', async (req, res) => {
     if (displayName.length > 20) return res.status(400).json({ error: 'Имя максимум 20 символов' });
     avatar = (avatar||'').toString().slice(0, 512*1024);
     bio = (bio||'').toString().slice(0,120);
-    const user = { displayName, avatar: avatar || '', bio: bio || '' };
-    if (db.isEnabled()) {
-      try{
-        const created = await db.createAccount({ displayName, avatar: user.avatar, bio: user.bio });
-        const token = makeToken(created.id);
-        return res.json({ token, displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
-      }catch(dbErr){ console.error('DB createAccount failed, fallback to ephemeral:', dbErr.message); }
-    }
+    const user = { displayName, avatar: '', bio: '' };
+    // guests never use DB, never occupy handle
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, displayName, avatar: user.avatar, bio: user.bio });
+    ephemeralUsers.set(id, { id, username: null, displayName, avatar: '', bio: '' });
     const token = makeToken(id);
-    res.json({ token, displayName, avatar: user.avatar, bio: user.bio });
+    res.json({ token, displayName, username: null, avatar: '', bio: '' });
   }catch(e){ console.error('/api/auth error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -528,10 +522,11 @@ wss.on('connection', async (ws, req) => {
     ws.close(1008, 'Unauthorized');
     return;
   }
-  ws.username = user.username;
+  ws.username = user.username || ('guest:'+user.id);
   ws.displayName = user.display_name || user.displayName || user.username || 'гость';
   ws.avatar = user.avatar || '';
   ws.code = code;
+  ws.isGuest = !user.email && !user.username;
 
   if (rooms[code].bans && rooms[code].bans.includes(ws.username)) {
     ws.close(1008, 'You are banned from this room');

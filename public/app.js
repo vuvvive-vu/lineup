@@ -52,8 +52,8 @@ async function logout(){
 }
 
 let currentAvatar='', currentBio='', currentUsername='', currentDisplayName='';
-function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
-function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
+function isEn(){ return false; }
+function setLang(en){ localStorage.setItem('rave_lang','ru'); document.documentElement.lang='ru'; }
 const T={
   // Auth
   'Регистрация':'Registration','Вход':'Login','Режим гостя':'Guest mode',
@@ -173,8 +173,7 @@ async function checkAuth(){
 function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
-  navRight.innerHTML=`<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button>`;
-  $('#langToggle').onclick=toggleLang;
+  navRight.innerHTML=``;
   applyTranslations();
   // show verified/success params
   const params=new URLSearchParams(location.search);
@@ -202,10 +201,9 @@ function showLobby(displayName, avatar){
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : letterFor(nameForLetter);
   const avaCls = isPhoto(avatar) ? ' has-photo letter-avatar' : ' letter-avatar';
   const bg = isPhoto(avatar) ? '' : ` style="background:${avatarBg(nameForLetter)};color:#fff;"`;
-  navRight.innerHTML = `<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button><button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">${isEn()?'Logout':'Выйти'}</button>`;
+  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
-  $('#langToggle').onclick = toggleLang;
   applyTranslations();
 }
 
@@ -645,12 +643,18 @@ function openProfile(){
   renderAvaLargeElNew(pAvaLarge, ava, disp);
   renderAvaLargeElNew(eAvaLarge, ava, disp);
   hideError(pError);
-  // show edit button only for own & not guest (check isGuest via email handle)
-  // we rely on last checkAuth isGuest flag - fetch quick
+  // immediate sync check so button appears instantly, no flicker
+  const localIsGuest = !handle || String(handle).startsWith('guest:');
+  if(openEditBtn) openEditBtn.style.display = localIsGuest ? 'none' : '';
+  const cardSync=document.getElementById('profileInfoCard');
+  if(cardSync) cardSync.style.display = localIsGuest ? 'none' : '';
+  // confirm via server
   fetch('/api/me', { headers:{ Authorization:'Bearer '+token() }}).then(r=>r.json()).then(j=>{
     const guest = j.isGuest;
     if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
-  }).catch(()=>{ if(openEditBtn) openEditBtn.style.display=''; });
+    const card=document.getElementById('profileInfoCard');
+    if(card) card.style.display = guest ? 'none' : '';
+  }).catch(()=>{});
   profileModal.classList.add('show');
 }
 function closeProfile(){ profileModal.classList.remove('show'); }
@@ -772,7 +776,7 @@ function setupHandleCheck(input, statusEl){
     const v=input.value.trim().toLowerCase();
     if(!v){ statusEl.textContent=t('Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); statusEl.style.color='#9a9a9a'; return; }
     if(v.length < 3){ statusEl.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); statusEl.style.color='#ff3b30'; return; }
-    if(!/^[a-z0-9_-]{3,20}$/.test(v)){ statusEl.textContent=''; return; }
+    if(!/^[a-z0-9_-]{3,20}$/.test(v)){ statusEl.textContent=t('Имя не поддерживается.  Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); statusEl.style.color='#ff3b30'; return; }
     statusEl.textContent=t('Проверка...');
     statusEl.style.color='#9a9a9a';
     t=setTimeout(async()=>{
@@ -783,10 +787,10 @@ function setupHandleCheck(input, statusEl){
         const r=await fetch('/api/check-username?username='+encodeURIComponent(v), {headers});
         const j=await r.json();
         if(j.available){
-          statusEl.textContent=isEn() ? `Username ${v} is available.` : `Имя ${v} доступно.`;
+          statusEl.textContent=t('Имя пользователя доступно.');
           statusEl.style.color='#4ade80';
         } else {
-          if(j.reason==='invalid'){ statusEl.textContent=''; }
+          if(j.reason==='invalid'){ statusEl.textContent=t('Имя не поддерживается.  Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); statusEl.style.color='#ff3b30'; }
           else { statusEl.textContent=t('Это имя уже занято.'); statusEl.style.color='#ff3b30'; }
         }
       }catch{ statusEl.textContent=''; }

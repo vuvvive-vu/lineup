@@ -29,8 +29,8 @@ const T={
 "Имя пользователя 3-20: a-z, 0-9, -_":"Username 3-20: a-z, 0-9, -_",
 "Проверка...":"Checking...",
 };
-function isEn(){return localStorage.getItem('rave_lang')==='en';}
-function t(s){if(!isEn())return s;return T[s]||s;}
+function isEn(){return false;}
+function t(s){return s;}
 function applyTranslations(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     const key=el.getAttribute('data-i18n');
@@ -199,7 +199,9 @@ function renderParticipants(users,h){
     // for participant ava we show avatar letter or photo
     const avaHtml = isPhotoAva(ava) ? `<img src="${ava}" style="width:100%;height:100%;object-fit:cover;display:block;">` : escapeHtml(letterForRoom(display));
     const avaStyle = isPhotoAva(ava) ? 'padding:0;overflow:hidden;' : `background:${avatarBgRoom(display)};color:#fff;`;
-    d.innerHTML=`<div class="ava" style="${avaStyle}">${avaHtml}</div><div class="name" style="display:flex;flex-direction:column;line-height:1.2;"><span>${escapeHtml(display)}</span><span style="font-size:11px;color:#9a9a9a;">@${escapeHtml(uname)}</span></div>${banBtn}${isHost?'<span class="crown">👑</span>':''}`;
+    const isGuestUser = !uname || String(uname).startsWith('guest:');
+    const handleHtml = isGuestUser ? '' : `<span style="font-size:11px;color:#9a9a9a;">@${escapeHtml(uname)}</span>`;
+    d.innerHTML=`<div class="ava" style="${avaStyle}">${avaHtml}</div><div class="name" style="display:flex;flex-direction:column;line-height:1.2;"><span>${escapeHtml(display)}</span>${handleHtml}</div>${banBtn}${isHost?'<span class="crown">👑</span>':''}`;
     if(canBan){
       const btn=d.querySelector('.ban-btn');
       btn.onclick=(e)=>{ e.stopPropagation(); if(confirm('Забанить '+uname+'?')){ ws.send(JSON.stringify({type:'ban',username:uname})); } };
@@ -869,11 +871,18 @@ function openProfileRoom(){
   renderAvaLargeRoomEl(pAvaLargeRoom, ava, disp);
   if(eAvaLargeRoom) renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
   pErrorRoom.classList.remove('show'); pErrorRoom.textContent=''; pErrorRoom.style.display='none';
-  // show edit only for non-guest own
+  // immediate sync so button appears instantly
+  const localIsGuestRoom = !handle || String(handle).startsWith('guest:');
+  if(openEditBtnRoom) openEditBtnRoom.style.display = localIsGuestRoom ? 'none' : '';
+  const cardSync=document.getElementById('profileInfoCard');
+  if(cardSync) cardSync.style.display = localIsGuestRoom ? 'none' : '';
+  // confirm via server
   fetch('/api/me', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
     const guest=j.isGuest;
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
-  }).catch(()=>{ if(openEditBtnRoom) openEditBtnRoom.style.display=''; });
+    const card=document.getElementById('profileInfoCard');
+    if(card) card.style.display = guest ? 'none' : '';
+  }).catch(()=>{});
   profileModalRoom.classList.add('show');
 }
 function closeProfileRoom(){ profileModalRoom.classList.remove('show'); }
@@ -982,14 +991,14 @@ if(profileModalRoom){
       const v=eUserInputRoom.value.trim().toLowerCase();
       if(!v){ eUserStatusRoom.textContent=t('Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); eUserStatusRoom.style.color='#9a9a9a'; return; }
       if(v.length<3){ eUserStatusRoom.textContent=t('Имя пользователя должно содержать не меньше 3 символов.'); eUserStatusRoom.style.color='#ff3b30'; return; }
-      if(!/^[a-z0-9_-]{3,20}$/.test(v)){ eUserStatusRoom.textContent=''; return; }
+      if(!/^[a-z0-9_-]{3,20}$/.test(v)){ eUserStatusRoom.textContent=t('Имя не поддерживается.  Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); eUserStatusRoom.style.color='#ff3b30'; return; }
       eUserStatusRoom.textContent=t('Проверка...'); eUserStatusRoom.style.color='#9a9a9a';
       tmr=setTimeout(async()=>{
         try{
           const r=await fetch('/api/check-username?username='+encodeURIComponent(v), {headers:{Authorization:'Bearer '+token}});
           const j=await r.json();
-          if(j.available){ eUserStatusRoom.textContent=isEn()?`Username ${v} is available.`:`Имя ${v} доступно.`; eUserStatusRoom.style.color='#4ade80'; }
-          else { if(j.reason==='invalid') eUserStatusRoom.textContent=''; else { eUserStatusRoom.textContent=t('Это имя уже занято.'); eUserStatusRoom.style.color='#ff3b30'; } }
+          if(j.available){ eUserStatusRoom.textContent=t('Имя пользователя доступно.'); eUserStatusRoom.style.color='#4ade80'; }
+          else { if(j.reason==='invalid'){ eUserStatusRoom.textContent=t('Имя не поддерживается.  Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.'); eUserStatusRoom.style.color='#ff3b30'; } else { eUserStatusRoom.textContent=t('Это имя уже занято.'); eUserStatusRoom.style.color='#ff3b30'; } }
         }catch{ eUserStatusRoom.textContent=''; }
       },380);
     };
@@ -1007,23 +1016,31 @@ function openViewProfile(username){
   fetch(`/api/users/${encodeURIComponent(username)}`).then(r=>r.json()).then(u=>{
     const ava=u.avatar||presenceAvatars[username]||'';
     const disp=u.displayName||u.username||username;
-    const handle=u.username||username;
+    const handle=u.username||null;
     const bio=u.bio||'';
+    const isGuest = !handle || String(handle).startsWith('guest:');
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); vAvaLarge.style.background=''; vAvaLarge.style.color=''; }
     else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); vAvaLarge.style.backgroundImage='none'; }
     vUsername.textContent=disp;
-    if(vHandle) vHandle.textContent=handle ? '@'+handle : 'гость';
-    vBio.textContent=bio||'—';
-    vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
+    const card=document.getElementById('viewProfileCard');
+    if(card) card.style.display = isGuest ? 'none' : '';
+    if(!isGuest){
+      if(vHandle) vHandle.textContent='@'+handle;
+      vBio.textContent=bio||'—';
+      vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
+    }
     viewProfileModal.classList.add('show');
   }).catch(()=>{
     const ava=presenceAvatars[username]||'';
     const disp=username;
+    const isGuest = String(username).startsWith('guest:');
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); }
     else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); }
     vUsername.textContent=disp;
-    if(vHandle) vHandle.textContent='@'+username;
-    vBio.textContent='—';
+    const card=document.getElementById('viewProfileCard');
+    if(card) card.style.display = isGuest ? 'none' : '';
+    if(!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent='@'+username;
+    if(!isGuest) vBio.textContent='—';
     viewProfileModal.classList.add('show');
   });
 }
