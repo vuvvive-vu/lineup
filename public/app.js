@@ -654,6 +654,19 @@ function openProfile(){
     if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
+    // Show creator badge
+    const crownIcon = document.getElementById('pCrownIcon');
+    const creatorBadge = document.getElementById('pCreatorBadge');
+    const avaWrap = document.getElementById('pAvaWrap');
+    if(j.isCreator) {
+      if(crownIcon) crownIcon.style.display = 'block';
+      if(creatorBadge) creatorBadge.style.display = 'inline-block';
+      if(avaWrap) avaWrap.classList.add('creator-badge');
+    } else {
+      if(crownIcon) crownIcon.style.display = 'none';
+      if(creatorBadge) creatorBadge.style.display = 'none';
+      if(avaWrap) avaWrap.classList.remove('creator-badge');
+    }
   }).catch(()=>{});
   profileModal.classList.add('show');
 }

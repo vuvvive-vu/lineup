@@ -883,6 +883,19 @@ function openProfileRoom(){
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
+    // Show creator badge
+    const crownIcon = document.getElementById('pCrownIcon');
+    const creatorBadge = document.getElementById('pCreatorBadge');
+    const avaWrap = document.getElementById('pAvaWrap');
+    if(j.isCreator) {
+      if(crownIcon) crownIcon.style.display = 'block';
+      if(creatorBadge) creatorBadge.style.display = 'inline-block';
+      if(avaWrap) avaWrap.classList.add('creator-badge');
+    } else {
+      if(crownIcon) crownIcon.style.display = 'none';
+      if(creatorBadge) creatorBadge.style.display = 'none';
+      if(avaWrap) avaWrap.classList.remove('creator-badge');
+    }
   }).catch(()=>{});
   profileModalRoom.classList.add('show');
 }
@@ -1020,6 +1033,8 @@ function openViewProfile(username){
     const handle=u.username||null;
     const bio=u.bio||'';
     const isGuest = !handle || String(handle).startsWith('guest:');
+    const isCreator = u.isCreator || false;
+    
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); vAvaLarge.style.background=''; vAvaLarge.style.color=''; }
     else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); vAvaLarge.style.backgroundImage='none'; }
     vUsername.textContent=disp;
@@ -1030,6 +1045,21 @@ function openViewProfile(username){
       vBio.textContent=bio||'—';
       vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
     }
+    
+    // Show creator badge
+    const vCrownIcon = document.getElementById('vCrownIcon');
+    const vCreatorBadge = document.getElementById('vCreatorBadge');
+    const vAvaWrap = document.getElementById('vAvaWrap');
+    if(isCreator) {
+      if(vCrownIcon) vCrownIcon.style.display = 'block';
+      if(vCreatorBadge) vCreatorBadge.style.display = 'inline-block';
+      if(vAvaWrap) vAvaWrap.classList.add('creator-badge');
+    } else {
+      if(vCrownIcon) vCrownIcon.style.display = 'none';
+      if(vCreatorBadge) vCreatorBadge.style.display = 'none';
+      if(vAvaWrap) vAvaWrap.classList.remove('creator-badge');
+    }
+    
     viewProfileModal.classList.add('show');
   }).catch(()=>{
     const ava=presenceAvatars[username]||'';
@@ -1042,6 +1072,15 @@ function openViewProfile(username){
     if(card) card.style.display = isGuest ? 'none' : '';
     if(!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent='@'+username;
     if(!isGuest) vBio.textContent='—';
+    
+    // Hide creator badge on error
+    const vCrownIcon = document.getElementById('vCrownIcon');
+    const vCreatorBadge = document.getElementById('vCreatorBadge');
+    const vAvaWrap = document.getElementById('vAvaWrap');
+    if(vCrownIcon) vCrownIcon.style.display = 'none';
+    if(vCreatorBadge) vCreatorBadge.style.display = 'none';
+    if(vAvaWrap) vAvaWrap.classList.remove('creator-badge');
+    
     viewProfileModal.classList.add('show');
   });
 }

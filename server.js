@@ -14,6 +14,13 @@ if (!process.env.JWT_SECRET) {
 }
 const JWT_EXPIRES = '30d';
 
+// Creator username (founder badge)
+const CREATOR_USERNAME = 'owner'; // Измени на свой username
+
+function isCreator(username) {
+  return username && username.toLowerCase() === CREATOR_USERNAME.toLowerCase();
+}
+
 function genCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -282,11 +289,18 @@ app.post('/api/login', async (req, res) => {
     const user = { displayName: d, avatar: avatar||'', bio: bio||'' };
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
+      return res.json({ 
+        token: makeToken(created.id), 
+        displayName: created.display_name, 
+        username: created.username, 
+        avatar: created.avatar, 
+        bio: created.bio,
+        isCreator: isCreator(created.username)
+      });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
-    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, isCreator: false });
   }catch(e){ console.error('/api/login error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -320,7 +334,17 @@ app.post('/api/auth/register-email', async (req, res) => {
       const device = detectDevice(req.headers['user-agent']);
       const emailSent = await sendVerifyCode(email, code, displayName, device);
       const token = makeToken(user.id);
-      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email, emailVerified: false, codeSent: emailSent });
+      return res.json({ 
+        token, 
+        displayName: user.display_name, 
+        username: user.username, 
+        avatar: user.avatar || '', 
+        bio: user.bio || '', 
+        email, 
+        emailVerified: false, 
+        codeSent: emailSent,
+        isCreator: isCreator(user.username)
+      });
     }
 
     // ephemeral mode — auto-verify (no real email delivery)
@@ -351,7 +375,16 @@ app.post('/api/auth/login-email', async (req, res) => {
       const user = await db.verifyPassword(email, password);
       if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
       const token = makeToken(user.id);
-      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email: user.email, emailVerified: user.email_verified });
+      return res.json({ 
+        token, 
+        displayName: user.display_name, 
+        username: user.username, 
+        avatar: user.avatar || '', 
+        bio: user.bio || '', 
+        email: user.email, 
+        emailVerified: user.email_verified,
+        isCreator: isCreator(user.username)
+      });
     }
 
     // ephemeral mode
@@ -360,7 +393,16 @@ app.post('/api/auth/login-email', async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const token = makeToken(user.id);
-    res.json({ token, displayName: user.displayName, username: user.username, avatar: user.avatar, bio: user.bio, email: user.email, emailVerified: user.emailVerified });
+    res.json({ 
+      token, 
+      displayName: user.displayName, 
+      username: user.username, 
+      avatar: user.avatar, 
+      bio: user.bio, 
+      email: user.email, 
+      emailVerified: user.emailVerified,
+      isCreator: isCreator(user.username)
+    });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Ошибка входа' });
@@ -472,15 +514,36 @@ app.get('/api/me', async (req, res) => {
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   const isGuest = !user.email;
-  res.json({ displayName: user.display_name || user.displayName || user.username, username: user.username || null, avatar: user.avatar || '', bio: user.bio || '', email: user.email || null, emailVerified: user.email_verified || false, isGuest });
+  res.json({ 
+    displayName: user.display_name || user.displayName || user.username, 
+    username: user.username || null, 
+    avatar: user.avatar || '', 
+    bio: user.bio || '', 
+    email: user.email || null, 
+    emailVerified: user.email_verified || false, 
+    isGuest,
+    isCreator: isCreator(user.username)
+  });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
     const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
-    if (rows[0]) return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '' });
+    if (rows[0]) return res.json({ 
+      displayName: rows[0].display_name, 
+      username: rows[0].username, 
+      avatar: rows[0].avatar || '', 
+      bio: rows[0].bio || '',
+      isCreator: isCreator(rows[0].username)
+    });
   }
   const u = [...ephemeralUsers.values()].find(x=> (x.username && x.username.toLowerCase()===req.params.username.toLowerCase()) || x.displayName===req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
-  res.json({ displayName: u.displayName || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '' });
+  res.json({ 
+    displayName: u.displayName || u.username, 
+    username: u.username || null, 
+    avatar: u.avatar || '', 
+    bio: u.bio || '',
+    isCreator: isCreator(u.username)
+  });
 });
 app.put('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
@@ -529,7 +592,14 @@ app.put('/api/me', async (req, res) => {
     await db.updateUserProfileById(user.id, { displayName, username, avatar, bio });
     const updated = await db.getUserById(user.id);
     const newToken = makeToken(user.id);
-    return res.json({ displayName: updated.display_name, username: updated.username, avatar: updated.avatar, bio: updated.bio, token: newToken });
+    return res.json({ 
+      displayName: updated.display_name, 
+      username: updated.username, 
+      avatar: updated.avatar, 
+      bio: updated.bio, 
+      token: newToken,
+      isCreator: isCreator(updated.username)
+    });
   }
   if (!isGuest) {
     // email ephemeral
