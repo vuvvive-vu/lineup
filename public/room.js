@@ -12,6 +12,12 @@ function getBadgeLocalR(){ const b=localStorage.getItem('rave_badge'); if(b) ret
 function setBadgeLocalR(badge){ if(badge){ localStorage.setItem('rave_badge', String(badge).toLowerCase()); localStorage.setItem('rave_isCreator','1'); } else { localStorage.removeItem('rave_badge'); localStorage.setItem('rave_isCreator','0'); } }
 function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
   if(!avaWrap) return;
+  const cur=avaWrap.dataset.badge||null;
+  if(cur===badge && badge && avaWrap.querySelectorAll('.snowflake').length>=10){
+    if(crownIcon) crownIcon.style.display=badge?'block':'none';
+    if(badgeEl) badgeEl.style.display=badge && !isGuest?'inline-block':'none';
+    return;
+  }
   avaWrap.classList.remove('creator-badge','badge-developer','badge-snow');
   avaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
   delete avaWrap.dataset.badge;

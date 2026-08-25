@@ -276,17 +276,14 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 }
 @keyframes fall {
   0% {
-    transform: translateY(0) translateX(0) rotate(0deg) scale(0.8);
+    transform: translateY(0) translateX(0) rotate(0deg) scale(0.9);
     opacity: 0;
   }
-  15% {
-    opacity: 0.4;
-    transform: translateY(35px) translateX(calc(var(--drift, 20px) * 0.15)) rotate(50deg) scale(1);
-  }
-  30% {
+  8% {
     opacity: 0.85;
+    transform: translateY(22px) translateX(calc(var(--drift, 20px) * 0.08)) rotate(25deg) scale(1);
   }
-  80% {
+  85% {
     opacity: 0.85;
   }
   100% {

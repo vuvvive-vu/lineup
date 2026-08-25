@@ -711,6 +711,13 @@ function openProfile(){
 
 function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
   if (!avaWrap) return;
+  const currentBadge = avaWrap.dataset.badge || null;
+  // если тот же бейдж и снежинки уже есть - не пересоздаём (избегаем пропадания при повторном открытии)
+  if (currentBadge === badge && badge && avaWrap.querySelectorAll('.snowflake').length >= 10) {
+    if (crownIcon) crownIcon.style.display = badge ? 'block' : 'none';
+    if (badgeEl) badgeEl.style.display = badge && !isGuest ? 'inline-block' : 'none';
+    return;
+  }
   // очистить старые бейдж-классы
   avaWrap.classList.remove('creator-badge', 'badge-developer', 'badge-snow');
   avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
