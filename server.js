@@ -673,13 +673,25 @@ app.get('/api/admin/accounts', async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (db.isEnabled()) {
     const users = await db.getAllUsers();
-    return res.json({ accounts: users.map(u => ({ username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', created: u.created_at })) });
+    return res.json({ accounts: users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', created: u.created_at })) });
   }
   const accounts = [];
-  for (const [id, u] of ephemeralUsers) {
-    accounts.push({ username: u.username || id, avatar: u.avatar || '😎', bio: u.bio || '', created: null });
+  for (const [id, u] of ephemeralEmailUsers) {
+    accounts.push({ id, username: u.username || id, avatar: u.avatar || '😎', bio: u.bio || '', created: null });
   }
   res.json({ accounts });
+});
+
+app.delete('/api/admin/accounts/:id', async (req, res) => {
+  if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
+  if (db.isEnabled()) {
+    await db.deleteAccount(req.params.id);
+    return res.json({ ok: true });
+  }
+  for (const [email, user] of ephemeralEmailUsers) {
+    if (user.id === req.params.id) { ephemeralEmailUsers.delete(email); return res.json({ ok: true }); }
+  }
+  res.status(404).json({ error: 'Аккаунт не найден' });
 });
 
 // error handler

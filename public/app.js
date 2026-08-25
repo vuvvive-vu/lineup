@@ -54,7 +54,20 @@ async function checkAuth(){
     const j = await r.json();
     currentAvatar=j.avatar||localStorage.getItem('rave_ava')||'😎'; currentBio=j.bio||''; currentUsername=j.username;
     localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio);
-    showLobby(j.username, currentAvatar);
+    if(!j.emailVerified && j.email){
+      showAuth();
+      inVerification=true;
+      window._pendingToken=t;
+      window._pendingVerifyEmail=j.email;
+      authEmailEl.parentElement.parentElement.style.display='none';
+      authBtnEl.parentElement.style.display='none';
+      authSwitchEl.style.display='none';
+      forgotLink.style.display='none';
+      document.getElementById('authError').style.display='none';
+      authSuccessEl.style.display='';
+    } else {
+      showLobby(j.username, currentAvatar);
+    }
   }catch{ showAuth(); }
 }
 
@@ -98,6 +111,7 @@ checkAuth();
 
 // --- Auth tabs ---
 let authMode='register'; // login or register
+let inVerification=false; // currently showing code input
 const authTabs=document.getElementById('authTabs');
 const tabEmail=document.getElementById('tabEmail');
 const tabQuick=document.getElementById('tabQuick');
@@ -129,6 +143,7 @@ if(authTabs){
   }
   authTabs.querySelectorAll('button').forEach(btn=>{
     btn.onclick=()=>{
+      if(inVerification) return; // don't switch during code verification
       authTabs.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       if(btn.dataset.tab==='email'){
@@ -208,9 +223,11 @@ if(authBtnEl){
         const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
-        setToken(j.token,j.username,j.avatar,j.bio);
         currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
         if(!j.emailVerified){
+          window._pendingToken=j.token;
+          window._pendingVerifyEmail=email;
+          inVerification=true;
           authEmailEl.parentElement.parentElement.style.display='none';
           authBtnEl.parentElement.style.display='none';
           authSwitchEl.style.display='none';
@@ -218,17 +235,29 @@ if(authBtnEl){
           if(regUsernameField) regUsernameField.style.display='none';
           document.getElementById('authError').style.display='none';
           authSuccessEl.style.display='';
-          window._pendingVerifyEmail=email;
         } else {
+          setToken(j.token,j.username,j.avatar,j.bio);
           showLobby(j.username,currentAvatar);
         }
       } else {
         const r=await fetch('/api/auth/login-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
-        setToken(j.token,j.username,j.avatar,j.bio);
         currentAvatar=j.avatar||'😎'; currentBio=j.bio||''; currentUsername=j.username;
-        showLobby(j.username,currentAvatar);
+        if(!j.emailVerified){
+          window._pendingToken=j.token;
+          window._pendingVerifyEmail=email;
+          inVerification=true;
+          authEmailEl.parentElement.parentElement.style.display='none';
+          authBtnEl.parentElement.style.display='none';
+          authSwitchEl.style.display='none';
+          forgotLink.style.display='none';
+          document.getElementById('authError').style.display='none';
+          authSuccessEl.style.display='';
+        } else {
+          setToken(j.token,j.username,j.avatar,j.bio);
+          showLobby(j.username,currentAvatar);
+        }
       }
     }catch(e){ showError(authError,e.message); }
     finally{ authBtnEl.disabled=false; }
@@ -266,6 +295,9 @@ if(verifyCodeBtn){
       const r=await fetch('/api/auth/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:window._pendingVerifyEmail,code})});
       const j=await r.json();
       if(!r.ok) throw new Error(j.error||'Ошибка');
+      inVerification=false;
+      setToken(window._pendingToken,currentUsername,currentAvatar,currentBio);
+      window._pendingToken=null;
       showLobby(currentUsername,currentAvatar);
     }catch(e){ verifyCodeError.textContent=e.message; verifyCodeError.style.display=''; }
     finally{ verifyCodeBtn.disabled=false; }

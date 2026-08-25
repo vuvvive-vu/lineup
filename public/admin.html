@@ -173,6 +173,7 @@ async function refreshAccounts(){
         <td style="font-size:11px;color:#6a6a6a;">${created}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
           ${isOnline?'<span class="pill" style="color:#34c759;border-color:#1f6b2a;">онлайн</span>':''}
+          <button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="deleteAccount('${esc(a.id)}','${esc(a.username)}')">Удалить</button>
         </td>
       </tr>`;
     }).join('');
@@ -198,6 +199,13 @@ async function clearChat(code){
 async function kickUser(username){
   if(!confirm(`Кикнуть ${username}?`)) return;
   await fetch(`/api/admin/users/${encodeURIComponent(username)}/kick`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  refresh();
+}
+async function deleteAccount(id,username){
+  if(!confirm(`Удалить аккаунт ${username}?`)) return;
+  const r=await fetch(`/api/admin/accounts/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  const j=await r.json();
+  if(!r.ok) return alert(j.error||'Ошибка');
   refresh();
 }
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
