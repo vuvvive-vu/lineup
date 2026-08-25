@@ -21,62 +21,62 @@
   <!-- AUTH -->
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
-      <h1 id="authTitle">Регистрация</h1>
-      <p id="authSubtitle">Зарегистрируйтесь чтобы продолжить.</p>
+      <h1 id="authTitle" data-i18n="Регистрация">Регистрация</h1>
+      <p id="authSubtitle" data-i18n="Зарегистрируйтесь чтобы продолжить.">Зарегистрируйтесь чтобы продолжить.</p>
       <div class="tabs" id="authTabs">
-        <button class="active" data-tab="email">Почта</button>
-        <button data-tab="quick">Быстро</button>
+        <button class="active" data-tab="email" data-i18n="Почта">Почта</button>
+        <button data-tab="quick" data-i18n="Быстро">Быстро</button>
       </div>
       <div id="authError" class="error"></div>
       <!-- Email auth -->
       <div id="tabEmail">
         <div id="emailFields">
           <div class="field" id="regUsernameField">
-            <label>Ник</label>
-            <input id="regUsername" placeholder="твой ник" maxlength="20" />
+            <label data-i18n="Ник">Ник</label>
+            <input id="regUsername" placeholder="твой ник" maxlength="20" data-i18n-placeholder="твой ник" />
           </div>
           <div class="field">
-            <label>Почта</label>
+            <label data-i18n="Почта">Почта</label>
             <input id="authEmail" type="email" placeholder="mail@example.com" autocomplete="email" />
           </div>
           <div class="field">
-            <label>Пароль</label>
-            <input id="authPassword" type="password" placeholder="минимум 6 символов" autocomplete="current-password" />
+            <label data-i18n="Пароль">Пароль</label>
+            <input id="authPassword" type="password" placeholder="минимум 6 символов" autocomplete="current-password" data-i18n-placeholder="минимум 6 символов" />
           </div>
         </div>
-        <button id="authBtn" class="btn-primary">Зарегистрироваться</button>
+        <button id="authBtn" class="btn-primary" data-i18n="Зарегистрироваться">Зарегистрироваться</button>
         <div style="text-align:right;margin-top:8px;">
-          <a href="#" id="forgotLink" style="font-size:12px;color:#6a6a6a;">Забыли пароль?</a>
+          <a href="#" id="forgotLink" style="font-size:12px;color:#6a6a6a;" data-i18n="Забыли пароль?">Забыли пароль?</a>
         </div>
-        <p class="hint" id="authSwitch">Уже есть аккаунт? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Войти</a></p>
+        <p class="hint" id="authSwitch"><span data-i18n="Уже есть аккаунт?">Уже есть аккаунт?</span> <a href="#" id="switchToReg" style="color:#fff;font-weight:600;" data-i18n="Войти">Войти</a></p>
       </div>
       <!-- Quick auth (old style) -->
       <div id="tabQuick" style="display:none;">
         <div class="field">
-          <label>Ник</label>
-          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
+          <label data-i18n="Ник">Ник</label>
+          <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" data-i18n-placeholder="например, anomalyco" />
         </div>
-        <button id="quickAuthBtn" class="btn-primary">Войти</button>
+        <button id="quickAuthBtn" class="btn-primary" data-i18n="Войти">Войти</button>
         </div>
       <!-- Forgot password -->
       <div id="forgotForm" style="display:none;">
-        <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите email — отправим ссылку для сброса пароля</p>
+        <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;" data-i18n="Введите email — отправим код для сброса">Введите email — отправим код для сброса</p>
         <div class="field">
-          <label>Почта</label>
+          <label data-i18n="Почта">Почта</label>
           <input id="forgotEmail" type="email" placeholder="mail@example.com" />
         </div>
-        <button id="forgotBtn" class="btn-primary">Отправить</button>
-        <p class="hint"><a href="#" id="backToLogin" style="color:#fff;">Назад ко входу</a></p>
+        <button id="forgotBtn" class="btn-primary" data-i18n="Отправить">Отправить</button>
+        <p class="hint"><a href="#" id="backToLogin" style="color:#fff;" data-i18n="Назад ко входу">Назад ко входу</a></p>
       </div>
       <!-- Success message -->
       <div id="authSuccess" style="display:none;text-align:center;">
-        <p style="font-size:14px;color:#9a9a9a;">Проверьте почту — мы отправили код подтверждения.</p>
+        <p style="font-size:14px;color:#9a9a9a;" data-i18n="Проверьте почту — мы отправили код подтверждения.">Проверьте почту — мы отправили код подтверждения.</p>
         <div class="field" style="margin-top:16px;">
-          <label>Код из письма</label>
+          <label data-i18n="Код из письма">Код из письма</label>
           <input id="verifyCodeInput" type="text" placeholder="123456" maxlength="6" inputmode="numeric" style="text-align:center;font-size:24px;letter-spacing:8px;" />
         </div>
         <p id="verifyCodeError" style="color:#ff6b6b;font-size:13px;display:none;"></p>
-        <button id="verifyCodeBtn" class="btn-primary" style="margin-top:12px;">Подтвердить</button>
+        <button id="verifyCodeBtn" class="btn-primary" style="margin-top:12px;" data-i18n="Подтвердить">Подтвердить</button>
       </div>
       <!-- Reset password form (code) -->
       <div id="resetForm" style="display:none;">
@@ -91,7 +91,7 @@
         </div>
         <div class="field">
           <label>Новый пароль</label>
-          <input id="resetPassword" type="password" placeholder="минимум 6 символов" />
+          <input id="resetPassword" type="password" placeholder="минимум 6 символов" data-i18n-placeholder="минимум 6 символов" />
         </div>
         <button id="resetBtn" class="btn-primary">Сбросить пароль</button>
         <p class="hint"><a href="#" id="backToLogin2" style="color:#fff;">Назад ко входу</a></p>
@@ -104,27 +104,27 @@
     <div class="container">
       <div class="hero">
         <h1>Смотрите фильмы и сериалы вместе с togetherly.</h1>
-        <p>Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.</p>
+        <p data-i18n="Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.">Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.</p>
       </div>
       <div class="grid2">
         <div class="card">
           <div class="card-icon">🔧</div>
-          <h3>Создать комнату</h3>
-          <p>Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и поделись ссылкой/кодом с другом.</p>
-          <button class="btn-primary" id="openCreate">Создать комнату</button>
+          <h3 data-i18n="Создать комнату">Создать комнату</h3>
+          <p data-i18n="Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и поделись ссылкой/кодом с другом.">Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и поделись ссылкой/кодом с другом.</p>
+          <button class="btn-primary" id="openCreate" data-i18n="Создать комнату">Создать комнату</button>
         </div>
         <div class="card">
           <div class="card-icon">⛓</div>
-          <h3>Войти по коду</h3>
-          <p>У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.</p>
-          <button class="btn-primary" id="openJoin">Войти в комнату</button>
+          <h3 data-i18n="Войти по коду">Войти по коду</h3>
+          <p data-i18n="У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.">У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.</p>
+          <button class="btn-primary" id="openJoin" data-i18n="Войти в комнату">Войти в комнату</button>
         </div>
       </div>
 
       <div class="about-section" style="margin-top:48px;padding-top:32px;border-top:1px solid var(--border);">
-        <h2 style="font-size:20px;letter-spacing:-0.02em;margin-bottom:10px;">Немного про нас</h2>
+        <h2 style="font-size:20px;letter-spacing:-0.02em;margin-bottom:10px;" data-i18n="Немного про нас">Немного про нас</h2>
         <p style="color:var(--muted);font-size:14px;line-height:1.6;max-width:600px;margin-bottom:24px;">Togetherly — сервис для удобного совместного просмотра любого медиаконтента из доступных площадок в плеере. Сервис развивается с каждым днём, добавляются новые функции для вашего удобства!</p>
-        <h3 style="font-size:15px;margin-bottom:12px;">Связь с разработчиком</h3>
+        <h3 style="font-size:15px;margin-bottom:12px;" data-i18n="Связь с разработчиком">Связь с разработчиком</h3>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <a href="https://t.me/vuvvive" target="_blank" class="btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><svg width="18" height="18" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 48C37.2548 48 48 37.2548 48 24C48 10.7452 37.2548 0 24 0C10.7452 0 0 10.7452 0 24C0 37.2548 10.7452 48 24 48Z" fill="url(#paint0_linear)"/><path d="M8.93822 25.174C11.7438 23.6286 14.8756 22.3388 17.8018 21.0424C22.836 18.919 27.8902 16.8324 32.9954 14.8898C33.9887 14.5588 35.7734 14.2351 35.9484 15.7071C35.8526 17.7907 35.4584 19.8621 35.188 21.9335C34.5017 26.4887 33.7085 31.0283 32.935 35.5685C32.6685 37.0808 30.774 37.8637 29.5618 36.8959C26.6486 34.9281 23.713 32.9795 20.837 30.9661C19.8949 30.0088 20.7685 28.6341 21.6099 27.9505C24.0093 25.5859 26.5539 23.5769 28.8279 21.0901C29.4413 19.6088 27.6289 20.8572 27.0311 21.2397C23.7463 23.5033 20.5419 25.9051 17.0787 27.8945C15.3097 28.8683 13.2479 28.0361 11.4797 27.4927C9.89428 26.8363 7.57106 26.175 8.93806 25.1741L8.93822 25.174Z" fill="white"/><defs><linearGradient id="paint0_linear" x1="18.0028" y1="2.0016" x2="6.0028" y2="30" gradientUnits="userSpaceOnUse"><stop stop-color="#37AEE2"/><stop offset="1" stop-color="#1E96C8"/></linearGradient></defs></svg> Telegram</a>
           <a href="mailto:support@togetherly.online" class="btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><svg width="18" height="18" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="22" fill="#0088FF"/><text x="24" y="31" text-anchor="middle" font-size="26" font-weight="700" font-family="Arial,sans-serif" fill="#FF8C00">@</text></svg> Почта</a>
@@ -142,16 +142,16 @@
   <div id="joinModal" class="modal-bg">
     <div class="modal">
       <div class="modal-head">
-          <h3>Войти в комнату</h3>
+          <h3 data-i18n="Войти в комнату">Войти в комнату</h3>
         <button class="x" data-close="joinModal">✕</button>
       </div>
-      <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Вставь ссылку или код (например, 7X9KQ2 или https://.../room?code=7X9KQ2)</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" data-i18n="Вставь ссылку или код (например, 7X9KQ2 или https://.../room?code=7X9KQ2)">Вставь ссылку или код (например, 7X9KQ2 или https://.../room?code=7X9KQ2)</p>
       <div class="field">
-        <label>Код / Ссылка</label>
+        <label data-i18n="Код / Ссылка">Код / Ссылка</label>
         <input id="joinInput" placeholder="7X9KQ2" />
       </div>
       <div id="joinError" class="error"></div>
-      <button id="joinBtn" class="btn-primary">Войти</button>
+      <button id="joinBtn" class="btn-primary" data-i18n="Войти">Войти</button>
     </div>
   </div>
 
@@ -159,7 +159,7 @@
   <div id="createModal" class="modal-bg">
     <div class="modal">
       <div class="modal-head">
-        <h3>Создать комнату</h3>
+        <h3 data-i18n="Создать комнату">Создать комнату</h3>
         <button class="x" data-close="createModal">✕</button>
       </div>
       <div class="platforms">
@@ -168,19 +168,17 @@
         <button class="plat" data-plat="youtube">YouTube</button>
       </div>
       <div class="field">
-        <label>Название комнаты (необязательно)</label>
-        <input id="roomTitle" placeholder="Вечерний кинчик" />
+        <label data-i18n="Название комнаты (необязательно)">Название комнаты (необязательно)</label>
+        <input id="roomTitle" placeholder="Вечерний кинчик" data-i18n-placeholder="Вечерний кинчик" />
       </div>
       <div class="field">
-        <label id="linkLabel">Ссылка на видео VK</label>
+        <label id="linkLabel" data-i18n="Ссылка на видео VK">Ссылка на видео VK</label>
         <input id="videoUrl" placeholder="https://vk.com/video-123_456" />
         <div id="videoUrlStatus" style="font-size:11px;min-height:16px;margin-top:4px;"></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;" id="platformHint">
-          Вставь обычную ссылку на VK видео, например https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789 — мы покажем только плеер без ленты.
-        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;" id="platformHint" data-i18n="Вставь обычную ссылку на VK видео">Вставь обычную ссылку на VK видео, например https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789 — мы покажем только плеер без ленты.</div>
       </div>
       <div id="createError" class="error"></div>
-      <button id="createBtn" class="btn-primary">Создать и войти</button>
+      <button id="createBtn" class="btn-primary" data-i18n="Создать и войти">Создать и войти</button>
     </div>
   </div>
 
@@ -204,11 +202,11 @@
       </div>
       <div class="field">
         <label>Ник</label>
-        <input id="pUsername" placeholder="твой ник" maxlength="20" />
+        <input id="pUsername" placeholder="твой ник" maxlength="20" data-i18n-placeholder="твой ник" />
       </div>
       <div class="field">
         <label>Описание</label>
-        <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3"></textarea>
+        <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3" data-i18n-placeholder="пару слов о себе..."></textarea>
         <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px;"><span id="bioCount">0</span>/120</div>
       </div>
       <div id="pError" class="error"></div>

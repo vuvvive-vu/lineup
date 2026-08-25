@@ -5,6 +5,38 @@ const token = localStorage.getItem('rave_token');
 const me = localStorage.getItem('rave_user')||'гость';
 if(!token) location.href='/?needAuth=1';
 
+const T={
+"Выйти":"Exit","Загрузка плеера...":"Loading player...","🔊 Включить звук":"🔊 Unmute",
+"Чат":"Chat","Написать сообщение...":"Type a message...","Отправить":"Send",
+"Пригласи друзей":"Invite friends","Скопируй код или ссылку — по ней друзья зайдут прямо в эту комнату.":"Copy the code or link — friends will join this room directly.",
+"Копировать":"Copy","Участники":"Participants","Забаненные":"Banned","О комнате":"About",
+"Профиль":"Profile","Выбери аватар или загрузи фото":"Choose an avatar or upload a photo",
+"📷 Загрузить фото":"📷 Upload photo","Ник":"Nickname","твой ник":"your nickname",
+"Описание":"About you","пару слов о себе...":"a few words about yourself...",
+"Сохранить":"Save","Выйти из аккаунта":"Log out","Закрыть":"Close",
+"📋 Копировать":"📋 Copy","🗑 Удалить":"🗑 Delete","удалить сообщение?":"delete message?",
+"Удалено":"Deleted","only host can delete":"only the host can delete",
+"Загрузка...":"Loading...","Код скопирован!":"Code copied!","Ссылка скопирована!":"Link copied!",
+"Управление воспроизведением (только хост)":"Playback control (host only)","Удаление сообщений (только хост)":"Delete messages (host only)",
+"О приложении":"About the app","Связь с разработчиком":"Contact developer",
+"Выйти из аккаунта":"Log out","Сменить аккаунт":"Switch account",
+};
+function isEn(){return localStorage.getItem('rave_lang')==='en';}
+function t(s){if(!isEn())return s;return T[s]||s;}
+function applyTranslations(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(T[key])el.textContent=T[key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const key=el.getAttribute('data-i18n-placeholder');
+    if(T[key])el.placeholder=T[key];
+  });
+}
+applyTranslations();
+const rlBtn=document.getElementById('roomLangToggle');
+if(rlBtn){rlBtn.textContent=isEn()?'RU':'EN';rlBtn.onclick=()=>{localStorage.setItem('rave_lang',isEn()?'ru':'en');location.reload();};}
+
 const playerEl=document.getElementById('player');
 const placeholder=document.getElementById('placeholder');
 const messagesEl=document.getElementById('messages');

@@ -29,35 +29,51 @@ async function sendEmail({ to, subject, html }) {
   }
 }
 
-async function sendVerifyCode(email, code) {
+function detectDevice(ua) {
+  if (!ua) return 'Неизвестное устройство';
+  if (/android/i.test(ua)) return 'Android';
+  if (/iphone|ipad/i.test(ua)) return 'iOS';
+  if (/windows/i.test(ua)) return 'Windows';
+  if (/macintosh|mac os/i.test(ua)) return 'macOS';
+  if (/linux/i.test(ua)) return 'Linux';
+  return 'Неизвестное устройство';
+}
+
+async function sendVerifyCode(email, code, username, device) {
+  const deviceStr = device || 'Неизвестное устройство';
   return sendEmail({
     to: email,
     subject: `Код подтверждения: ${code} — togetherly`,
     html: `
-      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;color:#111;">
-        <h2 style="font-size:22px;font-weight:700;margin-bottom:16px;">Код подтверждения</h2>
-        <p style="font-size:14px;color:#555;line-height:1.6;margin-bottom:24px;">Введите этот код на сайте:</p>
-        <div style="font-size:36px;font-weight:700;letter-spacing:8px;text-align:center;padding:24px;background:#f5f5f5;border-radius:12px;margin-bottom:24px;">${code}</div>
-        <p style="font-size:12px;color:#999;margin-top:32px;">Код действителен в течение 10 минут. Если вы не создавали аккаунт — игнорируйте это письмо.</p>
+      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;color:#111;">
+        <p style="font-size:15px;color:#333;line-height:1.6;margin-bottom:24px;">Привет, <b>${username}</b>!</p>
+        <p style="font-size:15px;color:#333;line-height:1.6;margin-bottom:8px;">Регистрация нового электронного адреса требует дальнейшей проверки.</p>
+        <p style="font-size:15px;color:#333;line-height:1.6;margin-bottom:24px;">Чтобы завершить регистрацию в системе, введите шестизначный код проверки.</p>
+        <p style="font-size:13px;color:#888;margin-bottom:4px;">Устройство: <b>${deviceStr}</b></p>
+        <div style="font-size:14px;color:#888;margin-bottom:16px;">Код подтверждения:</div>
+        <div style="font-size:42px;font-weight:700;letter-spacing:12px;text-align:center;padding:28px;background:#f5f5f5;border-radius:12px;margin-bottom:28px;color:#111;">${code}</div>
+        <p style="font-size:13px;color:#999;line-height:1.6;margin-bottom:32px;">Если вы не пытались зарегистрироваться на сайте по адресу <a href="https://www.togetherly.online" style="color:#999;">www.togetherly.online</a> — просто проигнорируйте данное сообщение.</p>
+        <p style="font-size:13px;color:#999;">Спасибо,<br>Команда Togetherly.</p>
       </div>
     `
   });
 }
 
-async function sendResetEmail(email, token) {
-  const code = token;
+async function sendResetEmail(email, code, username) {
   return sendEmail({
     to: email,
     subject: `Код сброса пароля: ${code} — togetherly`,
     html: `
-      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;color:#111;">
-        <h2 style="font-size:22px;font-weight:700;margin-bottom:16px;">Сброс пароля</h2>
-        <p style="font-size:14px;color:#555;line-height:1.6;margin-bottom:24px;">Введите этот код на сайте:</p>
-        <div style="font-size:36px;font-weight:700;letter-spacing:8px;text-align:center;padding:24px;background:#f5f5f5;border-radius:12px;margin-bottom:24px;">${code}</div>
-        <p style="font-size:12px;color:#999;margin-top:32px;">Код действителен в течение 1 часа. Если вы не запрашивали сброс — игнорируйте это письмо.</p>
+      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;color:#111;">
+        <p style="font-size:15px;color:#333;line-height:1.6;margin-bottom:24px;">Привет, <b>${username || ''}</b>!</p>
+        <p style="font-size:15px;color:#333;line-height:1.6;margin-bottom:24px;">Вы запросили сброс пароля. Введите код ниже:</p>
+        <div style="font-size:14px;color:#888;margin-bottom:16px;">Код сброса:</div>
+        <div style="font-size:42px;font-weight:700;letter-spacing:12px;text-align:center;padding:28px;background:#f5f5f5;border-radius:12px;margin-bottom:28px;color:#111;">${code}</div>
+        <p style="font-size:13px;color:#999;line-height:1.6;margin-bottom:32px;">Код действителен в течение 1 часа. Если вы не запрашивали сброс — игнорируйте это письмо.</p>
+        <p style="font-size:13px;color:#999;">Спасибо,<br>Команда Togetherly.</p>
       </div>
     `
   });
 }
 
-module.exports = { sendVerifyCode, sendResetEmail };
+module.exports = { sendVerifyCode, sendResetEmail, detectDevice };

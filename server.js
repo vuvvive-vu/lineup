@@ -3,10 +3,17 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const db = require('./db');
-const { sendVerifyCode, sendResetEmail } = require('./email');
+const { sendVerifyCode, sendResetEmail, detectDevice } = require('./email');
 
-function genCode() { return Math.floor(100000 + Math.random() * 900000).toString(); }
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const JWT_EXPIRES = '30d';
+
+function genCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -43,11 +50,18 @@ const ephemeralEmailUsers = new Map(); // email -> { id, username, email, passwo
 // init DB if DATABASE_URL is set (Render env var)
 db.initDb().catch(e => console.error('DB init error:', e.message));
 
-function genCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let c = '';
-  for (let i=0;i<6;i++) c+= chars[Math.floor(Math.random()*chars.length)];
-  return c;
+function makeToken(accountId) {
+  return jwt.sign({ id: accountId }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+}
+async function parseToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded.id) return null;
+    if (db.isEnabled()) {
+      return await db.getUserById(decoded.id);
+    }
+    return ephemeralUsers.get(decoded.id) || null;
+  } catch { return null; }
 }
 function toEmbedUrl(platform, url) {
   url = url.trim();
@@ -84,20 +98,50 @@ function toEmbedUrl(platform, url) {
   return url;
 }
 
-function makeToken(accountId) {
-  return Buffer.from(accountId + ':' + Date.now() + ':' + Math.random().toString(36).slice(2)).toString('base64');
+// Rate limiting
+const rateLimit = new Map(); // ip -> { count, resetAt }
+function checkRateLimit(ip, max = 10, windowMs = 60000) {
+  const now = Date.now();
+  const entry = rateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimit.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= max;
 }
-async function parseToken(token) {
-  try {
-    const decoded = Buffer.from(token, 'base64').toString('utf8');
-    const accountId = decoded.split(':')[0];
-    if (!accountId || accountId.length < 1) return null;
-    if (db.isEnabled()) {
-      return await db.getUserById(accountId);
-    }
-    return ephemeralUsers.get(accountId) || null;
-  } catch { return null; }
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimit) {
+    if (now > entry.resetAt) rateLimit.delete(ip);
+  }
+}, 60000);
+
+// Code attempt limiting
+const codeAttempts = new Map(); // email -> { count, lockedUntil }
+function checkCodeAttempts(email, max = 5) {
+  const entry = codeAttempts.get(email);
+  if (!entry) return { ok: true };
+  if (entry.lockedUntil && Date.now() < entry.lockedUntil) {
+    const mins = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+    return { ok: false, error: `Слишком много попыток. Попробуй через ${mins} мин.` };
+  }
+  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
+    codeAttempts.delete(email);
+    return { ok: true };
+  }
+  return { ok: true };
 }
+function recordCodeAttempt(email) {
+  const entry = codeAttempts.get(email) || { count: 0 };
+  entry.count++;
+  if (entry.count >= 5) entry.lockedUntil = Date.now() + 15 * 60000;
+  codeAttempts.set(email, entry);
+}
+function clearCodeAttempts(email) {
+  codeAttempts.delete(email);
+}
+
 function isValidVideoUrl(platform, url){
   url=url.trim();
   try{
@@ -169,10 +213,11 @@ app.post('/api/login', async (req, res) => {
 // --- Email auth routes ---
 
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 
 app.post('/api/auth/register-email', async (req, res) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip, 5, 300000)) return res.status(429).json({ error: 'Слишком много регистраций. Подожди 5 минут.' });
     let { username, email, password } = req.body;
     username = (username || '').trim();
     email = (email || '').trim().toLowerCase();
@@ -184,11 +229,14 @@ app.post('/api/auth/register-email', async (req, res) => {
     const code = genCode();
 
     if (db.isEnabled()) {
-      const existing = await db.getUserByEmail(email);
-      if (existing) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+      const existingEmail = await db.getUserByEmail(email);
+      if (existingEmail) return res.status(400).json({ error: 'Email уже зарегистрирован' });
+      const existingUser = await db.getUserByUsername(username);
+      if (existingUser) return res.status(400).json({ error: 'Этот ник уже занят' });
       const { user, verifyToken } = await db.createAccountWithAuth({ username, email, password });
       await db.setVerifyToken(user.id, code);
-      const emailSent = await sendVerifyCode(email, code);
+      const device = detectDevice(req.headers['user-agent']);
+      const emailSent = await sendVerifyCode(email, code, username, device);
       const token = makeToken(user.id);
       return res.json({ token, username: user.username, avatar: user.avatar || '😎', bio: user.bio || '', emailVerified: false, codeSent: emailSent });
     }
@@ -209,6 +257,8 @@ app.post('/api/auth/register-email', async (req, res) => {
 
 app.post('/api/auth/login-email', async (req, res) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip, 10, 60000)) return res.status(429).json({ error: 'Слишком много попыток. Подожди минуту.' });
     let { email, password } = req.body;
     email = (email || '').trim().toLowerCase();
     password = password || '';
@@ -241,12 +291,16 @@ app.post('/api/auth/verify-code', async (req, res) => {
     code = (code || '').trim();
     if (!email || !code) return res.status(400).json({ error: 'Введите email и код' });
 
+    const attemptCheck = checkCodeAttempts(email);
+    if (!attemptCheck.ok) return res.status(429).json({ error: attemptCheck.error });
+
     if (db.isEnabled()) {
       const user = await db.getUserByEmail(email);
       if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
       if (user.email_verified) return res.json({ success: true, message: 'Почта уже подтверждена' });
       const ok = await db.verifyEmailByCode(email, code);
-      if (!ok) return res.status(400).json({ error: 'Неверный или просроченный код' });
+      if (!ok) { recordCodeAttempt(email); return res.status(400).json({ error: 'Неверный или просроченный код' }); }
+      clearCodeAttempts(email);
       return res.json({ success: true });
     }
 
@@ -254,7 +308,8 @@ app.post('/api/auth/verify-code', async (req, res) => {
     const user = ephemeralEmailUsers.get(email);
     if (!user) return res.status(400).json({ error: 'Пользователь не найден' });
     if (user.emailVerified) return res.json({ success: true, message: 'Почта уже подтверждена' });
-    if (user.verifyCode !== code) return res.status(400).json({ error: 'Неверный код' });
+    if (user.verifyCode !== code) { recordCodeAttempt(email); return res.status(400).json({ error: 'Неверный код' }); }
+    clearCodeAttempts(email);
     user.emailVerified = true;
     user.verifyCode = null;
     res.json({ success: true });
@@ -266,6 +321,8 @@ app.post('/api/auth/verify-code', async (req, res) => {
 
 app.post('/api/auth/forgot', async (req, res) => {
   try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip, 3, 300000)) return res.status(429).json({ error: 'Слишком много запросов. Подожди 5 минут.' });
     let { email } = req.body;
     email = (email || '').trim().toLowerCase();
     if (!email) return res.status(400).json({ error: 'Введите email' });
@@ -277,7 +334,7 @@ app.post('/api/auth/forgot', async (req, res) => {
       if (user) {
         const expires = new Date(Date.now() + 3600000);
         await db.pool.query('UPDATE users SET reset_token=$1, reset_expires=$2 WHERE id=$3', [code, expires, user.id]);
-        await sendResetEmail(email, code);
+        await sendResetEmail(email, code, user.username);
       }
       return res.json({ ok: true, message: 'Если аккаунт с таким email существует, код отправлен' });
     }
@@ -287,7 +344,7 @@ app.post('/api/auth/forgot', async (req, res) => {
     if (user) {
       user.resetCode = code;
       user.resetExpires = Date.now() + 3600000;
-      await sendResetEmail(email, code);
+      await sendResetEmail(email, code, user.username);
     }
     res.json({ ok: true, message: 'Если аккаунт с таким email существует, код отправлен' });
   } catch (e) {

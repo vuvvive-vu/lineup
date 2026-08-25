@@ -15,7 +15,8 @@
   <div class="nav-right">
     <span id="roomTitleTop" style="color:#fff;font-weight:700;font-size:14px;"></span>
     <span id="roomCodeTop" class="badge"></span>
-    <button class="btn-ghost" onclick="location.href='/'">Выйти</button>
+    <button class="btn-ghost lang-btn" id="roomLangToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">EN</button>
+    <button class="btn-ghost" onclick="location.href='/'" data-i18n="Выйти">Выйти</button>
   </div>
 </header>
 
@@ -23,16 +24,16 @@
   <div class="player-wrap" style="position:relative; overflow:hidden;">
     <div id="milanaLayer" style="position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1;"></div>
     <div class="player" id="player" style="position:relative; z-index:2;">
-      <div class="player-placeholder" id="placeholder">Загрузка плеера...</div>
+      <div class="player-placeholder" id="placeholder" data-i18n="Загрузка плеера...">Загрузка плеера...</div>
       <!-- iframe injected -->
-      <button id="unmuteBtn" style="display:none;position:absolute;bottom:12px;right:12px;z-index:6;background:#fff;color:#000;border:none;padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);">🔊 Включить звук</button>
+      <button id="unmuteBtn" style="display:none;position:absolute;bottom:12px;right:12px;z-index:6;background:#fff;color:#000;border:none;padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);" data-i18n="🔊 Включить звук">🔊 Включить звук</button>
     </div>
   </div>
 
   <div class="room-bottom">
     <div class="chat">
       <div class="chat-head">
-        <h4>Чат</h4>
+        <h4 data-i18n="Чат">Чат</h4>
         <span class="online" id="online">0 в комнате</span>
       </div>
       <div class="messages" id="messages"></div>
@@ -40,37 +41,37 @@
       <div class="chat-input">
         <button id="photoBtn" class="chat-icon-btn" title="Прикрепить фото">📷</button>
         <input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-        <input id="chatInput" placeholder="Написать сообщение..." maxlength="500"/>
-        <button id="sendBtn">Отправить</button>
+        <input id="chatInput" placeholder="Написать сообщение..." maxlength="500" data-i18n-placeholder="Написать сообщение..."/>
+        <button id="sendBtn" data-i18n="Отправить">Отправить</button>
       </div>
     </div>
 
     <div class="side">
       <div class="side-card">
-        <h4>Пригласи друзей</h4>
-        <p>Скопируй код или ссылку — по ней друзья зайдут прямо в эту комнату.</p>
+        <h4 data-i18n="Пригласи друзей">Пригласи друзей</h4>
+        <p data-i18n="Скопируй код или ссылку — по ней друзья зайдут прямо в эту комнату.">Скопируй код или ссылку — по ней друзья зайдут прямо в эту комнату.</p>
         <div class="code-box">
           <code id="codeBox">------</code>
-          <button class="icon-btn" id="copyCode">Копировать</button>
+          <button class="icon-btn" id="copyCode" data-i18n="Копировать">Копировать</button>
         </div>
         <div class="link-row">
           <input id="linkBox" readonly />
-          <button class="icon-btn" id="copyLink">Копировать</button>
+          <button class="icon-btn" id="copyLink" data-i18n="Копировать">Копировать</button>
         </div>
       </div>
 
       <div class="side-card" id="participantsCard">
-        <h4>Участники <span id="pCount" style="color:var(--muted);font-weight:600;font-size:12px;"></span></h4>
+        <h4 data-i18n="Участники">Участники <span id="pCount" style="color:var(--muted);font-weight:600;font-size:12px;"></span></h4>
         <div id="participantsList" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;"></div>
       </div>
 
       <div class="side-card" id="bansCard" style="display:none;">
-        <h4>Забаненные <span id="bansCount" style="color:#ff3b30;font-weight:600;font-size:12px;"></span></h4>
+        <h4 data-i18n="Забаненные">Забаненные <span id="bansCount" style="color:#ff3b30;font-weight:600;font-size:12px;"></span></h4>
         <div id="bansList" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;"></div>
       </div>
 
       <div class="side-card">
-        <h4>О комнате</h4>
+        <h4 data-i18n="О комнате">О комнате</h4>
         <p id="roomInfo">—</p>
         <div class="room-meta" style="margin-top:10px;">
           <span class="badge" id="platformBadge"></span>
@@ -85,32 +86,32 @@
   <div id="profileModal" class="modal-bg">
     <div class="modal profile-modal">
       <div class="modal-head">
-        <h3>Профиль</h3>
+        <h3 data-i18n="Профиль">Профиль</h3>
         <button class="x" data-close="profileModal">✕</button>
       </div>
       <div class="profile-ava-wrap">
         <div class="profile-ava-large" id="pAvaLarge">😎</div>
-        <div style="font-size:12px;color:var(--muted);">Выбери аватар или загрузи фото</div>
+        <div style="font-size:12px;color:var(--muted);" data-i18n="Выбери аватар или загрузи фото">Выбери аватар или загрузи фото</div>
         <div class="ava-grid" id="avaGrid">
           <button data-ava="😎">😎</button><button data-ava="🦊">🦊</button><button data-ava="🐱">🐱</button><button data-ava="🚀">🚀</button><button data-ava="👑">👑</button><button data-ava="🎬">🎬</button><button data-ava="🍿">🍿</button><button data-ava="❤️">❤️</button>
           <button data-ava="😈">😈</button><button data-ava="👾">👾</button><button data-ava="🌙">🌙</button><button data-ava="🔥">🔥</button><button data-ava="⚡">⚡</button><button data-ava="💀">💀</button><button data-ava="🌸">🌸</button><button data-ava="🍓">🍓</button>
         </div>
-        <button class="btn-ghost" id="uploadAvaBtn" style="margin-top:10px;font-size:12px;padding:8px 16px;">📷 Загрузить фото</button>
+        <button class="btn-ghost" id="uploadAvaBtn" style="margin-top:10px;font-size:12px;padding:8px 16px;" data-i18n="📷 Загрузить фото">📷 Загрузить фото</button>
         <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">до 2MB • PNG, JPG, WEBP</div>
       </div>
       <div class="field">
-        <label>Ник</label>
-        <input id="pUsername" placeholder="твой ник" maxlength="20" />
+        <label data-i18n="Ник">Ник</label>
+        <input id="pUsername" placeholder="твой ник" maxlength="20" data-i18n-placeholder="твой ник" />
       </div>
       <div class="field">
-        <label>Описание</label>
-        <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3"></textarea>
+        <label data-i18n="Описание">Описание</label>
+        <textarea id="pBio" placeholder="пару слов о себе..." maxlength="120" rows="3" data-i18n-placeholder="пару слов о себе..."></textarea>
         <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px;"><span id="bioCount">0</span>/120</div>
       </div>
       <div id="pError" class="error"></div>
-      <button id="pSave" class="btn-primary">Сохранить</button>
-      <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;">Выйти из аккаунта</button>
+      <button id="pSave" class="btn-primary" data-i18n="Сохранить">Сохранить</button>
+      <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;" data-i18n="Выйти из аккаунта">Выйти из аккаунта</button>
     </div>
   </div>
 
@@ -118,7 +119,7 @@
   <div id="viewProfileModal" class="modal-bg">
     <div class="modal profile-modal" style="max-width:360px;">
       <div class="modal-head">
-        <h3>Профиль</h3>
+        <h3 data-i18n="Профиль">Профиль</h3>
         <button class="x" data-close="viewProfileModal">✕</button>
       </div>
       <div class="profile-ava-wrap">
@@ -126,7 +127,7 @@
         <div id="vUsername" style="font-weight:800;font-size:18px;letter-spacing:-0.02em;"></div>
         <div id="vBio" style="font-size:13px;color:#8a8a8a;text-align:center;max-width:280px;line-height:1.5;white-space:pre-wrap;word-break:break-word;"></div>
       </div>
-      <button class="btn-ghost" style="width:100%;margin-top:14px;" data-close="viewProfileModal">Закрыть</button>
+      <button class="btn-ghost" style="width:100%;margin-top:14px;" data-close="viewProfileModal" data-i18n="Закрыть">Закрыть</button>
     </div>
   </div>
 
@@ -145,8 +146,8 @@
     </div>
     <div class="ctx-divider"></div>
     <div class="ctx-actions">
-      <button class="ctx-action-btn" data-action="copy">📋 Копировать</button>
-      <button class="ctx-action-btn ctx-delete" data-action="delete">🗑 Удалить</button>
+      <button class="ctx-action-btn" data-action="copy" data-i18n="📋 Копировать">📋 Копировать</button>
+      <button class="ctx-action-btn ctx-delete" data-action="delete" data-i18n="🗑 Удалить">🗑 Удалить</button>
     </div>
   </div>
 

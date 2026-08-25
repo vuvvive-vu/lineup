@@ -41,8 +41,81 @@ async function logout(){
 let currentAvatar='😎', currentBio='', currentUsername='';
 function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
 function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
-const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Ник','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK, RuTube or YouTube and share the link/code with friends.'}};
-function t(s){ return (isEn()?T.en:T.ru)[s]||s; }
+const T={
+  // Auth
+  'Регистрация':'Registration','Вход':'Login','Режим гостя':'Guest mode',
+  'Зарегистрируйтесь чтобы продолжить.':'Sign up to continue.',
+  'Войдите в аккаунт чтобы продолжить.':'Log in to your account to continue.',
+  'Быстрый вход по нику':'Quick login by nickname',
+  'Почта':'Email','Быстро':'Quick',
+  'Ник':'Nickname','Пароль':'Password','Войти':'Log in','Зарегистрироваться':'Sign up',
+  'Забыли пароль?':'Forgot password?',
+  'Уже есть аккаунт?':'Already have an account?','Нет аккаунта?':'Don\'t have an account?',
+  'Введите ник':'Enter nickname','Ник максимум 20 символов':'Nickname max 20 characters',
+  'Введите email':'Enter email','Введите пароль':'Enter password',
+  'Введи ник':'Enter nickname','Email уже зарегистрирован':'Email already registered',
+  'Этот ник уже занят':'This nickname is taken',
+  'Некорректный email':'Invalid email','Пароль минимум 6 символов':'Password min 6 characters',
+  'минимум 6 символов':'min 6 characters','твой ник':'your nickname',
+  'например, anomalyco':'e.g. anomalyco','пару слов о себе...':'a few words about yourself...',
+  'Введите email и код':'Enter email and code','Неверный или просроченный код':'Invalid or expired code',
+  'Неверный код':'Invalid code','Введите 6-значный код':'Enter 6-digit code',
+  'Проверьте почту — мы отправили код подтверждения.':'Check your email — we sent a verification code.',
+  'Код из письма':'Code from email','Подтвердить':'Confirm',
+  'Назад ко входу':'Back to login','Войти в аккаунт чтобы продолжить':'Log in to continue',
+  'Введите email — отправим код для сброса':'Enter email — we\'ll send a reset code',
+  'Отправить':'Send','Назад':'Back',
+  'Введи код':'Enter code','Комната не найдена':'Room not found',
+  'Слишком много попыток':'Too many attempts',
+  // Lobby
+  'Создать комнату':'Create room','Войти по коду':'Join by code','Войти в комнату':'Join room',
+  'Немного про нас':'About us','Связь с разработчиком':'Contact developer',
+  'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':
+    'Create a room, pick a video from VK, RuTube or YouTube and share the link/code with friends.',
+  'Выбери площадку — VK, RuTube или YouTube — вставь ссылку на видео и поделись ссылкой/кодом с другом.':
+    'Choose a platform — VK, RuTube or YouTube — paste a video link and share it with a friend.',
+  'У тебя есть ссылка или код от друга? Вставь его и сразу попадёшь в комнату.':
+    'Have a link or code from a friend? Paste it and join the room instantly.',
+  // Room
+  'Профиль':'Profile','Описание':'Description','Сохранить':'Save',
+  'Выбери аватар или загрузи фото':'Choose an avatar or upload a photo',
+  '📷 Загрузить фото':'📷 Upload photo',
+  'Выйти из аккаунта':'Log out','Сменить аккаунт':'Switch account',
+  'Админ-панель':'Admin panel','Управление пользователями':'User management',
+  'Вставь ссылку или код (например, 7X9KQ2 или https://.../room?code=7X9KQ2)':'Paste a link or code (e.g. 7X9KQ2 or https://.../room?code=7X9KQ2)',
+  'Код / Ссылка':'Code / Link',
+  'Название комнаты (необязательно)':'Room name (optional)',
+  'Ссылка на видео VK':'Video link (VK)',
+  'Создать и войти':'Create and join',
+  'Вечерний кинчик':'Evening movies',
+  'Вставь обычную ссылку на VK видео':'Paste a regular VK video link',
+  'Ник не может быть пустым':'Nickname cannot be empty','Максимум 20 символов':'Max 20 characters',
+  'Фото до 2MB':'Photo up to 2MB','Только изображения':'Images only',
+  'Фото слишком большое после сжатия':'Photo too large after compression',
+  'Загрузить фото':'Upload photo','Выйти из аккаунта':'Log out',
+  'Прикрепить фото':'Attach photo','Отправить':'Send','Копировать':'Copy',
+  'Удалить':'Delete','Закрыть':'Close',
+  'Приглашение в комнату':'Room invite','Код':'Code',
+  'Поделиться ссылкой':'Share link','Скопировано':'Copied',
+  'Создай комнату...':'Create a room...',
+  // Nav
+  'Logout':'Logout',
+};
+function t(s){ if(!isEn()) return s; return T[s]||s; }
+function applyTranslations(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(T[key]) el.textContent=isEn()?T[key]:key;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const key=el.getAttribute('data-i18n-placeholder');
+    if(T[key]) el.placeholder=isEn()?T[key]:key;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{
+    const key=el.getAttribute('data-i18n-title');
+    if(T[key]) el.title=isEn()?T[key]:key;
+  });
+}
 function toggleLang(){ setLang(!isEn()); location.reload(); }
 
 async function checkAuth(){
@@ -74,8 +147,9 @@ async function checkAuth(){
 function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
-  navRight.innerHTML=`<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">EN</button>`;
+  navRight.innerHTML=`<button class="btn-ghost lang-btn" id="langToggle" style="font-size:12px;padding:6px 12px;font-weight:700;">${isEn()?'RU':'EN'}</button>`;
   $('#langToggle').onclick=toggleLang;
+  applyTranslations();
   // show verified/success params
   const params=new URLSearchParams(location.search);
   if(params.get('verified')==='1'){
@@ -104,6 +178,7 @@ function showLobby(username, avatar){
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
   $('#langToggle').onclick = toggleLang;
+  applyTranslations();
 }
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -134,11 +209,11 @@ if(authTabs){
   const authSubtitle=document.getElementById('authSubtitle');
   function updateAuthTitles(){
     if(authMode==='register'){
-      if(authTitle) authTitle.textContent='Регистрация';
-      if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить';
+      if(authTitle) authTitle.textContent=t('Регистрация');
+      if(authSubtitle) authSubtitle.textContent=t('Зарегистрируйтесь чтобы продолжить.');
     } else {
-      if(authTitle) authTitle.textContent='Вход';
-      if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
+      if(authTitle) authTitle.textContent=t('Вход');
+      if(authSubtitle) authSubtitle.textContent=t('Войдите в аккаунт чтобы продолжить.');
     }
   }
   authTabs.querySelectorAll('button').forEach(btn=>{
@@ -151,8 +226,8 @@ if(authTabs){
         updateAuthTitles();
       } else {
         tabEmail.style.display='none'; tabQuick.style.display='';
-        if(authTitle) authTitle.textContent='Режим гостя';
-        if(authSubtitle) authSubtitle.textContent='Быстрый вход по нику';
+        if(authTitle) authTitle.textContent=t('Режим гостя');
+        if(authSubtitle) authSubtitle.textContent=t('Быстрый вход по нику');
       }
     };
   });
@@ -163,21 +238,21 @@ if(switchToReg){
     e.preventDefault();
     authMode='login';
     regUsernameField.style.display='none';
-    authBtnEl.textContent='Войти';
-    authSwitchEl.innerHTML='Нет аккаунта? <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">Зарегистрироваться</a>';
+    authBtnEl.textContent=t('Войти');
+    authSwitchEl.innerHTML=t('Нет аккаунта?')+' <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">'+t('Зарегистрироваться')+'</a>';
     const authTitle=document.getElementById('authTitle');
     const authSubtitle=document.getElementById('authSubtitle');
-    if(authTitle) authTitle.textContent='Вход';
-    if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
+    if(authTitle) authTitle.textContent=t('Вход');
+    if(authSubtitle) authSubtitle.textContent=t('Войдите в аккаунт чтобы продолжить.');
     document.getElementById('switchToLogin').onclick=(e)=>{
       e.preventDefault();
       authMode='register';
       regUsernameField.style.display='';
-      authBtnEl.textContent='Зарегистрироваться';
-      authSwitchEl.innerHTML='Уже есть аккаунт? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Войти</a>';
+      authBtnEl.textContent=t('Зарегистрироваться');
+      authSwitchEl.innerHTML=t('Уже есть аккаунт?')+' <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">'+t('Войти')+'</a>';
       document.getElementById('switchToReg').onclick=switchToReg.onclick;
-      if(authTitle) authTitle.textContent='Регистрация';
-      if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить.';
+      if(authTitle) authTitle.textContent=t('Регистрация');
+      if(authSubtitle) authSubtitle.textContent=t('Зарегистрируйтесь чтобы продолжить.');
     };
   };
 }
