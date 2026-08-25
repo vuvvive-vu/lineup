@@ -863,7 +863,7 @@ if(profileModalRoom){
     pErrorRoom.classList.remove('show');
     const newName=pUsernameRoom.value.trim();
     const newBio=pBioRoom.value.trim();
-    if(!newName) { pErrorRoom.textContent='Username не может быть пустым'; pErrorRoom.classList.add('show'); return; }
+    if(!newName) { pErrorRoom.textContent='Ник не может быть пустым'; pErrorRoom.classList.add('show'); return; }
     pSaveRoom.disabled=true; pSaveRoom.textContent='Сохранение...';
     try{
       const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({username:newName, avatar:selectedAvaRoom, bio:newBio}) });

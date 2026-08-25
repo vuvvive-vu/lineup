@@ -21,8 +21,8 @@
   <!-- AUTH -->
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
-      <h1 id="authTitle">Вход</h1>
-      <p id="authSubtitle">Войдите в аккаунт чтобы продолжить.</p>
+      <h1 id="authTitle">Регистрация</h1>
+      <p id="authSubtitle">Зарегистрируйтесь чтобы продолжить.</p>
       <div class="tabs" id="authTabs">
         <button class="active" data-tab="email">Почта</button>
         <button data-tab="quick">Быстро</button>
@@ -31,8 +31,8 @@
       <!-- Email auth -->
       <div id="tabEmail">
         <div id="emailFields">
-          <div class="field" id="regUsernameField" style="display:none;">
-            <label>Username</label>
+          <div class="field" id="regUsernameField">
+            <label>Ник</label>
             <input id="regUsername" placeholder="твой ник" maxlength="20" />
           </div>
           <div class="field">
@@ -44,16 +44,16 @@
             <input id="authPassword" type="password" placeholder="минимум 6 символов" autocomplete="current-password" />
           </div>
         </div>
-        <button id="authBtn" class="btn-primary">Войти</button>
+        <button id="authBtn" class="btn-primary">Зарегистрироваться</button>
         <div style="text-align:right;margin-top:8px;">
           <a href="#" id="forgotLink" style="font-size:12px;color:#6a6a6a;">Забыли пароль?</a>
         </div>
-        <p class="hint" id="authSwitch">Нет аккаунта? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Зарегистрироваться</a></p>
+        <p class="hint" id="authSwitch">Уже есть аккаунт? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Войти</a></p>
       </div>
       <!-- Quick auth (old style) -->
       <div id="tabQuick" style="display:none;">
         <div class="field">
-          <label>Username</label>
+          <label>Ник</label>
           <input id="username" placeholder="например, anomalyco" autocomplete="username" maxlength="20" />
         </div>
         <button id="quickAuthBtn" class="btn-primary">Войти</button>
@@ -62,7 +62,7 @@
       <div id="forgotForm" style="display:none;">
         <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите email — отправим ссылку для сброса пароля</p>
         <div class="field">
-          <label>Email</label>
+          <label>Почта</label>
           <input id="forgotEmail" type="email" placeholder="mail@example.com" />
         </div>
         <button id="forgotBtn" class="btn-primary">Отправить</button>
@@ -82,7 +82,7 @@
       <div id="resetForm" style="display:none;">
         <p style="font-size:13px;color:#9a9a9a;margin-bottom:14px;">Введите код из письма и новый пароль</p>
         <div class="field">
-          <label>Email</label>
+          <label>Почта</label>
           <input id="resetEmail" type="email" placeholder="mail@example.com" />
         </div>
         <div class="field">
@@ -203,7 +203,7 @@
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">до 2MB • PNG, JPG, WEBP</div>
       </div>
       <div class="field">
-        <label>Username</label>
+        <label>Ник</label>
         <input id="pUsername" placeholder="твой ник" maxlength="20" />
       </div>
       <div class="field">

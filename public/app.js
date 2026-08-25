@@ -41,7 +41,7 @@ async function logout(){
 let currentAvatar='😎', currentBio='', currentUsername='';
 function isEn(){ return localStorage.getItem('rave_lang')==='en'; }
 function setLang(en){ localStorage.setItem('rave_lang', en?'en':'ru'); document.documentElement.lang=en?'en':'ru'; }
-const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Username','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK, RuTube or YouTube and share the link/code with friends.'}};
+const T={ru:{'Создать комнату':'Создать комнату','Создай комнату...':'Создай комнату...','Войти по коду':'Войти по коду','Войти в комнату':'Войти в комнату','Выйти':'Выйти','Username':'Ник','Например, anomalyco':'например, anomalyco','Немного про нас':'Немного про нас','Связь с разработчиком':'Связь с разработчиком','Смотрите фильмы и сериалы вместе с togetherly.':'Смотрите фильмы и сериалы вместе с togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.'},en:{'Создать комнату':'Create room','Создай комнату...':'Create a room...','Войти по коду':'Join by code','Войти в комнату':'Join room','Выйти':'Logout','Username':'Username','Например, anomalyco':'e.g. anomalyco','Немного про нас':'About us','Связь с разработчиком':'Contact developer','Смотрите фильмы и сериалы вместе with togetherly.':'Watch movies and series together with togetherly.','Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.':'Create a room, pick a video from VK, RuTube or YouTube and share the link/code with friends.'}};
 function t(s){ return (isEn()?T.en:T.ru)[s]||s; }
 function toggleLang(){ setLang(!isEn()); location.reload(); }
 
@@ -97,7 +97,7 @@ function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':
 checkAuth();
 
 // --- Auth tabs ---
-let authMode='login'; // login or register
+let authMode='register'; // login or register
 const authTabs=document.getElementById('authTabs');
 const tabEmail=document.getElementById('tabEmail');
 const tabQuick=document.getElementById('tabQuick');
@@ -146,23 +146,23 @@ if(authTabs){
 if(switchToReg){
   switchToReg.onclick=(e)=>{
     e.preventDefault();
-    authMode='register';
-    regUsernameField.style.display='';
-    authBtnEl.textContent='Зарегистрироваться';
-    authSwitchEl.innerHTML='Есть аккаунт? <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">Войти</a>';
+    authMode='login';
+    regUsernameField.style.display='none';
+    authBtnEl.textContent='Войти';
+    authSwitchEl.innerHTML='Нет аккаунта? <a href="#" id="switchToLogin" style="color:#fff;font-weight:600;">Зарегистрироваться</a>';
     const authTitle=document.getElementById('authTitle');
     const authSubtitle=document.getElementById('authSubtitle');
-    if(authTitle) authTitle.textContent='Регистрация';
-    if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить';
+    if(authTitle) authTitle.textContent='Вход';
+    if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
     document.getElementById('switchToLogin').onclick=(e)=>{
       e.preventDefault();
-      authMode='login';
-      regUsernameField.style.display='none';
-      authBtnEl.textContent='Войти';
-      authSwitchEl.innerHTML='Нет аккаунта? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Зарегистрироваться</a>';
+      authMode='register';
+      regUsernameField.style.display='';
+      authBtnEl.textContent='Зарегистрироваться';
+      authSwitchEl.innerHTML='Уже есть аккаунт? <a href="#" id="switchToReg" style="color:#fff;font-weight:600;">Войти</a>';
       document.getElementById('switchToReg').onclick=switchToReg.onclick;
-      if(authTitle) authTitle.textContent='Вход';
-      if(authSubtitle) authSubtitle.textContent='Войдите в аккаунт чтобы продолжить.';
+      if(authTitle) authTitle.textContent='Регистрация';
+      if(authSubtitle) authSubtitle.textContent='Зарегистрируйтесь чтобы продолжить.';
     };
   };
 }
@@ -203,8 +203,8 @@ if(authBtnEl){
     try{
       if(authMode==='register'){
         const username=(document.getElementById('regUsername')?.value||'').trim();
-        if(!username) return showError(authError,'Введите username');
-        if(username.length>20) return showError(authError,'Username максимум 20 символов');
+        if(!username) return showError(authError,'Введите ник');
+        if(username.length>20) return showError(authError,'Ник максимум 20 символов');
         const r=await fetch('/api/auth/register-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password})});
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
@@ -304,7 +304,7 @@ if(quickAuthBtn){
   quickAuthBtn.onclick=async()=>{
     hideError(authError);
     const username=usernameEl.value.trim();
-    if(!username) return showError(authError,'Введи username');
+    if(!username) return showError(authError,'Введи ник');
     quickAuthBtn.disabled=true;
     try{
       const ava=localStorage.getItem('rave_ava')||'😎';
@@ -510,7 +510,7 @@ pSave.onclick=async()=>{
   hideError(pError);
   const newName=pUsername.value.trim();
   const newBio=pBio.value.trim();
-  if(!newName) return showError(pError,'Username не может быть пустым');
+  if(!newName) return showError(pError,'Ник не может быть пустым');
   if(newName.length>20) return showError(pError,'Максимум 20 символов');
   pSave.disabled=true; pSave.textContent='Сохранение...';
   try{
