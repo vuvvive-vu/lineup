@@ -819,7 +819,7 @@ let currentUsernameRoom=localStorage.getItem('rave_user')||'';
 (async()=>{
   try{
     const r=await fetch('/api/me', {headers:{Authorization:'Bearer '+token}});
-    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); }
+    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0'); }
   }catch{}
   injectProfileBtn();
 })();
@@ -877,31 +877,41 @@ function openProfileRoom(){
   if(openEditBtnRoom) openEditBtnRoom.style.display = localIsGuestRoom ? 'none' : '';
   const cardSync=document.getElementById('profileInfoCard');
   if(cardSync) cardSync.style.display = localIsGuestRoom ? 'none' : '';
-  // confirm via server
+  // instant creator badge from localStorage (no delay)
+  const localIsCreatorRoom = localStorage.getItem('rave_isCreator') === '1' || handle.toLowerCase() === 'owner';
+  const crownIconSyncR = document.getElementById('pCrownIcon');
+  const creatorBadgeSyncR = document.getElementById('pCreatorBadge');
+  const avaWrapSyncR = document.getElementById('pAvaWrap');
+  if(localIsCreatorRoom && !localIsGuestRoom) {
+    if(crownIconSyncR) crownIconSyncR.style.display = 'block';
+    if(creatorBadgeSyncR) creatorBadgeSyncR.style.display = 'inline-block';
+    if(avaWrapSyncR) { avaWrapSyncR.classList.add('creator-badge'); createSnowflakesRoom(avaWrapSyncR); }
+  } else {
+    if(crownIconSyncR) crownIconSyncR.style.display = 'none';
+    if(creatorBadgeSyncR) creatorBadgeSyncR.style.display = 'none';
+    if(avaWrapSyncR) { avaWrapSyncR.classList.remove('creator-badge'); avaWrapSyncR.querySelectorAll('.snowflake').forEach(s => s.remove()); }
+  }
+  // confirm via server (update if changed)
   fetch('/api/me', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
     const guest=j.isGuest;
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    // Show creator badge
+    localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
-    if(j.isCreator) {
-      if(crownIcon) crownIcon.style.display = 'block';
-      if(creatorBadge) creatorBadge.style.display = 'inline-block';
-      if(avaWrap) {
-        avaWrap.classList.add('creator-badge');
-        // Add snowflakes
-        createSnowflakesRoom(avaWrap);
-      }
-    } else {
-      if(crownIcon) crownIcon.style.display = 'none';
-      if(creatorBadge) creatorBadge.style.display = 'none';
-      if(avaWrap) {
-        avaWrap.classList.remove('creator-badge');
-        // Remove snowflakes
-        avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
+    const isCreatorNow = !!j.isCreator;
+    const wasCreator = avaWrap && avaWrap.classList.contains('creator-badge');
+    if(isCreatorNow !== wasCreator) {
+      if(isCreatorNow) {
+        if(crownIcon) crownIcon.style.display = 'block';
+        if(creatorBadge) creatorBadge.style.display = 'inline-block';
+        if(avaWrap) { avaWrap.classList.add('creator-badge'); createSnowflakesRoom(avaWrap); }
+      } else {
+        if(crownIcon) crownIcon.style.display = 'none';
+        if(creatorBadge) creatorBadge.style.display = 'none';
+        if(avaWrap) { avaWrap.classList.remove('creator-badge'); avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove()); }
       }
     }
   }).catch(()=>{});
@@ -1001,7 +1011,7 @@ if(profileModalRoom){
     avatarFileRoom.value='';
   };
   if(pBioRoom) pBioRoom.addEventListener('input', ()=> { if(bioCountRoom) bioCountRoom.textContent=pBioRoom.value.length; });
-  pLogoutRoom.onclick=()=>{ localStorage.removeItem('rave_token'); localStorage.removeItem('rave_user'); localStorage.removeItem('rave_display'); localStorage.removeItem('rave_email'); location.href='/'; };
+  pLogoutRoom.onclick=()=>{ localStorage.removeItem('rave_token'); localStorage.removeItem('rave_user'); localStorage.removeItem('rave_display'); localStorage.removeItem('rave_email'); localStorage.removeItem('rave_isCreator'); location.href='/'; };
   pSaveRoom.onclick=async()=>{
     pErrorRoom.style.display='none'; pErrorRoom.classList.remove('show');
     const newDisplay=(document.getElementById('eDisplayName')?.value||'').trim();
@@ -1021,6 +1031,7 @@ if(profileModalRoom){
       localStorage.setItem('rave_user', j.username);
       localStorage.setItem('rave_ava', j.avatar);
       localStorage.setItem('rave_bio', j.bio);
+      localStorage.setItem('rave_isCreator', j.isCreator ? '1' : '0');
       currentAvatar=j.avatar; currentDisplayNameRoom=j.displayName; currentUsernameRoom=j.username;
       const btn=document.getElementById('profileBtnRoom');
       if(btn) renderAvaBtnRoom(btn, j.avatar, j.displayName);
