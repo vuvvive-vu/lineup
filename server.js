@@ -785,7 +785,12 @@ app.get('/api/rooms/:code', (req, res) => {
 
 // --- AI agent (free) ---
 const AI_API_KEY = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || (process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'meta-llama/llama-3.1-8b-instruct:free');
+let AI_MODEL = process.env.AI_MODEL || (process.env.GROQ_API_KEY ? 'groq/compound-mini' : 'meta-llama/llama-3.1-8b-instruct:free');
+// deprecated Groq model fallback (llama-3.1-8b-instant удалён 2025) — авто-замена
+if (AI_MODEL === 'llama-3.1-8b-instant' && process.env.GROQ_API_KEY) {
+  console.warn('[AI] AI_MODEL llama-3.1-8b-instant deprecated, fallback to groq/compound-mini');
+  AI_MODEL = 'groq/compound-mini';
+}
 const AI_BASE_URL = process.env.AI_BASE_URL || (process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions');
 
 const KNOWLEDGE = (() => {
@@ -1110,7 +1115,52 @@ app.post('/api/ai/chat', async (req, res) => {
     if (!r.ok) {
       const t = await r.text().catch(()=> '');
       console.error('[AI] LLM error', r.status, t.slice(0,500));
-      // тихий фолбэк без технической пометки — пробуем запасную модель
+      // если модель не найдена на Groq — пробуем актуальные Groq модели
+      if (t.includes('model_not_found') && process.env.GROQ_API_KEY) {
+        const groqFallbacks = ['groq/compound-mini','groq/compound','openai/gpt-oss-20b'];
+        for (const fm of groqFallbacks) {
+          if (fm === AI_MODEL) continue;
+          try {
+            const fr2 = await fetch(AI_BASE_URL, {
+              method:'POST',
+              headers:{'Authorization':`Bearer ${AI_API_KEY}`,'Content-Type':'application/json'},
+              body: JSON.stringify({model:fm, messages, temperature:0.2, max_tokens:600}),
+              signal: AbortSignal.timeout(15000)
+            });
+            if (fr2.ok) {
+              const fj2 = await fr2.json();
+              const frank2 = fj2.choices?.[0]?.message?.content || '';
+              if (frank2 && frank2.trim()) {
+                const ftool2 = extractToolCall(frank2);
+                let freply2 = frank2.replace(/```tool[\s\S]*?```/gi,'').replace(/```json[\s\S]*?```/gi,'').trim();
+                if (ftool2) { try{ freply2 = freply2.replace(JSON.stringify(ftool2),'').trim(); }catch{} }
+                if (!freply2) freply2 = 'Привет! Я помощник Togetherly. Задай вопрос про сервис.';
+                if (ftool2 && ftool2.args) {
+                  let {platform, videoUrl, title} = ftool2.args;
+                  platform=(platform||'rutube').toLowerCase(); if(!['vk','rutube','youtube'].includes(platform)) platform='rutube';
+                  title=(title||'Без названия'); videoUrl=(videoUrl||'').trim();
+                  if (videoUrl.startsWith('SEARCH:')) { const q=videoUrl.slice(7).trim()||title; const fo=await resolveByTitle(q); if(fo){ videoUrl=fo.url; platform=fo.platform; } }
+                  if (!isValidVideoUrl(platform, videoUrl)) { const fo2=await resolveByTitle(title); if(fo2){ videoUrl=fo2.url; platform=fo2.platform; } }
+                  if (isValidVideoUrl(platform, videoUrl)) {
+                    const token2 = req.headers.authorization?.replace('Bearer ','');
+                    const user2 = await parseToken(token2);
+                    if (user2 && user2.email) {
+                      const emb = toEmbedUrl(platform, videoUrl);
+                      let code; do{code=genCode();}while(rooms[code]);
+                      const hn = user2.username||user2.display_name||user2.displayName||user2.id;
+                      const room={code, title:title.slice(0,60), platform, videoUrl, embedUrl:emb, host:hn, createdAt:new Date().toISOString(), messages:[], bans:[]};
+                      rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+                      return res.json({reply: freply2, action:{type:'room_created', code, url:`/room.html?code=${code}`, platform}});
+                    }
+                  }
+                }
+                return res.json({reply: freply2});
+              }
+            }
+          } catch {}
+        }
+      }
+      // тихий фолбэк без технической пометки — пробуем запасную модель (OpenRouter)
       const fallbackModels = ['poolside/laguna-xs-2.1:free','liquid/lfm-2.5-2.6b:free','cohere/north-mini-code:free'].filter(m=>m!==AI_MODEL);
       for(const fm of fallbackModels){
         try{
