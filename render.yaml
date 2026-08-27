@@ -18,14 +18,6 @@ services:
         value: noreply@togetherly.online
       - key: SITE_URL
         sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: AI_MODEL
-        value: openai/gpt-oss-20b
-      - key: VK_SERVICE_TOKEN
-        sync: false
     healthCheckPath: /
 
 databases:
