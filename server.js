@@ -786,11 +786,6 @@ app.get('/api/rooms/:code', (req, res) => {
 // --- AI agent (free) ---
 const AI_API_KEY = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || '';
 let AI_MODEL = process.env.AI_MODEL || (process.env.GROQ_API_KEY ? 'openai/gpt-oss-20b' : 'meta-llama/llama-3.1-8b-instruct:free');
-// deprecated Groq model fallback (llama-3.1-8b-instant СѓРґР°Р»С‘РЅ 2025) вЂ” Р°РІС‚Рѕ-Р·Р°РјРµРЅР°
-if (AI_MODEL === 'llama-3.1-8b-instant' && process.env.GROQ_API_KEY) {
-  console.warn('[AI] AI_MODEL llama-3.1-8b-instant deprecated, fallback to openai/gpt-oss-20b');
-  AI_MODEL = 'openai/gpt-oss-20b';
-}
 if (AI_MODEL === 'groq/compound-mini' && process.env.GROQ_API_KEY) {
   // groq/compound-mini СѓРїРёСЂР°РµС‚СЃСЏ РІ Р»РёРјРёС‚ 100k TPD РЅР° llama-3.3-70b, РїРµСЂРµРєР»СЋС‡Р°РµРј РЅР° 20b СЃ РѕС‚РґРµР»СЊРЅС‹Рј Р»РёРјРёС‚РѕРј
   console.warn('[AI] AI_MODEL groq/compound-mini hit TPD limit, fallback to openai/gpt-oss-20b');
@@ -1157,6 +1152,9 @@ app.post('/api/ai/chat', async (req, res) => {
     if (!r.ok) {
       const t = await r.text().catch(()=> '');
       console.error('[AI] LLM error', r.status, t.slice(0,500));
+      if (r.status === 429 || /rate_limit|rate limit|TPD|tokens per day/i.test(t)) {
+        return res.status(503).json({ error: 'Лимит AI временно исчерпан. Попробуй позже или проверь тариф модели.', rateLimited: true });
+      }
       // РµСЃР»Рё РјРѕРґРµР»СЊ РЅРµ РЅР°Р№РґРµРЅР° РЅР° Groq вЂ” РїСЂРѕР±СѓРµРј Р°РєС‚СѓР°Р»СЊРЅС‹Рµ Groq РјРѕРґРµР»Рё
       if (t.includes('model_not_found') && process.env.GROQ_API_KEY) {
         const groqFallbacks = ['groq/compound-mini','groq/compound','openai/gpt-oss-20b'];
