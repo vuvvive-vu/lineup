@@ -788,23 +788,31 @@ const AI_API_KEY = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY ||
 const AI_MODEL = process.env.AI_MODEL || (process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'meta-llama/llama-3.1-8b-instruct:free');
 const AI_BASE_URL = process.env.AI_BASE_URL || (process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions');
 
-const AI_SYSTEM = `Ты — ИИ-помощник сервиса togetherly (совместный просмотр VK / RuTube / YouTube).
-Отвечай кратко, на русском, 2-5 предложений, дружелюбно.
-Знание о сервисе:
-- Регистрация: по почте (имя 1-20, username 3-20 a-z0-9_-, email + пароль 6+, код 6 цифр) или гость (ник ≤20, avatar emoji/base64 ≤2MB, bio ≤120).
-- Лобби: "Создать комнату" → выбрать VK/RuTube/YouTube → вставить ссылку → "Создать и войти" → код 6 символов (7X9KQ2) или ссылка /room.html?code=XXXX. "Войти по коду" → вставить код/ссылку.
-- Платформы: VK vk.com/video-123_456 vkvideo.ru video_ext.php?oid=..., YouTube youtube.com/watch?v= youtu.be, Rutube rutube.ru/video/...
-- В комнате: плеер iframe, синк только хост (play/pause/seek), чат 500 симв/сообщ 200 сообщ/комната, удаление при выходе всех, бан хостом (✕), хост меняется случайно при уходе, участники в "Участники".
-- Профиль: смена имени/username/аватара/bio, гость — временно, email — в Postgres, support@togetherly.online, telegram t.me/vuvvive.
-- Друзья/подписки/личные сообщения НЕ предусмотрены — только код/ссылка комнаты.
-- Если спрашивают не про togetherly — скажи "я знаю только про togetherly" и кратко верни к сервису.
-- Если просят "включи/найди/поставь" + название (напр. сумерки 3) — верни JSON tool_call, не выдумывай ссылку.
+const KNOWLEDGE = (() => {
+  try {
+    const faq = fs.readFileSync(path.join(__dirname, 'public/faq.html'), 'utf8').slice(0,3500);
+    const lobby = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8').slice(0,3500);
+    const room = fs.readFileSync(path.join(__dirname, 'public/room.html'), 'utf8').slice(0,3500);
+    return `=== FAQ ===\n${faq}\n\n=== LOBBY ===\n${lobby}\n\n=== ROOM ===\n${room}`;
+  } catch(e){ return 'Togetherly: FAQ / Lobby / Room'; }
+})();
+const AI_SYSTEM = `Ты — ИИ-помощник сервиса togetherly. Ты знаешь структуру проекта целиком — внизу полный FAQ, лобби и комната.
 
-Формат для включения видео (только если юзер явно просит создать/включить):
+Отвечай кратко, на русском, 2-5 предложений, дружелюбно. Понимай интент сам, без ключевых слов. Не упоминай платформы как ограничения.
+
+База знаний:
+${KNOWLEDGE}
+
+Правила:
+- Если вопрос информационный (как смотреть видео, что такое комната, как забанить) — отвечай текстом по базе, без tool.
+- Только если юзер явно просит "включи/покажи/найди/запусти" + название/ссылку — вызови create_room.
+- Никогда не выдумывай videoUrl, ставь SEARCH:название для поиска.
+
+Формат для create_room (только если нужно создать):
 \`\`\`tool
 {"tool":"create_room","args":{"platform":"rutube","videoUrl":"SEARCH:название","title":"Название"}}
 \`\`\`
-platform: vk | rutube | youtube (для "сумерки" и фильмов ставь rutube). Если дал ссылку — используй её и правильный platform. Если дал только название — ставь videoUrl как "SEARCH:название" и title как название. Не выдумывай ID.
+platform: vk | rutube | youtube
 `;
 
 async function resolveYoutubeByTitle(title){
@@ -992,35 +1000,6 @@ async function resolveVkByTitle(title) {
   return null;
 }
 
-function offlineAnswer(message) {
-  const q = message.toLowerCase();
-  if (q.includes('дру') || q.includes('friend') || q.includes('добавить') || q.includes('подпис')) {
-    return 'В togetherly нет друзей/подписок — делитесь кодом комнаты (например 7X9KQ2) или ссылкой /room.html?code=XXXX, друзья зайдут по ней. Участников видно в блоке "Участники".';
-  }
-  if (q.includes('создать') || q.includes('комнат')) {
-    return 'Нажми "Создать комнату" → выбери площадку → вставь ссылку на видео → "Создать и войти" → скопируй код и скинь друзьям.';
-  }
-  if (q.includes('vk') || q.includes('вк')) {
-    return 'Скинь ссылку на видео — создам комнату.';
-  }
-  if (q.includes('бан') || q.includes('кик')) {
-    return 'Банить может только хост комнаты: нажми ✕ у участника → он попадёт в "Забаненные" и не зайдёт снова. Разбанить — там же.';
-  }
-  if (q.includes('хост') || q.includes('синх') || q.includes('управ')) {
-    return 'Синхронизирует только хост (создатель комнаты). Если хост выйдет — хост перейдёт случайному участнику.';
-  }
-  if (q.includes('гость') || q.includes('регист') || q.includes('аккаунт')) {
-    return 'Можно как гость (ник ≤20) или по почте (username 3-20 a-z0-9_-, пароль 6+, код из письма). Гость пропадёт после очистки браузера.';
-  }
-  if (q.includes('аватар') || q.includes('профиль') || q.includes('био')) {
-    return 'Профиль → аватар (emoji или фото до 2MB), имя ≤20, bio ≤120. Почту менять нельзя.';
-  }
-  if (q.includes('чат')) {
-    return 'Чат в комнате — до 500 символов, 200 сообщений, видно всем. При выходе всех комната удаляется.';
-  }
-  return 'Привет! Я помощник togetherly. Спроси как создать комнату, какие ссылки подходят, как банить или попроси "включи [название]" — создам комнату. Друзья/ЛС не предусмотрены — только код комнаты.';
-}
-
 function extractToolCall(text) {
   if (!text) return null;
   const t = text.trim();
@@ -1101,54 +1080,11 @@ app.post('/api/ai/chat', async (req, res) => {
       }
     }
 
-    // offline mode if no key
     if (!AI_API_KEY) {
-      // if wantsRoom and looks like VK link provided
-      const urlMatch = message.match(/https?:\/\/[^\s]+vk\.(?:com|ru|video\.ru)[^\s]*/i)
-        || message.match(/https?:\/\/vkvideo\.ru[^\s]*/i)
-        || message.match(/vk\.com\/video-?\d+_\d+/i);
-      if (wantsRoom && urlMatch) {
-        let url = urlMatch[0];
-        if (!url.startsWith('http')) url = 'https://' + url;
-        if (isValidVideoUrl('vk', url)) {
-          const token = req.headers.authorization?.replace('Bearer ','');
-          const user = await parseToken(token);
-          if (!user) return res.json({ reply: 'Войди в аккаунт, и я сразу создам комнату. Ссылка корректна ✓', needAuth: true });
-          const embedUrl = toEmbedUrl('vk', url);
-          let code; do { code = genCode(); } while (rooms[code]);
-          const rawTitle = message.replace(url,'').replace(/включи|создай|найди|поставь|запусти|вруби|комнату|видео|на\s+vk/gi,'').trim().slice(0,60);
-          const title = rawTitle || 'Без названия';
-          const hostName = user.username || user.display_name || user.displayName || ('guest:'+user.id);
-          const room = { code, title, platform:'vk', videoUrl:url, embedUrl, host:hostName, createdAt:new Date().toISOString(), messages:[], bans:[] };
-          rooms[code]=room; saveJson(ROOMS_FILE, rooms);
-          return res.json({ reply: `Готово! Создал комнату "${title}".`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform:'vk' } });
-        }
-      }
-      if (wantsRoom) {
-        // try to extract title like "включи сумерки 3" — теперь без Госуслуг через YouTube обход
-        const title = message.replace(/включи|создай|найди|поставь|запусти|вруби|комнату|видео|на\s+vk/gi,'').trim().slice(0,60);
-        if (title && title.length >= 3) {
-          const foundObj = await resolveByTitle(title);
-          if (foundObj) {
-            const {url:found, platform} = foundObj;
-            const token = req.headers.authorization?.replace('Bearer ','');
-            const user = await parseToken(token);
-            if (!user) return res.json({ reply: `Нашёл: ${found}. Войди в аккаунт — создам комнату.`, needAuth:true, foundUrl:found });
-            let code; do { code = genCode(); } while (rooms[code]);
-            const embedUrl = toEmbedUrl(platform, found);
-            const hostName2 = user.username || user.display_name || user.displayName || ('guest:'+user.id);
-            const room = { code, title, platform, videoUrl:found, embedUrl, host:hostName2, createdAt:new Date().toISOString(), messages:[], bans:[] };
-            rooms[code]=room; saveJson(ROOMS_FILE, rooms);
-            return res.json({ reply: `Нашёл "${title}" и создал комнату.`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform } });
-          }
-          const vkSearch = `https://vk.com/video?q=${encodeURIComponent(title)}`;
-          return res.json({ reply: `Не нашёл "${title}" автоматом. Попробуй скинуть прямую ссылку на видео — сразу создам комнату.\n\nИли открой поиск: ${vkSearch}` });
-        }
-      }
-      return res.json({ reply: offlineAnswer(message) });
+      return res.status(503).json({ error: 'ИИ не настроен. Добавьте GROQ_API_KEY.' });
     }
 
-    // online LLM
+    // online LLM — нативный Groq tool calling, понимает структуру FAQ/лобби/комната целиком
     const messages = [
       { role:'system', content: AI_SYSTEM },
       ...history,
@@ -1157,7 +1093,7 @@ app.post('/api/ai/chat', async (req, res) => {
     const body = {
       model: AI_MODEL,
       messages,
-      temperature: 0.4,
+      temperature: 0.2,
       max_tokens: 600
     };
     const r = await fetch(AI_BASE_URL, {
@@ -1192,7 +1128,7 @@ app.post('/api/ai/chat', async (req, res) => {
               const ftool = extractToolCall(frank);
               let freply = frank.replace(/```tool[\s\S]*?```/gi,'').replace(/```json[\s\S]*?```/gi,'').trim();
               if(ftool){ try{ freply = freply.replace(JSON.stringify(ftool),'').trim(); }catch{} freply = freply.replace(/\{[\s\S]*?"tool"[\s\S]*?\n\}/g,'').trim(); }
-              if(!freply) freply = offlineAnswer(message);
+              if(!freply) freply = 'Не понял вопрос, уточни, пожалуйста.';
               if(ftool && ftool.args){
                 let {platform, videoUrl, title} = ftool.args;
                 platform = (platform||'rutube').toLowerCase();
@@ -1223,12 +1159,16 @@ app.post('/api/ai/chat', async (req, res) => {
           }
         }catch{}
       }
-      return res.json({ reply: offlineAnswer(message) });
+      return res.json({ reply: 'Привет! Я помощник Togetherly. Задай вопрос про сервис или попроси включить фильм — например, "как создать комнату?" или "включи сумерки".' });
     }
     const j = await r.json();
-    const raw = j.choices?.[0]?.message?.content || j.choices?.[0]?.text || '';
-    const tool = extractToolCall(raw);
-    // clean reply (remove tool block and raw JSON)
+    const msg = j.choices?.[0]?.message || {};
+    let tool = null;
+    if (msg.tool_calls && msg.tool_calls[0]?.function?.name === 'create_room') {
+      try { const args = JSON.parse(msg.tool_calls[0].function.arguments); tool = {tool:'create_room', args}; } catch {}
+    }
+    if (!tool) tool = extractToolCall(msg.content || '');
+    const raw = msg.content || '';
     let reply = raw.replace(/```tool[\s\S]*?```/gi,'').replace(/```json[\s\S]*?```/gi,'').trim();
     if (tool) {
       try { reply = reply.replace(JSON.stringify(tool), '').trim(); } catch {}
@@ -1238,7 +1178,7 @@ app.post('/api/ai/chat', async (req, res) => {
       // remove any remaining raw JSON block containing "tool"
       reply = reply.replace(/\{[\s\S]*?"tool"\s*:\s*"create_room"[\s\S]*?\n\}/g,'').trim();
     }
-    if (!reply) reply = offlineAnswer(message);
+    if (!reply) reply = 'Не понял вопрос, уточни, пожалуйста.';
 
     if (tool && tool.args) {
       let { platform, videoUrl, title } = tool.args;
@@ -1277,7 +1217,8 @@ app.post('/api/ai/chat', async (req, res) => {
       rooms[code]=room; saveJson(ROOMS_FILE, rooms);
       const successReply = `Готово! Создал комнату "${title}".`;
       // если LLM не дал осмысленного ответа (пусто или оффлайн-заглушка) — замени на успех
-      const finalReply = (!reply || reply === offlineAnswer(message) || reply.includes('Скинь ссылку')) ? successReply : reply;
+      const isGeneric = !reply || reply === 'Не понял вопрос, уточни, пожалуйста.' || reply.includes('Скинь ссылку');
+      const finalReply = isGeneric ? successReply : reply;
       return res.json({ reply: finalReply, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform } });
     }
     // also handle case where LLM didn't use tool but user wants room and gave direct link (any platform)
