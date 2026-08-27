@@ -51,7 +51,10 @@
     </div>
   `;
 
+  const overlay = document.createElement('div');
+  overlay.id = 'aiOverlay';
   document.body.appendChild(fab);
+  document.body.appendChild(overlay);
   document.body.appendChild(panel);
 
   const msgsEl = panel.querySelector('#aiMessages');
@@ -119,20 +122,26 @@
     syncFab();
     if(!isRegistered()){
       panel.classList.add('open');
+      overlay.classList.add('open');
       renderHistory();
       return;
     }
     panel.classList.add('open');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
     renderHistory();
-    inputEl.focus();
-    msgsEl.scrollTop = msgsEl.scrollHeight;
+    setTimeout(()=>{ inputEl.focus(); msgsEl.scrollTop = msgsEl.scrollHeight; }, 50);
   }
-  function close(){ panel.classList.remove('open'); }
+  function close(){
+    panel.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
   fab.onclick = () => { if(panel.classList.contains('open')) close(); else open(); };
   closeBtn.onclick = close;
+  overlay.onclick = close;
   clearBtn.onclick = () => { history=[]; saveHistory(); renderHistory(); };
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && panel.classList.contains('open')) close(); });
-  panel.addEventListener('click', e=>{ if(e.target===panel) close(); });
 
   function isRegistered(){
     return !!localStorage.getItem('rave_email');
@@ -146,6 +155,8 @@
     // также блокируем панель для гостей
     if(!isRegistered() && panel.classList.contains('open')){
       panel.classList.remove('open');
+      overlay.classList.remove('open');
+      document.body.style.overflow='';
     }
   }
   // если гость — показываем подсказку вместо чата

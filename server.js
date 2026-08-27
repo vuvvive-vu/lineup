@@ -857,8 +857,19 @@ async function resolveRutubeByTitle(title){
     const results = j.results || j.videos || [];
     if(Array.isArray(results) && results.length){
       for(const it of results){
+        if(it.is_hidden || it.is_deleted || it.is_locked || it.is_adult) continue;
         const cand = it.video_url || it.embed_url || (it.id ? `https://rutube.ru/video/${it.id}/` : null);
-        if(cand && isValidVideoUrl('rutube', cand)) return cand;
+        if(cand && isValidVideoUrl('rutube', cand)){
+          // быстрая проверка что embed не 404
+          try{
+            const check = await fetch(`https://rutube.ru/api/video/${it.id}/`, { headers:{'User-Agent':'Mozilla/5.0'}, signal: AbortSignal.timeout(4000)});
+            if(check.ok){
+              const vj = await check.json();
+              if(vj.is_hidden || vj.is_deleted || vj.is_locked) continue;
+            }
+          }catch{}
+          return cand;
+        }
         if(it.id && /^[a-f0-9]{32}$/.test(it.id)){
           const c2 = `https://rutube.ru/video/${it.id}/`;
           if(isValidVideoUrl('rutube', c2)) return c2;
@@ -1073,6 +1084,23 @@ app.post('/api/ai/chat', async (req, res) => {
       return res.status(403).json({ error: 'ИИ-помощник доступен только для зарегистрированных пользователей. Войдите через почту — гостевые аккаунты не поддерживаются.', needAuth: true, guestBlocked: true });
     }
 
+    // — Рандомный фильм: "включи рандомный фильм" (без Госуслуг через RuTube)
+    const isRandom = /рандомн|случайн|любой фильм|не знаю что|что-?нибудь/i.test(message);
+    if (isRandom && wantsRoom) {
+      const picks = ["гарри поттер","сумерки","мстители","человек паук","аватар","пираты карибского моря","форсаж","интерстеллар","дюна","властелин колец","матрица","звездные войны","один дома","джон уик","трансформеры","терминатор","начало","титаник","холодное сердце","шрек","аватар 2","дюна 2","оппенгеймер","барби","чебурашка","вызов","холоп","мажор","брат","бумер"];
+      const pick = picks[Math.floor(Math.random()*picks.length)];
+      const foundObj = await resolveByTitle(pick);
+      if (foundObj) {
+        const {url, platform} = foundObj;
+        const embedUrl = toEmbedUrl(platform, url);
+        let code; do { code = genCode(); } while (rooms[code]);
+        const hostName = authUser.username || authUser.display_name || authUser.displayName || authUser.id;
+        const room = { code, title: pick, platform, videoUrl:url, embedUrl, host:hostName, createdAt:new Date().toISOString(), messages:[], bans:[] };
+        rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+        return res.json({ reply: `Включил рандомный фильм — "${pick}"!`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform } });
+      }
+    }
+
     // offline mode if no key
     if (!AI_API_KEY) {
       // if wantsRoom and looks like VK link provided
@@ -1117,7 +1145,7 @@ app.post('/api/ai/chat', async (req, res) => {
           return res.json({ reply: `Не нашёл "${title}" автоматом. Попробуй скинуть прямую ссылку на видео — сразу создам комнату.\n\nИли открой поиск: ${vkSearch}` });
         }
       }
-      return res.json({ reply: offlineAnswer(message) + '\n\nПодсказка: ИИ уже подключен. Пиши "включи сумерки" — найду через YouTube без Госуслуг.' });
+      return res.json({ reply: offlineAnswer(message) });
     }
 
     // online LLM
