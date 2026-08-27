@@ -356,7 +356,7 @@ function sendReaction(messageId, emoji){
   if(!ws||ws.readyState!==1) return;
   ws.send(JSON.stringify({type:'reaction', messageId, emoji}));
 }
-function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function sys(t){
   const d=document.createElement('div');
   d.style.cssText='text-align:center;color:#6a6a6a;font-size:11px;margin:6px 0;';

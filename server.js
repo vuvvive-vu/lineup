@@ -111,6 +111,28 @@ app.use(require('cors')({
   },
   credentials: true
 }));
+// Security headers — защита от XSS/кликджекинга без лома inline-скриптов
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // CSP: разрешаем inline-скрипты/стили (у вас много <script> и <style>), но блокируем чужой JS
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: https: blob:",
+    "media-src 'self' https: blob:",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.vk.com https://*.vk.ru https://*.vkvideo.ru https://rutube.ru https://*.rutube.ru",
+    "connect-src 'self' ws: wss: https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; '));
+  next();
+});
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -759,6 +781,502 @@ app.get('/api/rooms/:code', (req, res) => {
   const room = rooms[req.params.code.toUpperCase()];
   if (!room) return res.status(404).json({ error: 'Комната не найдена' });
   res.json(room);
+});
+
+// --- AI agent (free) ---
+const AI_API_KEY = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || '';
+const AI_MODEL = process.env.AI_MODEL || (process.env.GROQ_API_KEY ? 'llama-3.1-8b-instant' : 'meta-llama/llama-3.1-8b-instruct:free');
+const AI_BASE_URL = process.env.AI_BASE_URL || (process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions');
+
+const AI_SYSTEM = `Ты — ИИ-помощник сервиса togetherly (совместный просмотр VK / RuTube / YouTube).
+Отвечай кратко, на русском, 2-5 предложений, дружелюбно.
+Знание о сервисе:
+- Регистрация: по почте (имя 1-20, username 3-20 a-z0-9_-, email + пароль 6+, код 6 цифр) или гость (ник ≤20, avatar emoji/base64 ≤2MB, bio ≤120).
+- Лобби: "Создать комнату" → выбрать VK/RuTube/YouTube → вставить ссылку → "Создать и войти" → код 6 символов (7X9KQ2) или ссылка /room.html?code=XXXX. "Войти по коду" → вставить код/ссылку.
+- Платформы: VK vk.com/video-123_456 vkvideo.ru video_ext.php?oid=..., YouTube youtube.com/watch?v= youtu.be, Rutube rutube.ru/video/...
+- В комнате: плеер iframe, синк только хост (play/pause/seek), чат 500 симв/сообщ 200 сообщ/комната, удаление при выходе всех, бан хостом (✕), хост меняется случайно при уходе, участники в "Участники".
+- Профиль: смена имени/username/аватара/bio, гость — временно, email — в Postgres, support@togetherly.online, telegram t.me/vuvvive.
+- Друзья/подписки/личные сообщения НЕ предусмотрены — только код/ссылка комнаты.
+- Если спрашивают не про togetherly — скажи "я знаю только про togetherly" и кратко верни к сервису.
+- Если просят "включи/найди/поставь" + название (напр. сумерки 3) — верни JSON tool_call, не выдумывай ссылку.
+
+Формат для включения видео (только если юзер явно просит создать/включить):
+\`\`\`tool
+{"tool":"create_room","args":{"platform":"rutube","videoUrl":"SEARCH:название","title":"Название"}}
+\`\`\`
+platform: vk | rutube | youtube (для "сумерки" и фильмов ставь rutube). Если дал ссылку — используй её и правильный platform. Если дал только название — ставь videoUrl как "SEARCH:название" и title как название. Не выдумывай ID.
+`;
+
+async function resolveYoutubeByTitle(title){
+  const q = encodeURIComponent(title.trim().slice(0,80));
+  const instances = [
+    'https://vid.puffyan.us',
+    'https://invidious.snopyta.org',
+    'https://yewtu.be',
+    'https://inv.nadeko.net'
+  ];
+  for(const base of instances){
+    try{
+      const url = `${base}/api/v1/search?q=${q}&type=video`;
+      const res = await fetch(url, { headers:{'User-Agent':'Mozilla/5.0'}, signal: AbortSignal.timeout(6000)});
+      if(!res.ok) continue;
+      const j = await res.json();
+      if(Array.isArray(j) && j.length){
+        for(const it of j){
+          const vid = it.videoId || it.id;
+          if(vid && /^[a-zA-Z0-9_-]{11}$/.test(vid)){
+            const cand = `https://www.youtube.com/watch?v=${vid}`;
+            if(isValidVideoUrl('youtube', cand)) return cand;
+          }
+        }
+      }
+    }catch{}
+  }
+  // fallback: scrape youtube results (light)
+  try{
+    const url = `https://www.youtube.com/results?search_query=${q}`;
+    const res = await fetch(url, { headers:{'User-Agent':'Mozilla/5.0'}, signal: AbortSignal.timeout(6000)});
+    if(res.ok){
+      const html = await res.text();
+      const m = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+      if(m){
+        const cand = `https://www.youtube.com/watch?v=${m[1]}`;
+        if(isValidVideoUrl('youtube', cand)) return cand;
+      }
+    }
+  }catch{}
+  return null;
+}
+async function resolveRutubeByTitle(title){
+  try{
+    const q = encodeURIComponent(title.trim().slice(0,80));
+    const url = `https://rutube.ru/api/search/video/?query=${q}`;
+    const res = await fetch(url, { headers:{'User-Agent':'Mozilla/5.0'}, signal: AbortSignal.timeout(6000)});
+    if(!res.ok) return null;
+    const j = await res.json();
+    const results = j.results || j.videos || [];
+    if(Array.isArray(results) && results.length){
+      for(const it of results){
+        const cand = it.video_url || it.embed_url || (it.id ? `https://rutube.ru/video/${it.id}/` : null);
+        if(cand && isValidVideoUrl('rutube', cand)) return cand;
+        if(it.id && /^[a-f0-9]{32}$/.test(it.id)){
+          const c2 = `https://rutube.ru/video/${it.id}/`;
+          if(isValidVideoUrl('rutube', c2)) return c2;
+        }
+      }
+    }
+  }catch{}
+  return null;
+}
+async function resolveByTitle(title){
+  // порядок для фильмов: VK (если токен) -> RuTube (бесплатно, есть фильмы) -> YouTube (трейлеры) 
+  const vk = await resolveVkByTitleNoFallback(title);
+  if(vk) return {url:vk, platform:'vk'};
+  const rt = await resolveRutubeByTitle(title);
+  if(rt) return {url:rt, platform:'rutube'};
+  const yt = await resolveYoutubeByTitle(title);
+  if(yt) return {url:yt, platform:'youtube'};
+  return null;
+}
+async function resolveVkByTitleNoFallback(title){
+  const qClean = title.trim().slice(0,80);
+  const q = encodeURIComponent(qClean);
+  const VK_TOKEN = process.env.VK_SERVICE_TOKEN || process.env.VK_TOKEN || process.env.VK_API_KEY || '';
+  if (VK_TOKEN) {
+    try {
+      const apiUrl = `https://api.vk.com/method/video.search?q=${q}&sort=2&hd=0&adult=0&count=5&access_token=${encodeURIComponent(VK_TOKEN)}&v=5.199`;
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(7000) });
+      if (res.ok) {
+        const j = await res.json();
+        const items = j.response?.items || j.response;
+        if (Array.isArray(items) && items.length) {
+          for (const it of items) {
+            const owner = it.owner_id ?? it.ownerId;
+            const vid = it.id ?? it.vid;
+            if (owner && vid) {
+              const cand = `https://vk.com/video${owner}_${vid}`;
+              if (isValidVideoUrl('vk', cand)) return cand;
+            }
+          }
+        }
+        if (j.error) console.error('[VK API] error', j.error.error_msg || j.error);
+      }
+    } catch (e) { console.error('[VK API] fetch error', e.message); }
+  }
+  return null;
+}
+async function resolveVkByTitle(title) {
+  const viaApi = await resolveVkByTitleNoFallback(title);
+  if(viaApi) return viaApi;
+  const qClean = title.trim().slice(0,80);
+  const q = encodeURIComponent(qClean);
+  // 1) try direct VK scrape
+  // 1) try direct VK scrape
+  try {
+    const url = `https://vk.com/video?q=${q}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Accept': 'text/html'
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const html = await res.text();
+      let m = html.match(/\/video(-?\d+_\d+)/);
+      if (m) {
+        const cand = `https://vk.com/video${m[1]}`;
+        if (isValidVideoUrl('vk', cand)) return cand;
+      }
+      m = html.match(/video_ext\.php\?[^"']*oid=(-?\d+)[^"']*id=(\d+)/);
+      if (m) {
+        const cand = `https://vk.com/video_ext.php?oid=${m[1]}&id=${m[2]}`;
+        if (isValidVideoUrl('vk', cand)) return cand;
+      }
+      m = html.match(/vkvideo\.ru\/video(-?\d+_\d+)/);
+      if (m) return `https://vkvideo.ru/video${m[1]}`;
+    }
+  } catch {}
+  // 2) fallback: DuckDuckGo HTML search for vk video (VK blocks anon, DDG less)
+  try {
+    const ddgQ = encodeURIComponent(`site:vk.com/video ${qClean}`);
+    const ddgUrl = `https://html.duckduckgo.com/html/?q=${ddgQ}`;
+    const res = await fetch(ddgUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9'
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const html = await res.text();
+      // collect all uddg decoded urls and search for video id
+      const uddgs = [...html.matchAll(/uddg=([^&"']+)/g)];
+      for (const u of uddgs) {
+        try {
+          const candDecoded = decodeURIComponent(u[1]);
+          const m = candDecoded.match(/video(-?\d+_\d+)/);
+          if (m) {
+            const cand = `https://vk.com/video${m[1]}`;
+            if (isValidVideoUrl('vk', cand)) return cand;
+          }
+          // direct vkvideo pattern
+          const m2 = candDecoded.match(/vkvideo\.ru\/video(-?\d+_\d+)/);
+          if (m2) return `https://vkvideo.ru/video${m2[1]}`;
+        } catch {}
+      }
+      // fallback raw regex on html
+      let m = html.match(/vk\.com\/video(-?\d+_\d+)/);
+      if (m) {
+        const cand = `https://vk.com/video${m[1]}`;
+        if (isValidVideoUrl('vk', cand)) return cand;
+      }
+      m = html.match(/vkvideo\.ru\/video(-?\d+_\d+)/);
+      if (m) return `https://vkvideo.ru/video${m[1]}`;
+      const m2 = html.match(/https:\/\/vk\.com\/video-?\d+_\d+/);
+      if (m2 && isValidVideoUrl('vk', m2[0])) return m2[0];
+    }
+  } catch {}
+  return null;
+}
+
+function offlineAnswer(message) {
+  const q = message.toLowerCase();
+  if (q.includes('дру') || q.includes('friend') || q.includes('добавить') || q.includes('подпис')) {
+    return 'В togetherly нет друзей/подписок — делитесь кодом комнаты (например 7X9KQ2) или ссылкой /room.html?code=XXXX, друзья зайдут по ней. Участников видно в блоке "Участники".';
+  }
+  if (q.includes('создать') || q.includes('комнат')) {
+    return 'Нажми "Создать комнату" → выбери площадку → вставь ссылку на видео → "Создать и войти" → скопируй код и скинь друзьям.';
+  }
+  if (q.includes('vk') || q.includes('вк')) {
+    return 'Скинь ссылку на видео — создам комнату.';
+  }
+  if (q.includes('бан') || q.includes('кик')) {
+    return 'Банить может только хост комнаты: нажми ✕ у участника → он попадёт в "Забаненные" и не зайдёт снова. Разбанить — там же.';
+  }
+  if (q.includes('хост') || q.includes('синх') || q.includes('управ')) {
+    return 'Синхронизирует только хост (создатель комнаты). Если хост выйдет — хост перейдёт случайному участнику.';
+  }
+  if (q.includes('гость') || q.includes('регист') || q.includes('аккаунт')) {
+    return 'Можно как гость (ник ≤20) или по почте (username 3-20 a-z0-9_-, пароль 6+, код из письма). Гость пропадёт после очистки браузера.';
+  }
+  if (q.includes('аватар') || q.includes('профиль') || q.includes('био')) {
+    return 'Профиль → аватар (emoji или фото до 2MB), имя ≤20, bio ≤120. Почту менять нельзя.';
+  }
+  if (q.includes('чат')) {
+    return 'Чат в комнате — до 500 символов, 200 сообщений, видно всем. При выходе всех комната удаляется.';
+  }
+  return 'Привет! Я помощник togetherly. Спроси как создать комнату, какие ссылки подходят, как банить или попроси "включи [название]" — создам комнату. Друзья/ЛС не предусмотрены — только код комнаты.';
+}
+
+function extractToolCall(text) {
+  if (!text) return null;
+  const t = text.trim();
+  // direct JSON
+  if (t.startsWith('{') && t.includes('"tool"')) {
+    try { const j = JSON.parse(t); if (j.tool === 'create_room') return j; } catch {}
+    // find first { and try balanced parse
+    const idx = t.indexOf('{');
+    if (idx !== -1) {
+      const slice = t.slice(idx);
+      let depth=0, end=-1;
+      for(let i=0;i<slice.length;i++){ if(slice[i]==='{') depth++; else if(slice[i]==='}') {depth--; if(depth===0){end=i;break;}} }
+      if(end!==-1){ try{ const j=JSON.parse(slice.slice(0,end+1)); if(j.tool==='create_room') return j; }catch{} }
+    }
+  }
+  // ```tool {...}```
+  let m = text.match(/```tool\s*([\s\S]*?)```/i);
+  if (m) {
+    try { const j = JSON.parse(m[1].trim()); if (j.tool === 'create_room') return j; } catch {}
+  }
+  // ```json {...}```
+  m = text.match(/```json\s*([\s\S]*?)```/i);
+  if (m) {
+    try { const j = JSON.parse(m[1].trim()); if (j.tool === 'create_room') return j; } catch {}
+  }
+  // raw JSON with tool (find "tool" anywhere)
+  const toolIdx = text.indexOf('"tool"');
+  if (toolIdx !== -1) {
+    // find opening { before "tool"
+    let start = text.lastIndexOf('{', toolIdx);
+    if (start !== -1) {
+      const slice = text.slice(start);
+      let depth=0, end=-1;
+      for(let i=0;i<slice.length;i++){ if(slice[i]==='{') depth++; else if(slice[i]==='}') {depth--; if(depth===0){end=i;break;}} }
+      if(end!==-1){ try{ const j=JSON.parse(slice.slice(0,end+1)); if(j.tool==='create_room') return j; }catch{} }
+    }
+  }
+  return null;
+}
+
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip, 10, 60000)) return res.status(429).json({ error: 'Слишком много запросов. Подожди минуту.' });
+    let { message, history } = req.body || {};
+    message = (message || '').toString().trim().slice(0, 1000);
+    if (!message) return res.status(400).json({ error: 'Пустое сообщение' });
+    if (message.length < 2) return res.status(400).json({ error: 'Слишком коротко' });
+    history = Array.isArray(history) ? history.slice(-8).map(m=>({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m.content||'').slice(0,800)
+    })) : [];
+
+    // detect intent to create room even before LLM
+    const wantsRoom = /включи|создай|найди|поставь|запусти|вруби/i.test(message) && message.length < 200;
+
+    // — Только для зарегистрированных через почту, гостям — 403
+    const authHeader = req.headers.authorization?.replace('Bearer ','');
+    const authUser = await parseToken(authHeader);
+    if (!authUser || !authUser.email) {
+      return res.status(403).json({ error: 'ИИ-помощник доступен только для зарегистрированных пользователей. Войдите через почту — гостевые аккаунты не поддерживаются.', needAuth: true, guestBlocked: true });
+    }
+
+    // offline mode if no key
+    if (!AI_API_KEY) {
+      // if wantsRoom and looks like VK link provided
+      const urlMatch = message.match(/https?:\/\/[^\s]+vk\.(?:com|ru|video\.ru)[^\s]*/i)
+        || message.match(/https?:\/\/vkvideo\.ru[^\s]*/i)
+        || message.match(/vk\.com\/video-?\d+_\d+/i);
+      if (wantsRoom && urlMatch) {
+        let url = urlMatch[0];
+        if (!url.startsWith('http')) url = 'https://' + url;
+        if (isValidVideoUrl('vk', url)) {
+          const token = req.headers.authorization?.replace('Bearer ','');
+          const user = await parseToken(token);
+          if (!user) return res.json({ reply: 'Войди в аккаунт, и я сразу создам комнату. Ссылка корректна ✓', needAuth: true });
+          const embedUrl = toEmbedUrl('vk', url);
+          let code; do { code = genCode(); } while (rooms[code]);
+          const rawTitle = message.replace(url,'').replace(/включи|создай|найди|поставь|запусти|вруби|комнату|видео|на\s+vk/gi,'').trim().slice(0,60);
+          const title = rawTitle || 'Без названия';
+          const hostName = user.username || user.display_name || user.displayName || ('guest:'+user.id);
+          const room = { code, title, platform:'vk', videoUrl:url, embedUrl, host:hostName, createdAt:new Date().toISOString(), messages:[], bans:[] };
+          rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+          return res.json({ reply: `Готово! Создал комнату "${title}".`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform:'vk' } });
+        }
+      }
+      if (wantsRoom) {
+        // try to extract title like "включи сумерки 3" — теперь без Госуслуг через YouTube обход
+        const title = message.replace(/включи|создай|найди|поставь|запусти|вруби|комнату|видео|на\s+vk/gi,'').trim().slice(0,60);
+        if (title && title.length >= 3) {
+          const foundObj = await resolveByTitle(title);
+          if (foundObj) {
+            const {url:found, platform} = foundObj;
+            const token = req.headers.authorization?.replace('Bearer ','');
+            const user = await parseToken(token);
+            if (!user) return res.json({ reply: `Нашёл: ${found}. Войди в аккаунт — создам комнату.`, needAuth:true, foundUrl:found });
+            let code; do { code = genCode(); } while (rooms[code]);
+            const embedUrl = toEmbedUrl(platform, found);
+            const hostName2 = user.username || user.display_name || user.displayName || ('guest:'+user.id);
+            const room = { code, title, platform, videoUrl:found, embedUrl, host:hostName2, createdAt:new Date().toISOString(), messages:[], bans:[] };
+            rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+            return res.json({ reply: `Нашёл "${title}" и создал комнату.`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform } });
+          }
+          const vkSearch = `https://vk.com/video?q=${encodeURIComponent(title)}`;
+          return res.json({ reply: `Не нашёл "${title}" автоматом. Попробуй скинуть прямую ссылку на видео — сразу создам комнату.\n\nИли открой поиск: ${vkSearch}` });
+        }
+      }
+      return res.json({ reply: offlineAnswer(message) + '\n\nПодсказка: ИИ уже подключен. Пиши "включи сумерки" — найду через YouTube без Госуслуг.' });
+    }
+
+    // online LLM
+    const messages = [
+      { role:'system', content: AI_SYSTEM },
+      ...history,
+      { role:'user', content: message }
+    ];
+    const body = {
+      model: AI_MODEL,
+      messages,
+      temperature: 0.4,
+      max_tokens: 600
+    };
+    const r = await fetch(AI_BASE_URL, {
+      method:'POST',
+      headers:{
+        'Authorization': `Bearer ${AI_API_KEY}`,
+        'Content-Type':'application/json',
+        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3000',
+        'X-Title': 'togetherly'
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(()=> '');
+      console.error('[AI] LLM error', r.status, t.slice(0,500));
+      // тихий фолбэк без технической пометки — пробуем запасную модель
+      const fallbackModels = ['poolside/laguna-xs-2.1:free','liquid/lfm-2.5-2.6b:free','cohere/north-mini-code:free'].filter(m=>m!==AI_MODEL);
+      for(const fm of fallbackModels){
+        try{
+          const fr = await fetch(AI_BASE_URL, {
+            method:'POST',
+            headers:{'Authorization':`Bearer ${AI_API_KEY}`,'Content-Type':'application/json','HTTP-Referer':process.env.SITE_URL||'http://localhost:3000','X-Title':'togetherly'},
+            body: JSON.stringify({model:fm, messages, temperature:0.4, max_tokens:600}),
+            signal: AbortSignal.timeout(15000)
+          });
+          if(fr.ok){
+            const fj = await fr.json();
+            const frank = fj.choices?.[0]?.message?.content || fj.choices?.[0]?.text || '';
+            if(frank && frank.trim()){
+              // обработай как обычный ответ (не рекурсируй весь флоу, просто верни контент без tool)
+              const ftool = extractToolCall(frank);
+              let freply = frank.replace(/```tool[\s\S]*?```/gi,'').replace(/```json[\s\S]*?```/gi,'').trim();
+              if(ftool){ try{ freply = freply.replace(JSON.stringify(ftool),'').trim(); }catch{} freply = freply.replace(/\{[\s\S]*?"tool"[\s\S]*?\n\}/g,'').trim(); }
+              if(!freply) freply = offlineAnswer(message);
+              if(ftool && ftool.args){
+                let {platform, videoUrl, title} = ftool.args;
+                platform = (platform||'rutube').toLowerCase();
+                if(!['vk','rutube','youtube'].includes(platform)) platform='rutube';
+                title = (title||'Без названия'); videoUrl=(videoUrl||'').trim();
+                if(videoUrl.startsWith('SEARCH:')){
+                  const q=videoUrl.slice(7).trim()||title;
+                  const fo = await resolveByTitle(q);
+                  if(!fo){ return res.json({reply: (freply?freply+'\n\n':'')+`Не нашёл "${q}".`}); }
+                  videoUrl=fo.url; platform=fo.platform;
+                }
+                if(!isValidVideoUrl(platform, videoUrl)){
+                  const fo2 = await resolveByTitle(title);
+                  if(fo2){ videoUrl=fo2.url; platform=fo2.platform; } else { return res.json({reply: freply}); }
+                }
+                const token2 = req.headers.authorization?.replace('Bearer ','');
+                const user2 = await parseToken(token2);
+                if(!user2) return res.json({reply: freply, needAuth:true, foundUrl:videoUrl});
+                const emb = toEmbedUrl(platform, videoUrl);
+                let code; do{code=genCode();}while(rooms[code]);
+                const hn = user2.username||user2.display_name||user2.displayName||('guest:'+user2.id);
+                const room={code, title:title.slice(0,60), platform, videoUrl, embedUrl:emb, host:hn, createdAt:new Date().toISOString(), messages:[], bans:[]};
+                rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+                return res.json({reply: freply, action:{type:'room_created', code, url:`/room.html?code=${code}`, platform}});
+              }
+              return res.json({reply: freply});
+            }
+          }
+        }catch{}
+      }
+      return res.json({ reply: offlineAnswer(message) });
+    }
+    const j = await r.json();
+    const raw = j.choices?.[0]?.message?.content || j.choices?.[0]?.text || '';
+    const tool = extractToolCall(raw);
+    // clean reply (remove tool block and raw JSON)
+    let reply = raw.replace(/```tool[\s\S]*?```/gi,'').replace(/```json[\s\S]*?```/gi,'').trim();
+    if (tool) {
+      try { reply = reply.replace(JSON.stringify(tool), '').trim(); } catch {}
+      // also remove pretty-printed version
+      const toolStr = JSON.stringify(tool, null, 2);
+      reply = reply.replace(toolStr, '').trim();
+      // remove any remaining raw JSON block containing "tool"
+      reply = reply.replace(/\{[\s\S]*?"tool"\s*:\s*"create_room"[\s\S]*?\n\}/g,'').trim();
+    }
+    if (!reply) reply = offlineAnswer(message);
+
+    if (tool && tool.args) {
+      let { platform, videoUrl, title } = tool.args;
+      platform = (platform||'rutube').toLowerCase();
+      if (!['vk','rutube','youtube'].includes(platform)) platform = 'rutube';
+      title = (title|| message.replace(/включи|создай/gi,'').trim().slice(0,60) || 'Без названия');
+      videoUrl = (videoUrl||'').toString().trim();
+      // SEARCH placeholder — теперь через универсальный поиск (RuTube без токена)
+      if (videoUrl.startsWith('SEARCH:')) {
+        const q = videoUrl.slice(7).trim() || title;
+        const foundObj = await resolveByTitle(q);
+        if (!foundObj) {
+          const vkSearch2 = `https://vk.com/video?q=${encodeURIComponent(q)}`;
+          reply = (reply ? reply + '\n\n' : '') + `Не нашёл "${q}". Попробуй скинуть прямую ссылку на видео или перефразируй.`;
+          return res.json({ reply });
+        }
+        videoUrl = foundObj.url;
+        platform = foundObj.platform;
+      }
+      if (!isValidVideoUrl(platform, videoUrl)) {
+        // try resolve by title as fallback — через RuTube/YouTube без токена
+        const foundObj2 = await resolveByTitle(title);
+        if (foundObj2) { videoUrl = foundObj2.url; platform = foundObj2.platform; }
+        else {
+          reply = (reply ? reply + '\n\n' : '') + `Ссылка не подошла. Пример: https://vk.com/video-123456_789 или https://rutube.ru/video/xxx`;
+          return res.json({ reply });
+        }
+      }
+      const token = req.headers.authorization?.replace('Bearer ','');
+      const user = await parseToken(token);
+      if (!user) return res.json({ reply: 'Войди в аккаунт — создам комнату.', needAuth:true, foundUrl: videoUrl });
+      const hostName3 = user.username || user.display_name || user.displayName || ('guest:'+user.id);
+      const embedUrl = toEmbedUrl(platform, videoUrl);
+      let code; do { code = genCode(); } while (rooms[code]);
+      const room = { code, title: title.slice(0,60), platform, videoUrl, embedUrl, host:hostName3, createdAt:new Date().toISOString(), messages:[], bans:[] };
+      rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+      const successReply = `Готово! Создал комнату "${title}".`;
+      // если LLM не дал осмысленного ответа (пусто или оффлайн-заглушка) — замени на успех
+      const finalReply = (!reply || reply === offlineAnswer(message) || reply.includes('Скинь ссылку')) ? successReply : reply;
+      return res.json({ reply: finalReply, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform } });
+    }
+    // also handle case where LLM didn't use tool but user wants room and gave direct link (any platform)
+    if (wantsRoom) {
+      const urlMatch = message.match(/https?:\/\/[^\s]+/i);
+      if (urlMatch) {
+        let videoUrl = urlMatch[0].replace(/[.,;!?]+$/,'');
+        let plat = null;
+        for(const p of ['vk','rutube','youtube']) if(isValidVideoUrl(p, videoUrl)){ plat=p; break; }
+        if (plat) {
+          // уже авторизован (authUser с email), создаём
+          let code; do { code = genCode(); } while (rooms[code]);
+          const rawTitle2 = message.replace(videoUrl,'').replace(/включи|создай|найди|поставь|запусти|вруби|комнату|видео|на\s+vk/gi,'').trim().slice(0,60);
+          const title = rawTitle2 || 'Без названия';
+          const hostName4 = authUser.username || authUser.display_name || authUser.displayName || ('guest:'+authUser.id);
+          const embedUrl = toEmbedUrl(plat, videoUrl);
+          const room = { code, title, platform:plat, videoUrl, embedUrl, host:hostName4, createdAt:new Date().toISOString(), messages:[], bans:[] };
+          rooms[code]=room; saveJson(ROOMS_FILE, rooms);
+          return res.json({ reply: `Готово! Создал комнату "${title}".`, action:{ type:'room_created', code, url:`/room.html?code=${code}`, platform:plat } });
+        }
+      }
+    }
+    res.json({ reply });
+  } catch (e) {
+    console.error('[AI] handler error', e.message);
+    res.status(500).json({ error: 'Ошибка ИИ' });
+  }
 });
 
 // WebSocket

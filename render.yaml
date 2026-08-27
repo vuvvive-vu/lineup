@@ -18,6 +18,14 @@ services:
         value: noreply@togetherly.online
       - key: SITE_URL
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: groq/compound-mini
+      - key: VK_SERVICE_TOKEN
+        sync: false
     healthCheckPath: /
 
 databases:
