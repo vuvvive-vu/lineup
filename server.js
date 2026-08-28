@@ -118,14 +118,16 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   // CSP: разрешаем inline-скрипты/стили (у вас много <script> и <style>), но блокируем чужой JS
+  // frame-src расширена: vk.com без поддомена + все https для видео
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru https://vkvideo.ru https://*.vkvideo.ru https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https: blob:",
-    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.vk.com https://*.vk.ru https://*.vkvideo.ru https://*.rutube.ru",
+    "frame-src 'self' https: blob: https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru https://vkvideo.ru https://*.vkvideo.ru https://rutube.ru https://*.rutube.ru https://youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://youtu.be https://*.youtu.be",
+    "child-src 'self' https: blob:",
     "connect-src 'self' ws: wss: https:",
     "object-src 'none'",
     "base-uri 'self'",
