@@ -716,6 +716,20 @@ function sendChat(){
   clearTimeout(typingTimeout);
 }
 document.getElementById('sendBtn').onclick=sendChat;
+const agentAskBtn=document.getElementById('agentAskBtn');
+const agentHint=document.getElementById('agentHint');
+if(agentAskBtn){
+  agentAskBtn.onclick=()=>{
+    if(agentHint) agentHint.style.display = agentHint.style.display==='none' ? 'block':'none';
+    if(!chatInput.value.trim().toLowerCase().startsWith('включи')){
+      chatInput.value='включи ';
+      chatInput.focus();
+      chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
+    } else {
+      chatInput.focus();
+    }
+  };
+}
 chatInput.addEventListener('keydown',e=>{if(e.key==='Enter') sendChat();});
 chatInput.addEventListener('input', ()=>{
   const hasText=chatInput.value.trim().length>0;

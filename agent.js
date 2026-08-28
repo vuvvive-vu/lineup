@@ -5,7 +5,9 @@
 const https = require('https');
 const http = require('http');
 
-// --- каталог оставлен только для демо, приоритет у живого поиска RuTube ---
+// --- каталог: демо-записи, используются только если DEMO_CATALOG_ENABLED=1 ---
+// В проде выключен по умолчанию, чтобы любой реальный фильм шёл через живой RuTube
+const DEMO_CATALOG_ENABLED = process.env.DEMO_CATALOG_ENABLED === '1' || process.env.DEMO_CATALOG_ENABLED === 'true';
 const MIN_MATCH_SCORE = 50;
 
 const CATALOG = [
@@ -50,7 +52,7 @@ function normalizeWithTranslit(str){
 }
 
 const AGENT_TRIGGERS = [
-  /^(агент|бот|togetherly)?\s*(включи|покажи|запусти|найди|хочу посмотреть)\s+/i,
+  /^(агент|бот|togetherly)?\s*(включи|покажи|запусти|найди|хочу посмотреть|хочу|давай|может)\s+/i,
   /^\/включи\s+/i,
   /^\/play\s+/i,
   /^включи\s+/i,
@@ -120,7 +122,6 @@ function tokenScore(qTokens, tTokens){
 }
 
 function scoreText(query, title){
-  // учитывает транслит + опечатки
   const qVariants = normalizeWithTranslit(query);
   const tNorm = normalize(title);
   if(!tNorm) return 0;
@@ -132,35 +133,39 @@ function scoreText(query, title){
     const qTokens = qNorm.split(' ').filter(Boolean);
     if(qTokens.length===0) continue;
     const qNums = extractNumbers(qNorm);
-    // точное совпадение
     if(qNorm===tNorm) { best=Math.max(best,100); continue; }
-    // подстрока
     let subScore=0;
     if(tNorm.includes(qNorm) || qNorm.includes(tNorm)){
       const ratio=Math.min(qNorm.length, tNorm.length)/Math.max(qNorm.length, tNorm.length);
-      subScore= 80 + ratio*10; // 80-90
+      subScore= 80 + ratio*10;
+      // штраф за несовпадение чисел — применяется и к subScore
+      if(qNums.length>0 && tNums.length>0){
+        const inter=qNums.filter(n=>tNums.includes(n)).length;
+        if(inter===0) subScore -= 35;
+        else if(inter===qNums.length) subScore += 5;
+      } else if(qNums.length>0 && tNums.length===0){
+        subScore -= 10;
+      }
     }
-    // токен/levenshtein
     const ts=tokenScore(qTokens, tTokens);
     const jaccard = ts.matched / Math.max(ts.total, tTokens.length);
     let s = (ts.matched/ts.total)*70 + jaccard*20;
     if(ts.fuzzy>0) s -= ts.fuzzy*2;
-    // длина штраф если запрос сильно короче заголовка (напр. "маша" vs "маша и медведь серия 177")
-    // но если все токены запроса найдены - не штрафуем сильно
     if(ts.matched===ts.total && ts.total>=1) s = Math.max(s, 75);
-    // числа: если в запросе есть число, а в заголовке другое число -> сильно штраф
     if(qNums.length>0 && tNums.length>0){
       const intersect=qNums.filter(n=>tNums.includes(n)).length;
       if(intersect===0) s -= 35;
       else if(intersect===qNums.length) s += 10;
+    } else if(qNums.length>0 && tNums.length===0){
+      s -= 10;
     }
-    // если в запросе нет числа, а заголовок с числом - не штраф, но пометим для ambiguous
     best=Math.max(best, Math.max(subScore, s));
   }
   return Math.max(0, Math.min(100, Math.round(best)));
 }
 
 function searchCatalog(query){
+  if(!DEMO_CATALOG_ENABLED) return null;
   const variants=normalizeWithTranslit(query);
   let best=null, bestScore=0;
   for(const e of CATALOG){
@@ -180,15 +185,24 @@ function searchCatalog(query){
 }
 
 function findCatalogExact(query){
+  if(!DEMO_CATALOG_ENABLED) return null;
   const variants = normalizeWithTranslit(query);
   for(const e of CATALOG){
     for(const k of e.keys){
       const kn = normalize(k);
+      const kNums = extractNumbers(kn);
       for(const qv of variants){
         if(!qv || qv.length < 2) continue;
-        if(qv === kn) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
-        if(qv.length >= 3 && kn.startsWith(qv)) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
-        if(kn.length >= 3 && qv.startsWith(kn)) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
+        const qNums = extractNumbers(qv);
+        // только полное равенство, без startsWith — иначе "сваты 5" матчит "сваты 1"
+        if(qv !== kn) continue;
+        // проверка чисел: если в одном есть число, а в другом другое — не считаем точным
+        if(qNums.length>0 || kNums.length>0){
+          if(qNums.length!==kNums.length) continue;
+          const same=qNums.every((n,i)=>n===kNums[i]);
+          if(!same) continue;
+        }
+        return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
       }
     }
   }
@@ -235,18 +249,24 @@ async function searchRuTubeCandidates(query, limit=7){
         if(out.length>=limit) break;
       }
       if(out.length>0) return out;
+    } else {
+      console.log(`[AGENT] rutube api status=${r.status} body="${(r.data||'').slice(0,200).replace(/\n/g,' ')}" query="${query}"`);
     }
-  }catch(e){ console.log('[AGENT] rutube api fail', e.message); }
+  }catch(e){ console.log('[AGENT] rutube api fail', e.message, `query="${query}"`); }
   // 2) fallback - парсим HTML поиска (если API заблокирован на сервере)
   try{
     const url2=`https://rutube.ru/search/?query=${encodeURIComponent(query)}`;
     const r2=await fetchText(url2,8000);
-    const ids=[...r2.data.matchAll(/rutube\.ru\/video\/([a-f0-9]{32})/gi)].map(m=>m[1]);
-    const uniq=[...new Set(ids)].slice(0,limit);
-    if(uniq.length>0){
-      return uniq.map(id=>({ id, title: query, videoUrl:`https://rutube.ru/video/${id}/`, platform:'rutube', score: 60 }));
+    if(r2.status!==200){
+      console.log(`[AGENT] rutube html status=${r2.status} body="${(r2.data||'').slice(0,200).replace(/\n/g,' ')}" query="${query}"`);
+    } else {
+      const ids=[...r2.data.matchAll(/rutube\.ru\/video\/([a-f0-9]{32})/gi)].map(m=>m[1]);
+      const uniq=[...new Set(ids)].slice(0,limit);
+      if(uniq.length>0){
+        return uniq.map(id=>({ id, title: query, videoUrl:`https://rutube.ru/video/${id}/`, platform:'rutube', score: 60 }));
+      }
     }
-  }catch(e){ console.log('[AGENT] rutube html fail', e.message); }
+  }catch(e){ console.log('[AGENT] rutube html fail', e.message, `query="${query}"`); }
   return [];
 }
 
@@ -258,13 +278,14 @@ async function resolveFilm(query){
   if(!qNorm || qNorm.length<2) return { ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' };
   if(['фильм','фильма','кино','сериал','сериала','мультфильм','мультик','видео','включи','включить'].includes(qNorm)) return { ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' };
 
-  // быстрый путь: точное совпадение с каталогом (наруто, сваты и т.д.)
+  // быстрый путь: точное совпадение с каталогом — только если DEMO включён и по полному равенству
   const catExact = findCatalogExact(q);
   if(catExact){
+    console.log(`[AGENT] resolveFilm query="${q}" -> catalog hit title="${catExact.title}" score=${catExact.score}`);
     return { ok:true, match: { title:catExact.title, videoUrl:catExact.videoUrl, platform:catExact.platform, score:catExact.score }, source:'catalog', query:q, candidates:[catExact] };
   }
 
-  // 1. живой поиск RuTube + каталог как подсказка
+  // 1. живой поиск RuTube + каталог как подсказка (каталог учитывается только если DEMO_CATALOG_ENABLED)
   const candidates=await searchRuTubeCandidates(q, 8);
   // скорим каждого кандидата
   const scored=candidates.map(c=>({ ...c, score: scoreText(q, c.title) }))
@@ -279,10 +300,12 @@ async function resolveFilm(query){
   }
 
   if(scored.length===0){
+    console.log(`[AGENT] resolveFilm query="${q}" -> no candidates`);
     return { ok:false, error:`Не нашёл «${q}» на RuTube. Проверь название или вставь ссылку вручную.`, suggestions:[] };
   }
   const best=scored[0];
   const second=scored[1];
+  console.log(`[AGENT] resolveFilm query="${q}" best="${best.title}" score=${best.score} source=${best.source||'rutube'} candidates=${scored.length}`);
 
   // пустой результат по скорингу
   if(best.score < MIN_MATCH_SCORE){

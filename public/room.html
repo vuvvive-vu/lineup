@@ -41,8 +41,10 @@
         <button id="photoBtn" class="chat-icon-btn" title="Прикрепить фото">📷</button>
         <input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
         <input id="chatInput" placeholder="Написать сообщение..." maxlength="500" data-i18n-placeholder="Написать сообщение..."/>
+        <button id="agentAskBtn" class="chat-icon-btn" title="Спросить агента — напиши: включи Машу и Медведя" style="font-size:12px;padding:6px 10px;border:1px solid #2a2a2a;border-radius:999px;background:#1a1a1a;color:#fff;white-space:nowrap;">🤖 Спросить агента</button>
         <button id="sendBtn" data-i18n="Отправить">Отправить</button>
       </div>
+      <div id="agentHint" style="display:none;font-size:11px;color:#9a9a9a;padding:6px 4px 0;">Напиши с командой: <b style="color:#fff;">включи</b> + название, например <i>включи Машу и Медведя</i></div>
     </div>
 
     <div class="side">
