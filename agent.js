@@ -11,6 +11,8 @@ const CATALOG = [
   { keys: ['сумерки 2', 'сумерки новолуние', 'сумерки вторая часть'], title: 'Сумерки. Сага: Новолуние', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f222/' },
   { keys: ['сумерки 3', 'сумерки затмение'], title: 'Сумерки. Сага: Затмение', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f333/' },
   { keys: ['чебурашка'], title: 'Чебурашка (2023)', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f0a1b/' },
+  { keys: ['наруто','naruto','наруто 1 сезон'], title: 'Наруто 1 сезон 1 серия', platform: 'rutube', videoUrl: 'https://rutube.ru/video/ac51c2f08aea7236e6b0942e017f8f81/' },
+  { keys: ['маша и медведь','masha i medved','маша'], title: 'Маша и Медведь', platform: 'rutube', videoUrl: 'https://rutube.ru/video/298bc79746a96ed34265b47e46554501/' },
 ];
 
 function normalize(str){
@@ -178,7 +180,7 @@ function fetchText(url, timeoutMs=7000){
   return new Promise((resolve,reject)=>{
     const u=new URL(url);
     const lib=u.protocol==='https:'?https:http;
-    const req=lib.get(url,{headers:{'User-Agent':'Mozilla/5.0 togetherly-agent','Accept-Language':'ru'}},res=>{
+    const req=lib.get(url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'application/json, text/plain, */*','Accept-Language':'ru','Referer':'https://rutube.ru/'}},res=>{
       let d=''; res.on('data',c=>d+=c); res.on('end',()=>resolve({status:res.statusCode,data:d}));
     });
     req.on('error',reject);
@@ -187,24 +189,25 @@ function fetchText(url, timeoutMs=7000){
 }
 
 async function searchRuTubeCandidates(query, limit=7){
+  // 1) пробуем API
   try{
     const url=`https://rutube.ru/api/search/video/?query=${encodeURIComponent(query)}`;
     const r=await fetchText(url,8000);
-    const j=JSON.parse(r.data);
-    const arr=j.results||j.data||j.items||[];
-    const out=[];
-    for(const it of arr.slice(0,15)){
-      if(it.is_livestream || it.is_on_air) continue; // пропускаем эфиры
-      if(it.duration && it.duration>0 && it.duration<300) continue; // слишком короткие - трейлеры/шортсы, но оставляем если мало результатов
-      const id=it.id;
-      const title=it.title||'';
-      if(!id || !title) continue;
-      const videoUrl=`https://rutube.ru/video/${id}/`;
-      out.push({ id, title, videoUrl, platform:'rutube', author:it.author?.name||'', duration:it.duration });
-      if(out.length>=limit) break;
-    }
-    // если отфильтровали слишком много - берем первые без фильтра длительности
-    if(out.length===0){
+    if(r.status===200){
+      const j=JSON.parse(r.data);
+      const arr=j.results||j.data||j.items||[];
+      const out=[];
+      for(const it of arr.slice(0,15)){
+        if(it.is_livestream || it.is_on_air) continue;
+        if(it.duration && it.duration>0 && it.duration<300) continue;
+        const id=it.id;
+        const title=it.title||'';
+        if(!id || !title) continue;
+        const videoUrl=`https://rutube.ru/video/${id}/`;
+        out.push({ id, title, videoUrl, platform:'rutube', author:it.author?.name||'', duration:it.duration });
+        if(out.length>=limit) break;
+      }
+      if(out.length>0) return out;
       for(const it of arr.slice(0,limit)){
         if(it.is_livestream) continue;
         const id=it.id; const title=it.title||query;
@@ -212,9 +215,20 @@ async function searchRuTubeCandidates(query, limit=7){
         out.push({ id, title, videoUrl:`https://rutube.ru/video/${id}/`, platform:'rutube' });
         if(out.length>=limit) break;
       }
+      if(out.length>0) return out;
     }
-    return out;
-  }catch(e){ return []; }
+  }catch(e){ console.log('[AGENT] rutube api fail', e.message); }
+  // 2) fallback - парсим HTML поиска (если API заблокирован на сервере)
+  try{
+    const url2=`https://rutube.ru/search/?query=${encodeURIComponent(query)}`;
+    const r2=await fetchText(url2,8000);
+    const ids=[...r2.data.matchAll(/rutube\.ru\/video\/([a-f0-9]{32})/gi)].map(m=>m[1]);
+    const uniq=[...new Set(ids)].slice(0,limit);
+    if(uniq.length>0){
+      return uniq.map(id=>({ id, title: query, videoUrl:`https://rutube.ru/video/${id}/`, platform:'rutube', score: 60 }));
+    }
+  }catch(e){ console.log('[AGENT] rutube html fail', e.message); }
+  return [];
 }
 
 async function resolveFilm(query){
