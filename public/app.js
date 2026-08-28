@@ -987,7 +987,20 @@ setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTim
     status.style.color = err ? '#ff8a8a' : '#9a9a9a';
     status.style.display = t ? 'block' : 'none';
   }
-  function showResult(match, code){
+  let agentRequestSeq = 0;
+  let agentRedirectTimer = null;
+  function clearAgentRedirect(){
+    if(agentRedirectTimer){ clearTimeout(agentRedirectTimer); agentRedirectTimer = null; }
+  }
+  function scheduleAgentRedirect(code, reqId){
+    clearAgentRedirect();
+    agentRedirectTimer = setTimeout(()=>{
+      if(reqId !== agentRequestSeq) return;
+      location.href='/room.html?code='+code;
+    }, 900);
+  }
+  function showResult(match, code, reqId){
+    if(reqId !== agentRequestSeq) return;
     if(!result) return;
     result.style.display='block';
     result.innerHTML = `
@@ -1001,7 +1014,7 @@ setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTim
       </div>
     `;
     document.getElementById('agentGoBtn').onclick=()=> location.href='/room.html?code='+code;
-    setTimeout(()=> location.href='/room.html?code='+code, 900);
+    scheduleAgentRedirect(code, reqId);
   }
   function showChoose(candidates, query){
     if(!result) return;
@@ -1032,6 +1045,8 @@ setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTim
     if(!q) return setStatus('Введи название фильма', true);
     const t = token();
     if(!t) return setStatus('Войди в аккаунт чтобы использовать агента', true);
+    const reqId = ++agentRequestSeq;
+    clearAgentRedirect();
     btn.disabled=true; btn.textContent='Ищу...'; setStatus('Агент ищет «'+q+'» ...');
     if(result) result.style.display='none';
     try{
@@ -1040,6 +1055,7 @@ setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTim
         headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+t },
         body: JSON.stringify({ query: q })
       });
+      if(reqId !== agentRequestSeq) return;
       const j = await r.json();
       if(j.ambiguous){
         setStatus('', false);
@@ -1048,11 +1064,14 @@ setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTim
       }
       if(!r.ok) throw new Error(j.error || 'Не нашёл');
       setStatus('Нашёл! Перекидываю в комнату '+j.code+' ...');
-      showResult(j.match, j.code);
+      showResult(j.match, j.code, reqId);
     }catch(e){
+      if(reqId !== agentRequestSeq) return;
       setStatus(e.message || 'Не нашёл фильм. Проверь название.', true);
     }finally{
-      btn.disabled=false; btn.textContent='Найти и включить';
+      if(reqId === agentRequestSeq){
+        btn.disabled=false; btn.textContent='Найти и включить';
+      }
     }
   }
   btn.onclick = doAgent;

@@ -142,8 +142,12 @@ async function loadRoom(){
   if(!src.includes('/play/embed/') && !src.includes('/embed/')){
     if(raw.includes('rutube.ru')){
       const m=raw.match(/rutube\.ru\/video\/([a-f0-9]+)/i);
-      if(m) src=`https://rutube.ru/play/embed/${m[1]}`;
+      if(m) src=`https://rutube.ru/play/embed/${m[1]}?autoplay=1&muted=0`;
     }
+  }
+  // форсим autoplay для RuTube
+  if(src.includes('rutube.ru/play/embed') && !src.includes('autoplay')){
+    src += (src.includes('?')?'&':'?') + 'autoplay=1&muted=0';
   }
 
   iframe=document.createElement('iframe');
@@ -590,6 +594,19 @@ function sendTyping(isTyping){
   ws.send(JSON.stringify({type:'typing', isTyping}));
 }
 
+let agentInviteSeq = 0;
+let agentRedirectTimer = null;
+function clearAgentRedirect(){
+  if(agentRedirectTimer){ clearTimeout(agentRedirectTimer); agentRedirectTimer = null; }
+}
+function scheduleAgentRedirect(code, inviteId){
+  clearAgentRedirect();
+  agentRedirectTimer = setTimeout(()=>{
+    if(inviteId !== agentInviteSeq) return;
+    location.href='/room.html?code='+code;
+  }, 700);
+}
+
 // ws
 function connect(){
   const proto=location.protocol==='https:'?'wss:':'ws:';
@@ -613,7 +630,8 @@ function connect(){
       const isMeInvite = !data.from || data.from===me || data.auto;
       showAgentInvite({ code:data.code, title:data.title, platform:data.platform }, null, isMeInvite);
       if(isMeInvite && data.code){
-        setTimeout(()=> location.href='/room.html?code='+data.code, 700);
+        const inviteId = ++agentInviteSeq;
+        scheduleAgentRedirect(data.code, inviteId);
       }
     }
     if(data.type==='agent_choose'){

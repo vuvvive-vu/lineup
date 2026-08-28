@@ -6,6 +6,8 @@ const https = require('https');
 const http = require('http');
 
 // --- каталог оставлен только для демо, приоритет у живого поиска RuTube ---
+const MIN_MATCH_SCORE = 50;
+
 const CATALOG = [
   { keys: ['сумерки 1', 'сумерки первая часть', 'сумерки часть 1', 'twilight 1'], title: 'Сумерки (2008)', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f111/' },
   { keys: ['сумерки 2', 'сумерки новолуние', 'сумерки вторая часть'], title: 'Сумерки. Сага: Новолуние', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f222/' },
@@ -13,6 +15,7 @@ const CATALOG = [
   { keys: ['чебурашка'], title: 'Чебурашка (2023)', platform: 'rutube', videoUrl: 'https://rutube.ru/video/8c4fb4b7b0c1d2e3f4a5b6c7d8e9f0a1b/' },
   { keys: ['наруто','naruto','наруто 1 сезон'], title: 'Наруто 1 сезон 1 серия', platform: 'rutube', videoUrl: 'https://rutube.ru/video/ac51c2f08aea7236e6b0942e017f8f81/' },
   { keys: ['маша и медведь','masha i medved','маша'], title: 'Маша и Медведь', platform: 'rutube', videoUrl: 'https://rutube.ru/video/298bc79746a96ed34265b47e46554501/' },
+  { keys: ['сваты','svaty','сваты 1 сезон'], title: 'Сваты 1 сезон', platform: 'rutube', videoUrl: 'https://rutube.ru/video/b893ac1d6e58ec3c3ce1640d3cc5df7d/' },
 ];
 
 function normalize(str){
@@ -172,7 +175,23 @@ function searchCatalog(query){
     }
     if(es>bestScore){ bestScore=es; best=e; }
   }
-  if(best && bestScore>=55) return { ...best, score: bestScore };
+  if(best && bestScore>=MIN_MATCH_SCORE) return { ...best, score: bestScore };
+  return null;
+}
+
+function findCatalogExact(query){
+  const variants = normalizeWithTranslit(query);
+  for(const e of CATALOG){
+    for(const k of e.keys){
+      const kn = normalize(k);
+      for(const qv of variants){
+        if(!qv || qv.length < 2) continue;
+        if(qv === kn) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
+        if(qv.length >= 3 && kn.startsWith(qv)) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
+        if(kn.length >= 3 && qv.startsWith(kn)) return { title:e.title, videoUrl:e.videoUrl, platform:e.platform, score:100, source:'catalog' };
+      }
+    }
+  }
   return null;
 }
 
@@ -199,7 +218,7 @@ async function searchRuTubeCandidates(query, limit=7){
       const out=[];
       for(const it of arr.slice(0,15)){
         if(it.is_livestream || it.is_on_air) continue;
-        if(it.duration && it.duration>0 && it.duration<300) continue;
+        if(it.duration && it.duration>0 && it.duration<120) continue;
         const id=it.id;
         const title=it.title||'';
         if(!id || !title) continue;
@@ -239,7 +258,13 @@ async function resolveFilm(query){
   if(!qNorm || qNorm.length<2) return { ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' };
   if(['фильм','фильма','кино','сериал','сериала','мультфильм','мультик','видео','включи','включить'].includes(qNorm)) return { ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' };
 
-  // 1. живой поиск RuTube (приоритет) + каталог как подсказка
+  // быстрый путь: точное совпадение с каталогом (наруто, сваты и т.д.)
+  const catExact = findCatalogExact(q);
+  if(catExact){
+    return { ok:true, match: { title:catExact.title, videoUrl:catExact.videoUrl, platform:catExact.platform, score:catExact.score }, source:'catalog', query:q, candidates:[catExact] };
+  }
+
+  // 1. живой поиск RuTube + каталог как подсказка
   const candidates=await searchRuTubeCandidates(q, 8);
   // скорим каждого кандидата
   const scored=candidates.map(c=>({ ...c, score: scoreText(q, c.title) }))
@@ -260,7 +285,7 @@ async function resolveFilm(query){
   const second=scored[1];
 
   // пустой результат по скорингу
-  if(best.score < 55){
+  if(best.score < MIN_MATCH_SCORE){
     return { ok:false, error:`Не нашёл «${q}» на RuTube. Проверь название или вставь ссылку вручную.`, suggestions:[] };
   }
 
@@ -295,11 +320,7 @@ async function resolveFilm(query){
   }
 
   // иначе — точный хит, можно включать
-  if(best.score >= 60){
-    return { ok:true, match: { title:best.title, videoUrl:best.videoUrl, platform:best.platform, score:best.score }, source: best.source||'rutube', query:q, candidates: scored.slice(0,3) };
-  }
-
-  return { ok:false, error:`Не нашёл «${q}» на RuTube. Проверь название или вставь ссылку вручную.`, suggestions:[] };
+  return { ok:true, match: { title:best.title, videoUrl:best.videoUrl, platform:best.platform, score:best.score }, source: best.source||'rutube', query:q, candidates: scored.slice(0,3) };
 }
 
 function suggestFromCatalog(query){ return []; }

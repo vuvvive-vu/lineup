@@ -182,10 +182,14 @@ async function parseToken(token) {
 function toEmbedUrl(platform, url) {
   url = url.trim();
   try {
-    if (url.includes('/play/embed/') || url.includes('/embed/')) return url;
+    if (url.includes('/play/embed/') || url.includes('/embed/')) {
+      // добавляем autoplay если его нет
+      if(!url.includes('autoplay')) return url + (url.includes('?')?'&':'?') + 'autoplay=1&muted=0';
+      return url;
+    }
     if (url.includes('rutube.ru')) {
       const m = url.match(/rutube\.ru\/video\/([a-f0-9]+)/i);
-      if (m) return `https://rutube.ru/play/embed/${m[1]}`;
+      if (m) return `https://rutube.ru/play/embed/${m[1]}?autoplay=1&muted=0`;
     }
   } catch {}
   return url;
@@ -887,6 +891,7 @@ wss.on('connection', async (ws, req) => {
   ws.code = code;
   ws.userId = user.id; // Store user ID for cleanup
   ws.isGuest = !user.email && !user.username;
+  ws.agentReqId = 0;
 
   if (rooms[code].bans && rooms[code].bans.includes(ws.username)) {
     ws.close(1008, 'You are banned from this room');
@@ -968,7 +973,9 @@ wss.on('connection', async (ws, req) => {
           broadcast(code,{type:'chat',...errMsg,avatar:'🤖'});
           return;
         }
+        const reqId = ++ws.agentReqId;
         const result = await agent.resolveFilm(q);
+        if (reqId !== ws.agentReqId) return;
         if(!result.ok){
           if(result.ambiguous){
             ws.send(JSON.stringify({ type:'agent_choose', query:q, candidates:result.candidates, error: result.error }));
@@ -1045,6 +1052,7 @@ wss.on('connection', async (ws, req) => {
 
         // inline-agent: если текст — команда агенту, запускаем поиск и шлём invite
         if (text && !image && agent.isAgentQuery(text)) {
+          const reqId = ++ws.agentReqId;
           (async()=>{
             let qInline = agent.parseAgentCommand(text);
             if(qInline===null) qInline=text;
@@ -1060,6 +1068,7 @@ wss.on('connection', async (ws, req) => {
             }
             const q=qInline;
             const result = await agent.resolveFilm(q);
+            if (reqId !== ws.agentReqId) return;
             if(!result.ok){
               if(result.ambiguous){
                 ws.send(JSON.stringify({ type:'agent_choose', query:q, candidates:result.candidates, error: result.error }));
