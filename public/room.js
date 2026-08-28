@@ -139,15 +139,22 @@ async function loadRoom(){
 
   let src=room.embedUrl;
   const raw=room.videoUrl||src;
-  if(!src.includes('/play/embed/') && !src.includes('/embed/')){
-    if(raw.includes('rutube.ru')){
+  if(!src.includes('video_ext.php') && !src.includes('/play/embed/') && !src.includes('/embed/')){
+    if(raw.includes('vk.com')||raw.includes('vkvideo.ru')||raw.includes('vk.ru')){
+      const m=raw.match(/video(-?\d+)_(\d+)/);
+      if(m){ let h=''; try{h=new URL(raw).searchParams.get('hash')||'';}catch{} src=`https://vk.com/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2&js_api=1${h?'&hash='+h:''}`; }
+    } else if(raw.includes('rutube.ru')){
       const m=raw.match(/rutube\.ru\/video\/([a-f0-9]+)/i);
-      if(m) src=`https://rutube.ru/play/embed/${m[1]}?autoplay=1&muted=0`;
+      if(m) src=`https://rutube.ru/play/embed/${m[1]}`;
+    } else if(raw.includes('youtu.be')||raw.includes('youtube.com')){
+      let id=null;
+      if(raw.includes('youtu.be/')) id=raw.split('youtu.be/')[1].split(/[?&#]/)[0];
+      else try{id=new URL(raw).searchParams.get('v');}catch{}
+      if(id) src=`https://www.youtube.com/embed/${id}?enablejsapi=1&playsinline=1&origin=${location.origin}`;
     }
-  }
-  // форсим autoplay для RuTube
-  if(src.includes('rutube.ru/play/embed') && !src.includes('autoplay')){
-    src += (src.includes('?')?'&':'?') + 'autoplay=1&muted=0';
+  } else {
+    if(src.includes('youtube.com/embed') && !src.includes('enablejsapi')) src+=(src.includes('?')?'&':'?')+'enablejsapi=1&origin='+location.origin;
+    if(src.includes('video_ext.php') && !src.includes('js_api')) src+=(src.includes('?')?'&':'?')+'js_api=1';
   }
 
   iframe=document.createElement('iframe');
@@ -287,27 +294,7 @@ function addMessage({username,text,ts,avatar,image},isMe){
   const avaEl=`<div class="msg-avatar" data-user="${escapeHtml(username)}" title="${escapeHtml(username)}">${avaInner}</div>`;
   const imgHtml=image ? `<img class="msg-image" src="${image}" alt="photo" loading="lazy" />` : '';
   const textHtml=text ? escapeHtml(text) : '';
-  const invite = arguments[0].agentInvite;
-  const inviteHtml = invite ? `<div class="agent-invite"><span class="agent-invite-title">🎬 ${escapeHtml(invite.title||'Фильм')}</span><span style="font-size:11px;color:#9a9a9a;">${escapeHtml(invite.code)}</span><button class="agent-invite-btn" data-code="${escapeHtml(invite.code)}">Перейти</button></div>` : '';
-  const choose = arguments[0].agentChoose;
-  let chooseHtml='';
-  if(choose && choose.candidates){
-    chooseHtml=`<div class="agent-choose" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`+choose.candidates.map((c,i)=>`<button class="agent-choose-btn" data-i="${i}" style="text-align:left;background:#1e1e1e;border:1px solid #333;border-radius:10px;padding:8px 10px;font-size:12px;color:#fff;font-weight:600;cursor:pointer;">${escapeHtml(c.title)}</button>`).join('')+`</div>`;
-  }
-  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${textHtml}${imgHtml}${inviteHtml}${chooseHtml}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
-  if(invite){
-    const btn=d.querySelector('.agent-invite-btn');
-    if(btn) btn.onclick=()=> location.href='/room.html?code='+invite.code;
-  }
-  if(choose){
-    d.querySelectorAll('.agent-choose-btn').forEach(btn=>{
-      btn.onclick=()=>{
-        const c=choose.candidates[parseInt(btn.dataset.i)];
-        if(c) ws.send(JSON.stringify({type:'agent_pick', pick:{title:c.title, videoUrl:c.videoUrl}}));
-        btn.disabled=true; btn.textContent='Выбрано...';
-      };
-    });
-  }
+  d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${textHtml}${imgHtml}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
   const avaDom=d.querySelector('.msg-avatar');
   if(avaDom) avaDom.onclick=()=> openViewProfile(username);
 
@@ -375,47 +362,6 @@ function sys(t){
   d.style.cssText='text-align:center;color:#6a6a6a;font-size:11px;margin:6px 0;';
   d.textContent=t;
   messagesEl.appendChild(d);
-  messagesEl.scrollTop=messagesEl.scrollHeight;
-}
-function showAgentInvite(invite, fallbackText, autoRedirect){
-  if(!invite || !invite.code) return;
-  if(document.getElementById('agentToast-'+invite.code)) return;
-  const toast=document.createElement('div');
-  toast.id='agentToast-'+invite.code;
-  toast.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:90;background:#111;border:1px solid #232323;border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:280px;max-width:92vw;animation:pop .2s ease;';
-  toast.innerHTML=`<div style="width:36px;height:36px;border-radius:10px;background:#fff;color:#000;display:grid;place-items:center;font-size:16px;flex-shrink:0;">🤖</div><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(invite.title||'Фильм найден')}</div><div style="font-size:11px;color:#9a9a9a;">${escapeHtml((invite.platform||'').toUpperCase())} • комната ${escapeHtml(invite.code)}</div></div><button class="icon-btn" style="padding:8px 14px;font-size:12px;">Перейти</button><button class="x" style="width:28px;height:28px;flex-shrink:0;">✕</button>`;
-  const goBtn=toast.querySelector('.icon-btn');
-  const closeBtn=toast.querySelector('.x');
-  goBtn.onclick=()=> location.href='/room.html?code='+invite.code;
-  closeBtn.onclick=()=> toast.remove();
-  document.body.appendChild(toast);
-  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 12000);
-  if(autoRedirect){
-    goBtn.textContent='Перекидываю...';
-    goBtn.disabled=true;
-  }
-}
-function showAgentChooseToast(query, candidates){
-  if(!candidates||!candidates.length) return;
-  const id='agentChoose-'+Date.now();
-  const toast=document.createElement('div');
-  toast.id=id;
-  toast.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:95;background:#111;border:1px solid #232323;border-radius:16px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:320px;max-width:92vw;';
-  toast.innerHTML=`<div style="font-size:13px;color:#fff;font-weight:600;margin-bottom:8px;">Уточни какую часть «${escapeHtml(query)}» включить:</div>`+candidates.map((c,i)=>`<button class="agent-toast-pick" data-i="${i}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:#1e1e1e;border:1px solid #333;border-radius:10px;padding:8px 10px;margin-top:6px;color:#fff;cursor:pointer;font-size:12px;"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;text-align:left;color:#fff;font-weight:600;">${escapeHtml(c.title)}</span><span style="background:#fff;color:#000;border-radius:999px;padding:3px 8px;font-size:11px;margin-left:8px;">Выбрать</span></button>`).join('')+`<button class="x" style="position:absolute;top:6px;right:8px;width:22px;height:22px;border-radius:999px;border:1px solid #232323;background:#0a0a0a;color:#fff;">✕</button>`;
-  toast.style.position='fixed';
-  toast.querySelector('.x').onclick=()=>toast.remove();
-  toast.querySelectorAll('.agent-toast-pick').forEach(btn=>{
-    btn.onclick=()=>{
-      const c=candidates[parseInt(btn.dataset.i)];
-      if(c) ws.send(JSON.stringify({type:'agent_pick', pick:{title:c.title, videoUrl:c.videoUrl}}));
-      toast.remove();
-    };
-  });
-  document.body.appendChild(toast);
-  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 15000);
-}
-function showAgentChooseInChat(choose){
-  // уже отрисовано в addMessage через agentChoose, тут можно скролл
   messagesEl.scrollTop=messagesEl.scrollHeight;
 }
 function fmt(s){ if(isNaN(s)||s<0) return '0:00'; s=Math.floor(s); const m=Math.floor(s/60), sec=String(s%60).padStart(2,'0'); const h=Math.floor(m/60); if(h>0) return `${h}:${String(m%60).padStart(2,'0')}:${sec}`; return `${m}:${sec}`; }
@@ -594,19 +540,6 @@ function sendTyping(isTyping){
   ws.send(JSON.stringify({type:'typing', isTyping}));
 }
 
-let agentInviteSeq = 0;
-let agentRedirectTimer = null;
-function clearAgentRedirect(){
-  if(agentRedirectTimer){ clearTimeout(agentRedirectTimer); agentRedirectTimer = null; }
-}
-function scheduleAgentRedirect(code, inviteId){
-  clearAgentRedirect();
-  agentRedirectTimer = setTimeout(()=>{
-    if(inviteId !== agentInviteSeq) return;
-    location.href='/room.html?code='+code;
-  }, 700);
-}
-
 // ws
 function connect(){
   const proto=location.protocol==='https:'?'wss:':'ws:';
@@ -625,21 +558,7 @@ function connect(){
       data.messages.forEach(m=> addMessage(m, m.username===me));
       renderBans();
     }
-    if(data.type==='chat'){ if(data.avatar) presenceAvatars[data.username]=data.avatar; addMessage(data, data.username===me); if(data.agentInvite){ showAgentInvite(data.agentInvite, data.text); } if(data.agentChoose){ showAgentChooseInChat(data.agentChoose); } }
-    if(data.type==='agent_invite'){
-      const isMeInvite = !data.from || data.from===me || data.auto;
-      showAgentInvite({ code:data.code, title:data.title, platform:data.platform }, null, isMeInvite);
-      if(isMeInvite && data.code){
-        const inviteId = ++agentInviteSeq;
-        scheduleAgentRedirect(data.code, inviteId);
-      }
-    }
-    if(data.type==='agent_choose'){
-      showAgentChooseToast(data.query, data.candidates);
-    }
-    if(data.type==='agent_error'){
-      sys('🤖 '+data.text);
-    }
+    if(data.type==='chat'){ if(data.avatar) presenceAvatars[data.username]=data.avatar; addMessage(data, data.username===me); }
     if(data.type==='presence'){
       if(data.usersDetailed){
         data.usersDetailed.forEach(u=> presenceAvatars[u.username]=u.avatar);
@@ -716,20 +635,6 @@ function sendChat(){
   clearTimeout(typingTimeout);
 }
 document.getElementById('sendBtn').onclick=sendChat;
-const agentAskBtn=document.getElementById('agentAskBtn');
-const agentHint=document.getElementById('agentHint');
-if(agentAskBtn){
-  agentAskBtn.onclick=()=>{
-    if(agentHint) agentHint.style.display = agentHint.style.display==='none' ? 'block':'none';
-    if(!chatInput.value.trim().toLowerCase().startsWith('включи')){
-      chatInput.value='включи ';
-      chatInput.focus();
-      chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
-    } else {
-      chatInput.focus();
-    }
-  };
-}
 chatInput.addEventListener('keydown',e=>{if(e.key==='Enter') sendChat();});
 chatInput.addEventListener('input', ()=>{
   const hasText=chatInput.value.trim().length>0;

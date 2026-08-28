@@ -518,20 +518,24 @@ $('#openCreate').onclick = ()=> createModal.classList.add('show');
 document.querySelectorAll('[data-close]').forEach(b=> b.onclick = ()=> $('#'+b.dataset.close).classList.remove('show'));
 [ joinModal, createModal ].forEach(m=> m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('show'); }));
 
-// platform switch — только RuTube
-let platform = 'rutube';
+// platform switch
+let platform = 'vk';
 const platBtns = document.querySelectorAll('.plat');
 const linkLabel = $('#linkLabel');
 const videoUrl = $('#videoUrl');
 const hint = $('#platformHint');
 const hints = {
+  vk: 'Вставь обычную ссылку на VK видео, например https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789 — мы покажем только плеер без ленты.',
   rutube: 'RuTube: скопируй ссылку на видео, например https://rutube.ru/video/xxxx — мы превратим её в плеер.',
+  youtube: 'YouTube: поддерживается youtu.be, youtube.com/watch?v=, и прямые embed ссылки.'
 };
-const labels = { rutube:'Ссылка на RuTube' };
-const placeholders = { rutube:'https://rutube.ru/video/xxx' };
+const labels = { vk:'Ссылка на видео VK', rutube:'Ссылка на RuTube', youtube:'Ссылка на YouTube' };
+const placeholders = { vk:'https://vk.com/video-123_456', rutube:'https://rutube.ru/video/xxx', youtube:'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
 function isValidVideoUrlClient(plat, url){
   url=url.trim();
+  if(plat==='vk') return /^(https?:\/\/)?(m\.)?(vk\.com|vk\.ru|vkvideo\.ru)\/video-?\d+_\d+/.test(url) || /video_ext\.php\?.*oid=-?\d+.*id=\d+/.test(url);
   if(plat==='rutube') return /^(https?:\/\/)?(www\.)?rutube\.ru\/(video|play\/embed)\/[a-f0-9]+/i.test(url);
+  if(plat==='youtube') return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
   return false;
 }
 const videoUrlStatus=$('#videoUrlStatus');
@@ -544,8 +548,8 @@ function validateVideoUrl(){
     videoUrl.classList.add('input-ok'); videoUrl.classList.remove('input-err');
     return true;
   } else {
-    const ex={rutube:'Пример: https://rutube.ru/video/...'};
-    videoUrlStatus.textContent=`Неверный формат для RUTUBE. ${ex[platform]}`;
+    const ex={vk:'Пример: https://vk.com/video-123456_789', rutube:'Пример: https://rutube.ru/video/...', youtube:'Пример: https://youtu.be/...'};
+    videoUrlStatus.textContent=`Неверный формат для ${platform.toUpperCase()}. ${ex[platform]}`;
     videoUrlStatus.style.color='#ff3b30';
     videoUrl.classList.add('input-err'); videoUrl.classList.remove('input-ok');
     return false;
@@ -571,8 +575,8 @@ $('#createBtn').onclick = async ()=>{
   if(!url) return showError(err,'Вставь ссылку на видео');
   if(!isValidVideoUrlClient(platform, url)){
     validateVideoUrl();
-    const ex={ rutube:'https://rutube.ru/video/...'};
-    return showError(err, `Неверная ссылка для RUTUBE. Вставь правильную: ${ex[platform]}`);
+    const ex={ vk:'https://vk.com/video-123456_789', rutube:'https://rutube.ru/video/...', youtube:'https://youtu.be/...'};
+    return showError(err, `Неверная ссылка для ${platform.toUpperCase()}. Вставь правильную: ${ex[platform]}`);
   }
   $('#createBtn').disabled=true;
   try{
@@ -973,113 +977,6 @@ function spawnGlobalMilana(){
 }
 setInterval(spawnGlobalMilana, 1900);
 setTimeout(()=>{ spawnGlobalMilana(); setTimeout(spawnGlobalMilana, 900); setTimeout(spawnGlobalMilana, 1800); }, 500);
-
-// --- Agent search bar ---
-(function(){
-  const inp = document.getElementById('agentInput');
-  const btn = document.getElementById('agentBtn');
-  const status = document.getElementById('agentStatus');
-  const result = document.getElementById('agentResult');
-  if(!inp || !btn) return;
-  function setStatus(t, err=false){
-    if(!status) return;
-    status.textContent = t||'';
-    status.style.color = err ? '#ff8a8a' : '#9a9a9a';
-    status.style.display = t ? 'block' : 'none';
-  }
-  let agentRequestSeq = 0;
-  let agentRedirectTimer = null;
-  function clearAgentRedirect(){
-    if(agentRedirectTimer){ clearTimeout(agentRedirectTimer); agentRedirectTimer = null; }
-  }
-  function scheduleAgentRedirect(code, reqId){
-    clearAgentRedirect();
-    agentRedirectTimer = setTimeout(()=>{
-      if(reqId !== agentRequestSeq) return;
-      location.href='/room.html?code='+code;
-    }, 900);
-  }
-  function showResult(match, code, reqId){
-    if(reqId !== agentRequestSeq) return;
-    if(!result) return;
-    result.style.display='block';
-    result.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:16px;padding:12px 14px;">
-        <div style="width:42px;height:42px;border-radius:10px;background:#1a1a1a;display:grid;place-items:center;font-size:18px;">🎬</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(match.title)}</div>
-          <div style="font-size:11px;color:#9a9a9a;">RUTUBE • найдено агентом</div>
-        </div>
-        <button class="btn-primary" id="agentGoBtn" style="width:auto;padding:10px 18px;font-size:13px;">Перейти →</button>
-      </div>
-    `;
-    document.getElementById('agentGoBtn').onclick=()=> location.href='/room.html?code='+code;
-    scheduleAgentRedirect(code, reqId);
-  }
-  function showChoose(candidates, query){
-    if(!result) return;
-    result.style.display='block';
-      const items=candidates.map((c,i)=>`
-      <button class="agent-pick-btn" data-i="${i}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#1e1e1e;border:1px solid #333;border-radius:12px;padding:10px 12px;margin-top:8px;cursor:pointer;">
-        <span style="flex:1;font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.title)}</span>
-        <span style="background:#fff;color:#000;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;">Выбрать</span>
-      </button>
-    `).join('');
-     result.innerHTML=`<div style="margin-top:6px;padding:12px;background:#141414;border:1px solid #2a2a2a;border-radius:16px;"><div style="font-size:13px;color:#fff;font-weight:600;">Нашёл несколько вариантов по «${escapeHtml(query)}». Выбери нужный:</div>${items}</div>`;
-    // brighter titles
-    result.querySelectorAll('.agent-pick-btn span').forEach(s=>{ if(!s.textContent.includes('Выбрать')) s.style.color='#fff'; });
-    result.querySelectorAll('.agent-pick-btn').forEach(btn=>{
-      btn.onclick=async()=>{
-        const c=candidates[parseInt(btn.dataset.i)];
-        btn.disabled=true; btn.style.opacity='0.6';
-        const t=token();
-        const r=await fetch('/api/agent/pick',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({title:c.title, videoUrl:c.videoUrl})});
-        const j=await r.json();
-        if(j.ok) location.href='/room.html?code='+j.code;
-        else setStatus(j.error||'Ошибка',true);
-      };
-    });
-  }
-  async function doAgent(){
-    const q = inp.value.trim();
-    if(!q) return setStatus('Введи название фильма', true);
-    const t = token();
-    if(!t) return setStatus('Войди в аккаунт чтобы использовать агента', true);
-    const reqId = ++agentRequestSeq;
-    clearAgentRedirect();
-    btn.disabled=true; btn.textContent='Ищу...'; setStatus('Агент ищет «'+q+'» ...');
-    if(result) result.style.display='none';
-    try{
-      const r = await fetch('/api/agent/play', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+t },
-        body: JSON.stringify({ query: q })
-      });
-      if(reqId !== agentRequestSeq) return;
-      const j = await r.json();
-      if(j.ambiguous){
-        setStatus('', false);
-        showChoose(j.candidates, j.query||q);
-        return;
-      }
-      if(!r.ok) throw new Error(j.error || 'Не нашёл');
-      setStatus('Нашёл! Перекидываю в комнату '+j.code+' ...');
-      showResult(j.match, j.code, reqId);
-    }catch(e){
-      if(reqId !== agentRequestSeq) return;
-      setStatus(e.message || 'Не нашёл фильм. Проверь название.', true);
-    }finally{
-      if(reqId === agentRequestSeq){
-        btn.disabled=false; btn.textContent='Найти и включить';
-      }
-    }
-  }
-  btn.onclick = doAgent;
-  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') doAgent(); });
-  document.querySelectorAll('.agent-chip').forEach(ch=>{
-    ch.onclick=()=>{ inp.value = ch.dataset.q; doAgent(); };
-  });
-})();
 
 // hide topbar on scroll down, show on scroll up
 let lastScrollY=0;
