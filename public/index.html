@@ -114,6 +114,20 @@
         <h1 data-i18n="Смотрите фильмы и сериалы вместе с togetherly.">Смотрите фильмы и сериалы вместе с togetherly.</h1>
         <p data-i18n="Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.">Создай комнату, выбери фильм с VK / RuTube / YouTube и скинь ссылку/код друзьям.</p>
       </div>
+      <!-- AGENT SEARCH -->
+      <div class="agent-bar" id="agentBar">
+        <div class="agent-bar-head">
+          <span class="agent-badge">АГЕНТ</span>
+          <span class="agent-hint">Напиши что хочешь посмотреть - агент сам найдёт и создаст комнату.</span>
+        </div>
+        <div class="agent-search">
+          <input id="agentInput" placeholder="Например : включи Машу и Медведя." maxlength="120" />
+          <button id="agentBtn" class="btn-primary" style="width:auto;padding:12px 22px;white-space:nowrap;">Найти и включить</button>
+        </div>
+        <div id="agentStatus" class="agent-status"></div>
+        <div id="agentResult" class="agent-result" style="display:none;"></div>
+      </div>
+
       <div class="grid2">
         <div class="card">
           <div class="card-icon">🔧</div>
@@ -171,19 +185,17 @@
         <button class="x" data-close="createModal">✕</button>
       </div>
       <div class="platforms">
-        <button class="plat active" data-plat="vk">VK</button>
-        <button class="plat" data-plat="rutube">RuTube</button>
-        <button class="plat" data-plat="youtube">YouTube</button>
+        <button class="plat active" data-plat="rutube">RuTube</button>
       </div>
       <div class="field">
         <label data-i18n="Название комнаты (необязательно)">Название комнаты (необязательно)</label>
         <input id="roomTitle" placeholder="Вечерний кинчик" data-i18n-placeholder="Вечерний кинчик" />
       </div>
       <div class="field">
-        <label id="linkLabel" data-i18n="Ссылка на видео VK">Ссылка на видео VK</label>
-        <input id="videoUrl" placeholder="https://vk.com/video-123_456" />
+        <label id="linkLabel" data-i18n="Ссылка на RuTube">Ссылка на RuTube</label>
+        <input id="videoUrl" placeholder="https://rutube.ru/video/xxx" />
         <div id="videoUrlStatus" style="font-size:11px;min-height:16px;margin-top:4px;"></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;" id="platformHint" data-i18n="Вставь обычную ссылку на VK видео">Вставь обычную ссылку на VK видео, например https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789 — мы покажем только плеер без ленты.</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;" id="platformHint">RuTube: скопируй ссылку на видео, например https://rutube.ru/video/xxxx — мы превратим её в плеер.</div>
       </div>
       <div id="createError" class="error"></div>
       <button id="createBtn" class="btn-primary" data-i18n="Создать и войти">Создать и войти</button>

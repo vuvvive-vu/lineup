@@ -407,6 +407,25 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .ctx-action-btn.ctx-delete { color:#ff3b30; }
 .ctx-action-btn.ctx-delete:hover { background:#2a1215; }
 
+/* agent bar */
+.agent-bar { background: linear-gradient(135deg,#0f0f0f,#111); border:1px solid #1e1e1e; border-radius:20px; padding:18px; margin-bottom:16px; animation: fadeUp .5s ease both; }
+.agent-bar-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.agent-badge { background:#fff; color:#000; font-weight:800; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; padding:5px 10px; border-radius:999px; }
+.agent-hint { color:#8a8a8a; font-size:12px; line-height:1.4; }
+.agent-search { display:flex; gap:8px; }
+.agent-search input { flex:1; background:#000; border:1px solid #232323; color:#fff; padding:12px 14px; border-radius:999px; outline:none; font-size:13px; }
+.agent-search input:focus { border-color:#333; }
+.agent-search input::placeholder { color:#5a5a5a; }
+.agent-status { font-size:12px; color:#9a9a9a; margin-top:10px; min-height:16px; display:none; }
+.agent-result { margin-top:12px; }
+.agent-examples { display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:wrap; font-size:12px; color:#6a6a6a; }
+.agent-chip { background:#000; border:1px solid #1e1e1e; color:#cfcfcf; padding:6px 12px; border-radius:999px; font-size:12px; cursor:pointer; transition: all .15s; }
+.agent-chip:hover { background:#1a1a1a; border-color:#2a2a2a; color:#fff; transform: translateY(-1px); }
+.agent-invite { background: linear-gradient(135deg,#111,#0a0a0a); border:1px solid #1e1e1e; border-radius:14px; padding:10px 12px; display:flex; align-items:center; gap:10px; margin-top:8px; }
+.agent-invite-title { font-weight:700; font-size:13px; }
+.agent-invite-btn { margin-left:auto; background:#fff; color:#000; border:none; padding:8px 14px; border-radius:999px; font-weight:700; font-size:12px; cursor:pointer; }
+@media(max-width:600px){ .agent-search{flex-direction:column} .agent-search .btn-primary{width:100% !important} }
+
 /* welcome modal */
 .welcome-modal { max-width:420px; width:100%; background:linear-gradient(145deg,#111,#0a0a0a); border:1px solid #1e1e1e; border-radius:24px; padding:40px 32px 32px; text-align:center; animation:pop .3s ease; }
 .welcome-icon { margin-bottom:16px; }

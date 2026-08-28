@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./db');
 const { sendVerifyCode, sendResetEmail, detectDevice } = require('./email');
 
+const agent = require('./agent');
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.JWT_SECRET) {
   console.warn('⚠️  JWT_SECRET не установлен, используется временный ключ (токены будут невалидны после рестарта)');
@@ -96,18 +97,20 @@ const PORT = process.env.PORT || 3000;
 
 // CORS configuration - restrict to specific origins
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000', 'http://localhost:5173']; // Development defaults
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s=>s.trim())
+  : ['http://localhost:3000', 'http://localhost:5173', 'https://togetherly.online', 'https://www.togetherly.online'];
 
 app.use(require('cors')({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
+    // разрешаем любой поддомен onrender.com и togetherly.online
+    try{
+      const url=new URL(origin);
+      const host=url.hostname;
+      if(host.endsWith('.onrender.com') || host.endsWith('.togetherly.online') || host==='togetherly.online') return callback(null, true);
+    }catch{}
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
@@ -117,15 +120,15 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  // CSP: разрешаем inline-скрипты/стили (у вас много <script> и <style>), но блокируем чужой JS
+  // CSP: только RuTube + self
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://rutube.ru https://*.rutube.ru",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: https: blob:",
     "media-src 'self' https: blob:",
-    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.vk.com https://*.vk.ru https://*.vkvideo.ru https://*.rutube.ru",
+    "frame-src 'self' https://rutube.ru https://*.rutube.ru",
     "connect-src 'self' ws: wss: https:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -179,33 +182,10 @@ async function parseToken(token) {
 function toEmbedUrl(platform, url) {
   url = url.trim();
   try {
-    if (url.includes('video_ext.php') || url.includes('/play/embed/') || url.includes('/embed/')) return url;
-    if (url.includes('vk.com') || url.includes('vkvideo.ru') || url.includes('vk.ru')) {
-      const m = url.match(/video(-?\d+)_(\d+)/);
-      if (m) {
-        const oid = m[1];
-        const vid = m[2];
-        let hash = '';
-        try { hash = new URL(url).searchParams.get('hash') || ''; } catch {}
-        let embed = `https://vk.com/video_ext.php?oid=${oid}&id=${vid}&hd=2&js_api=1`;
-        if (hash) embed += `&hash=${hash}`;
-        return embed;
-      }
-      const oidMatch = url.match(/oid=(-?\d+)/);
-      const idMatch = url.match(/[?&]id=(\d+)/);
-      if (oidMatch && idMatch) return `https://vk.com/video_ext.php?oid=${oidMatch[1]}&id=${idMatch[1]}&hd=2&js_api=1`;
-    }
+    if (url.includes('/play/embed/') || url.includes('/embed/')) return url;
     if (url.includes('rutube.ru')) {
       const m = url.match(/rutube\.ru\/video\/([a-f0-9]+)/i);
       if (m) return `https://rutube.ru/play/embed/${m[1]}`;
-    }
-    if (url.includes('youtu.be') || url.includes('youtube.com')) {
-      let id = null;
-      if (url.includes('youtu.be/')) id = url.split('youtu.be/')[1].split(/[?&#]/)[0];
-      else if (url.includes('v=')) {
-        try { id = new URL(url).searchParams.get('v'); } catch {}
-      }
-      if (id) return `https://www.youtube.com/embed/${id}?enablejsapi=1`;
     }
   } catch {}
   return url;
@@ -258,14 +238,8 @@ function clearCodeAttempts(email) {
 function isValidVideoUrl(platform, url){
   url=url.trim();
   try{
-    if(platform==='vk'){
-      return /^(https?:\/\/)?(m\.)?(vk\.com|vk\.ru|vkvideo\.ru)\/video-?\d+_\d+/.test(url) || /video_ext\.php\?.*oid=-?\d+.*id=\d+/.test(url);
-    }
     if(platform==='rutube'){
       return /^(https?:\/\/)?(www\.)?rutube\.ru\/(video|play\/embed)\/[a-f0-9]+/i.test(url);
-    }
-    if(platform==='youtube'){
-      return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
     }
   }catch{ return false; }
   return false;
@@ -751,12 +725,12 @@ app.post('/api/rooms', async (req, res) => {
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Войдите в аккаунт' });
   let { platform, videoUrl, title } = req.body;
-  if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
+  if (!platform || !videoUrl) return res.status(400).json({ error: 'Вставьте ссылку RuTube' });
   platform = platform.toLowerCase();
-  if (!['vk','rutube','youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
+  if (platform !== 'rutube') platform = 'rutube'; // только RuTube
   if (!isValidVideoUrl(platform, videoUrl)) {
-    const examples={ vk:'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube:'Пример RuTube: https://rutube.ru/video/abc123...', youtube:'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
-    return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
+    const examples={ rutube:'Пример RuTube: https://rutube.ru/video/abc123...' };
+    return res.status(400).json({ error: `Неверная ссылка для RUTUBE. ${examples[platform]}` });
   }
   const embedUrl = toEmbedUrl(platform, videoUrl);
   let code;
@@ -775,6 +749,114 @@ app.post('/api/rooms', async (req, res) => {
   rooms[code] = room;
   saveJson(ROOMS_FILE, rooms);
   res.json({ code, room });
+});
+
+// --- Agent API ---
+app.post('/api/agent/search', async (req,res)=>{
+  try{
+    let q = (req.body?.query || req.body?.text || '').trim();
+    if(!q) return res.status(400).json({ error: 'Введите название фильма' });
+    const parsed = agent.parseAgentCommand(q);
+    if(parsed!==null){
+      if(!parsed) return res.json({ ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' });
+      q = parsed;
+    }
+    if(!q) return res.json({ ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' });
+    const result = await agent.resolveFilm(q);
+    if(result.ok){
+      return res.json({ ok:true, match: result.match, source: result.source, query: q });
+    }
+    if(result.ambiguous){
+      return res.json({ ok:false, ambiguous:true, reason:result.reason, candidates:result.candidates, query:q, error: result.error });
+    }
+    return res.json({ ok:false, code:result.code||'NOT_FOUND', error: result.error, suggestions:[] });
+  }catch(e){
+    console.error('agent/search error', e);
+    res.status(500).json({ error:'Ошибка агента' });
+  }
+});
+
+app.post('/api/agent/play', async (req,res)=>{
+  try{
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if(!user) return res.status(401).json({ error:'Войдите в аккаунт' });
+    let q = (req.body?.query || req.body?.text || '').trim();
+    if(!q) return res.status(400).json({ error:'Введите название' });
+    // если пришла фраза "включи сумереки" — вытащим ядро
+    const parsed = agent.parseAgentCommand(q);
+    if(parsed!==null){
+      if(!parsed) return res.status(400).json({ ok:false, code:'EMPTY', error:'Напиши название фильма. Например: Маша и Медведь' });
+      q = parsed;
+    }
+    const result = await agent.resolveFilm(q);
+    if(!result.ok){
+      if(result.ambiguous){
+        return res.status(409).json({ ok:false, ambiguous:true, reason:result.reason, candidates:result.candidates, query:q, error: result.error });
+      }
+      const code = result.code==='EMPTY'?400:404;
+      return res.status(code).json({ ok:false, code:result.code, error: result.error });
+    }
+    const m = result.match;
+    const embedUrl = toEmbedUrl(m.platform, m.videoUrl);
+    let code;
+    do { code = genCode(); } while (rooms[code]);
+    const room = {
+      code,
+      title: m.title || q,
+      platform: m.platform,
+      videoUrl: m.videoUrl,
+      embedUrl,
+      host: user.username || ('guest:'+user.id),
+      createdAt: new Date().toISOString(),
+      messages: [
+        { username: 'AGENT', text: `🎬 Агент включил «${m.title}» по запросу «${q}»`, ts: Date.now() }
+      ],
+      bans: [],
+      agent: true,
+      agentQuery: q,
+      agentSource: result.source
+    };
+    rooms[code] = room;
+    saveJson(ROOMS_FILE, rooms);
+    res.json({ ok:true, code, room, match: m, source: result.source });
+  }catch(e){
+    console.error('agent/play error', e);
+    res.status(500).json({ error:'Ошибка агента' });
+  }
+});
+
+// прямой выбор после ambiguous (без повторного поиска)
+app.post('/api/agent/pick', async (req,res)=>{
+  try{
+    const token = req.headers.authorization?.replace('Bearer ','');
+    const user = await parseToken(token);
+    if(!user) return res.status(401).json({ error:'Войдите в аккаунт' });
+    const { videoUrl, title } = req.body||{};
+    if(!videoUrl || !isValidVideoUrl('rutube', videoUrl)) return res.status(400).json({ error:'Неверная ссылка RuTube' });
+    const embedUrl = toEmbedUrl('rutube', videoUrl);
+    let code;
+    do { code = genCode(); } while (rooms[code]);
+    const room={
+      code,
+      title: (title||'Фильм').trim(),
+      platform:'rutube',
+      videoUrl,
+      embedUrl,
+      host: user.username || ('guest:'+user.id),
+      createdAt: new Date().toISOString(),
+      messages:[{ username:'AGENT', text:`🎬 Комната «${title}» создана`, ts:Date.now() }],
+      bans:[],
+      agent:true,
+      agentQuery:title
+    };
+    rooms[code]=room;
+    saveJson(ROOMS_FILE, rooms);
+    res.json({ ok:true, code, room });
+  }catch(e){
+    console.error('agent/pick error',e);
+    res.status(500).json({ error:'Ошибка' });
+  }
 });
 
 app.get('/api/rooms/:code', (req, res) => {
@@ -832,9 +914,110 @@ wss.on('connection', async (ws, req) => {
   const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
   broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
 
-  ws.on('message', (data) => {
+  ws.on('message', async (data) => {
     try {
       const msg = JSON.parse(data);
+      // прямой выбор из предложенных вариантов
+      if (msg.type === 'agent_pick') {
+        const pick = msg.pick || {};
+        const title = (pick.title||'').trim() || 'Фильм';
+        const videoUrl = (pick.videoUrl||'').trim();
+        if(!videoUrl || !isValidVideoUrl('rutube', videoUrl)){
+          ws.send(JSON.stringify({ type:'agent_error', text:'Неверная ссылка RuTube' }));
+          return;
+        }
+        const embedUrlPick = toEmbedUrl('rutube', videoUrl);
+        let newCodePick;
+        do { newCodePick = genCode(); } while (rooms[newCodePick]);
+        const newRoomPick = {
+          code: newCodePick,
+          title,
+          platform: 'rutube',
+          videoUrl,
+          embedUrl: embedUrlPick,
+          host: ws.username,
+          createdAt: new Date().toISOString(),
+          messages: [{ username:'AGENT', text:`🎬 Комната «${title}» создана`, ts: Date.now() }],
+          bans: [],
+          agent:true,
+          agentQuery: title
+        };
+        rooms[newCodePick]=newRoomPick;
+        saveJson(ROOMS_FILE, rooms);
+        const invitePick = { username:'AGENT', text:`🎬 Выбрано «${title}» — комната ${newCodePick}`, ts: Date.now(), agentInvite:{ code:newCodePick, title, platform:'rutube' } };
+        rooms[code].messages.push(invitePick);
+        if(rooms[code].messages.length>200) rooms[code].messages.shift();
+        saveJson(ROOMS_FILE, rooms);
+        broadcast(code, { type:'chat', ...invitePick, avatar:'🤖' });
+        ws.send(JSON.stringify({ type:'agent_invite', code:newCodePick, title, platform:'rutube', videoUrl, auto:true }));
+        broadcast(code, { type:'agent_invite', code:newCodePick, title, platform:'rutube' }, ws);
+        return;
+      }
+      // Agent command via chat: "включи ..." / "/включи ..." / "агент включи ..."
+      if (msg.type === 'agent' || msg.type === 'agent_request') {
+        const rawQ = (msg.query || msg.text || '').trim();
+        let q = agent.parseAgentCommand(rawQ);
+        if(q===null) q = rawQ;
+        if(!q){
+          const err='Напиши название фильма. Например: Маша и Медведь';
+          ws.send(JSON.stringify({ type:'agent_error', text:err }));
+          const errMsg={ username:'AGENT', text:'🤖 '+err, ts:Date.now() };
+          rooms[code].messages.push(errMsg);
+          if(rooms[code].messages.length>200) rooms[code].messages.shift();
+          saveJson(ROOMS_FILE, rooms);
+          broadcast(code,{type:'chat',...errMsg,avatar:'🤖'});
+          return;
+        }
+        const result = await agent.resolveFilm(q);
+        if(!result.ok){
+          if(result.ambiguous){
+            ws.send(JSON.stringify({ type:'agent_choose', query:q, candidates:result.candidates, error: result.error }));
+            const errMsg = { username:'AGENT', text: '🤖 '+result.error, ts: Date.now(), agentChoose: { query:q, candidates:result.candidates } };
+            rooms[code].messages.push(errMsg);
+            if(rooms[code].messages.length>200) rooms[code].messages.shift();
+            saveJson(ROOMS_FILE, rooms);
+            broadcast(code, { type:'chat', ...errMsg, avatar:'🤖' });
+            return;
+          }
+          ws.send(JSON.stringify({ type:'agent_error', text: result.error }));
+          const errMsg = { username:'AGENT', text: '🤖 '+result.error, ts: Date.now() };
+          rooms[code].messages.push(errMsg);
+          if(rooms[code].messages.length>200) rooms[code].messages.shift();
+          saveJson(ROOMS_FILE, rooms);
+          broadcast(code, { type:'chat', ...errMsg, avatar:'🤖' });
+          return;
+        }
+        const m = result.match;
+        const embedUrl = toEmbedUrl(m.platform, m.videoUrl);
+        let newCode;
+        do { newCode = genCode(); } while (rooms[newCode]);
+        const newRoom = {
+          code: newCode,
+          title: m.title || q,
+          platform: m.platform,
+          videoUrl: m.videoUrl,
+          embedUrl,
+          host: ws.username,
+          createdAt: new Date().toISOString(),
+          messages: [{ username:'AGENT', text:`🎬 Комната создана по запросу «${q}» → «${m.title}»`, ts: Date.now() }],
+          bans: [],
+          agent:true,
+          agentQuery: q
+        };
+        rooms[newCode] = newRoom;
+        saveJson(ROOMS_FILE, rooms);
+        // уведомляем всех в текущей комнате
+        const inviteMsg = { username:'AGENT', text:`🎬 Агент нашёл «${m.title}» и создал комнату ${newCode}. Нажми «Перейти» чтобы смотреть вместе.`, ts: Date.now(), agentInvite: { code:newCode, title:m.title, platform:m.platform } };
+        rooms[code].messages.push(inviteMsg);
+        if(rooms[code].messages.length>200) rooms[code].messages.shift();
+        saveJson(ROOMS_FILE, rooms);
+        broadcast(code, { type:'chat', ...inviteMsg, avatar:'🤖' });
+        // личное приглашение запросившему с авто-редиректом
+        ws.send(JSON.stringify({ type:'agent_invite', code:newCode, title:m.title, platform:m.platform, videoUrl:m.videoUrl, source: result.source }));
+        // также бродкастим invite всем чтобы могли перейти
+        broadcast(code, { type:'agent_invite', code:newCode, title:m.title, platform:m.platform, source: result.source }, ws);
+        return;
+      }
       if (msg.type === 'chat') {
         const text = (msg.text||'').trim();
         const image = msg.image || null;
@@ -859,6 +1042,70 @@ wss.on('connection', async (ws, req) => {
         if (rooms[code].messages.length > 200) rooms[code].messages.shift();
         saveJson(ROOMS_FILE, rooms);
         broadcast(code, { type: 'chat', ...chatMsg, avatar: ws.avatar || '😎' });
+
+        // inline-agent: если текст — команда агенту, запускаем поиск и шлём invite
+        if (text && !image && agent.isAgentQuery(text)) {
+          (async()=>{
+            let qInline = agent.parseAgentCommand(text);
+            if(qInline===null) qInline=text;
+            if(!qInline){
+              const err='Напиши название фильма. Например: Маша и Медведь';
+              const errMsg={ username:'AGENT', text:'🤖 '+err, ts:Date.now() };
+              rooms[code].messages.push(errMsg);
+              if(rooms[code].messages.length>200) rooms[code].messages.shift();
+              saveJson(ROOMS_FILE, rooms);
+              broadcast(code,{type:'chat',...errMsg,avatar:'🤖'});
+              ws.send(JSON.stringify({type:'agent_error',text:err}));
+              return;
+            }
+            const q=qInline;
+            const result = await agent.resolveFilm(q);
+            if(!result.ok){
+              if(result.ambiguous){
+                ws.send(JSON.stringify({ type:'agent_choose', query:q, candidates:result.candidates, error: result.error }));
+                const errMsg={ username:'AGENT', text:'🤖 '+result.error, ts:Date.now(), agentChoose:{ query:q, candidates:result.candidates } };
+                rooms[code].messages.push(errMsg);
+                if(rooms[code].messages.length>200) rooms[code].messages.shift();
+                saveJson(ROOMS_FILE, rooms);
+                broadcast(code,{type:'chat',...errMsg,avatar:'🤖'});
+                return;
+              }
+              const errMsg = { username:'AGENT', text: '🤖 '+result.error, ts: Date.now() };
+              rooms[code].messages.push(errMsg);
+              if(rooms[code].messages.length>200) rooms[code].messages.shift();
+              saveJson(ROOMS_FILE, rooms);
+              broadcast(code, { type:'chat', ...errMsg, avatar:'🤖' });
+              ws.send(JSON.stringify({ type:'agent_error', text: result.error }));
+              return;
+            }
+            const m = result.match;
+            const embedUrl2 = toEmbedUrl(m.platform, m.videoUrl);
+            let newCode2;
+            do { newCode2 = genCode(); } while (rooms[newCode2]);
+            const newRoom2 = {
+              code: newCode2,
+              title: m.title || q,
+              platform: m.platform,
+              videoUrl: m.videoUrl,
+              embedUrl: embedUrl2,
+              host: ws.username,
+              createdAt: new Date().toISOString(),
+              messages: [{ username:'AGENT', text:`🎬 Комната создана по запросу «${q}» → «${m.title}»`, ts: Date.now() }],
+              bans: [],
+              agent:true,
+              agentQuery: q
+            };
+            rooms[newCode2]=newRoom2;
+            saveJson(ROOMS_FILE, rooms);
+            const inviteMsg2 = { username:'AGENT', text:`🎬 Нашёл «${m.title}» по запросу «${q}». Код комнаты: ${newCode2}`, ts: Date.now(), agentInvite:{ code:newCode2, title:m.title, platform:m.platform } };
+            rooms[code].messages.push(inviteMsg2);
+            if(rooms[code].messages.length>200) rooms[code].messages.shift();
+            saveJson(ROOMS_FILE, rooms);
+            broadcast(code, { type:'chat', ...inviteMsg2, avatar:'🤖' });
+            ws.send(JSON.stringify({ type:'agent_invite', code:newCode2, title:m.title, platform:m.platform, videoUrl:m.videoUrl, auto:true, source: result.source }));
+            broadcast(code, { type:'agent_invite', code:newCode2, title:m.title, platform:m.platform, source: result.source }, ws);
+          })().catch(e=>console.error('inline agent error',e));
+        }
       }
       if (msg.type === 'reaction') {
         const mid=(msg.messageId||'').toString().slice(0,64);
