@@ -523,7 +523,31 @@ function applySync(action,time,playing){
   setTimeout(()=> suppressSync=false, 800);
 
   if(action==='unmute') return;
-  if(action==='state') action=playing ? 'play' : 'pause';
+  // State updates are frequent; do not seek on every packet or playback will stutter.
+  if(action==='state'){
+    if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
+      try{
+        const current=ytPlayer.getCurrentTime()||0;
+        const currentState=ytPlayer.getPlayerState();
+        if((currentState===1)!==!!playing){
+          if(playing) ytPlayer.playVideo();
+          else ytPlayer.pauseVideo();
+        }
+        if(Math.abs(current-t)>2.2) ytPlayer.seekTo(t,true);
+      }catch{}
+    } else if(vkPlayer){
+      try{
+        const current=vkPlayer.getCurrentTime()||0;
+        const currentState=vkPlayer.getState();
+        if((currentState===VK.VideoPlayer.States.PLAYING)!==!!playing){
+          if(playing) vkPlayer.play();
+          else vkPlayer.pause();
+        }
+        if(Math.abs(current-t)>2.2) vkPlayer.seek(t);
+      }catch{}
+    }
+    return;
+  }
   if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
     try{
       if(action==='play'){
