@@ -12,12 +12,11 @@
 <body>
   <div id="globalMilana" aria-hidden="true"></div>
   <header class="topbar">
-    <div class="logo"><i>T</i> togetherly</div>
+    <div class="logo">togetherly</div>
     <div class="nav-right" id="navRight">
       <!-- filled by JS -->
     </div>
   </header>
-
   <!-- AUTH -->
   <div id="authScreen" class="auth-wrap">
     <div class="auth-card">
@@ -277,16 +276,32 @@
     </div>
   </div>
 
+  <!-- HALLOWEEN NOTICE -->
+  <div id="halloweenNoticeModal" class="modal-bg">
+    <div class="welcome-modal halloween-notice-modal">
+      <div class="welcome-icon halloween-notice-icon">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="56" height="56" rx="16" fill="#451521" stroke="#8a2d3d" stroke-width="1"/>
+          <image href="/assets/HALLOWEENhouse.png" x="7" y="7" width="42" height="42" preserveAspectRatio="xMidYMid meet" />
+        </svg>
+      </div>
+      <h2 class="welcome-title">Spooky season is here</h2>
+      <p class="welcome-text">Мы немного обновили внешний вид сайта и добавили атмосферу Хэллоуина : новые цвета, оформление и небольшие тематические детали.</p>
+      <p class="welcome-text">Теперь Togetherly выглядит чуть необычнее и уютнее, а пользоваться сайтом стало ещё интереснее.</p>
+      <button class="welcome-btn" id="halloweenNoticeContinue">Продолжить</button>
+    </div>
+  </div>
+
   <!-- WELCOME -->
   <div id="welcomeModal" class="modal-bg">
     <div class="welcome-modal">
       <div class="welcome-icon">
         <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="56" height="56" rx="16" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
-          <text x="28" y="36" text-anchor="middle" font-family="Inter,-apple-system,BlinkMacSystemFont,sans-serif" font-size="26" font-weight="900" fill="#fff">T</text>
+          <rect width="56" height="56" rx="16" fill="#451521" stroke="#8a2d3d" stroke-width="1"/>
+          <image href="/assets/HALLOWEENcat.png" x="7" y="7" width="42" height="42" preserveAspectRatio="xMidYMid meet" />
         </svg>
       </div>
-      <h2 class="welcome-title">Добро пожаловать</h2>
+       <h2 class="welcome-title">Welcome</h2>
       <p class="welcome-text">Используя данный сервис вы соглашаетесь с нашей <a href="/privacy" target="_blank">политикой конфиденциальности</a>.</p>
       <p class="welcome-text">Мы НЕ несём ответственности за ваши действия на сайте.</p>
       <div class="welcome-footer">С уважением,<br/>togetherly corporation.</div>

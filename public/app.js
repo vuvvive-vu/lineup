@@ -5,13 +5,30 @@ const navRight = $('#navRight');
 const authError = $('#authError');
 const usernameEl = $('#username');
 
-// welcome modal
+// intro modals
+const halloweenNoticeModal = document.getElementById('halloweenNoticeModal');
+const halloweenNoticeContinue = document.getElementById('halloweenNoticeContinue');
 const welcomeModal = document.getElementById('welcomeModal');
 const welcomeContinue = document.getElementById('welcomeContinue');
-if(welcomeModal && welcomeContinue){
-  if(!sessionStorage.getItem('togetherly_welcomed')){
-    welcomeModal.classList.add('show');
+function showWelcomeAfterNotice(){
+  if(welcomeModal && !sessionStorage.getItem('togetherly_welcomed')) welcomeModal.classList.add('show');
+}
+if(halloweenNoticeModal && halloweenNoticeContinue){
+  const noticeShown = sessionStorage.getItem('togetherly_halloween_notice');
+  if(!noticeShown){
+    halloweenNoticeModal.classList.add('show');
+    sessionStorage.setItem('togetherly_halloween_notice','1');
+  } else {
+    showWelcomeAfterNotice();
   }
+  halloweenNoticeContinue.onclick = ()=>{
+    halloweenNoticeModal.classList.remove('show');
+    showWelcomeAfterNotice();
+  };
+} else {
+  showWelcomeAfterNotice();
+}
+if(welcomeModal && welcomeContinue){
   welcomeContinue.onclick = ()=>{
     welcomeModal.classList.remove('show');
     sessionStorage.setItem('togetherly_welcomed','1');
@@ -213,6 +230,7 @@ async function checkAuth(){
 function showAuth(){
   authScreen.style.display='grid';
   lobby.classList.remove('show');
+  document.body.classList.remove('lobby-active');
   navRight.innerHTML=``;
   applyTranslations();
   // show verified/success params
@@ -238,6 +256,7 @@ function showLobby(displayName, avatar){
   const nameForLetter = displayName || getDisplayName() || 'Г';
   authScreen.style.display='none';
   lobby.classList.add('show');
+  document.body.classList.add('lobby-active');
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : letterFor(nameForLetter);
   const avaCls = isPhoto(avatar) ? ' has-photo letter-avatar' : ' letter-avatar';
   const bg = isPhoto(avatar) ? '' : ` style="background:${avatarBg(nameForLetter)};color:#fff;"`;
@@ -958,7 +977,7 @@ function spawnGlobalMilana(){
   if(!layer || document.hidden) return;
   const el=document.createElement('div');
   el.className='milana';
-  el.textContent='♥️';
+  el.innerHTML='<img src="/assets/witch.png" alt="">';
   milanaY = (milanaY + 29) % 68;
   const y=12 + milanaY + (Math.random()*4-2);
   const x= 4 + Math.random()*88;
@@ -970,7 +989,7 @@ function spawnGlobalMilana(){
   el.style.left=finalX+'%';
   el.style.top=y+'%';
   el.style.animationDuration=(13 + Math.random()*2)+'s';
-  el.style.fontSize=(14 + Math.random()*1.2)+'px';
+  el.style.width=(24 + Math.random()*10)+'px';
   el.style.opacity=(0.10 + Math.random()*0.05).toString();
   layer.appendChild(el);
   setTimeout(()=> el.remove(), 14500);

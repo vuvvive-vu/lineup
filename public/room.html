@@ -11,7 +11,7 @@
 </head>
 <body>
 <header class="topbar">
-  <a href="/" class="logo"><i>T</i> togetherly</a>
+  <a href="/" class="logo">togetherly</a>
   <div class="nav-right">
     <span id="roomTitleTop" style="color:#fff;font-weight:700;font-size:14px;"></span>
     <span id="roomCodeTop" class="badge"></span>
@@ -25,6 +25,7 @@
     <div class="player" id="player" style="position:relative; z-index:2;">
       <div class="player-placeholder" id="placeholder" data-i18n="Загрузка плеера...">Загрузка плеера...</div>
       <!-- iframe injected -->
+      <div id="guestPlayerLock" class="guest-player-lock" aria-label="Плеером управляет хост"></div>
       <button id="unmuteBtn" style="display:none;position:absolute;bottom:12px;right:12px;z-index:6;background:#fff;color:#000;border:none;padding:8px 14px;border-radius:999px;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.4);" data-i18n="🔊 Включить звук">🔊 Включить звук</button>
     </div>
   </div>

@@ -114,6 +114,7 @@ const linkBox=document.getElementById('linkBox');
 const participantsList=document.getElementById('participantsList');
 const pCount=document.getElementById('pCount');
 const hostHint=document.getElementById('hostHint');
+const guestPlayerLock=document.getElementById('guestPlayerLock');
 const typingEl=document.getElementById('typing');
 let currentAvatar=localStorage.getItem('rave_ava')||'😎';
 let currentBio=localStorage.getItem('rave_bio')||'';
@@ -180,7 +181,7 @@ function spawnMilana(){
   if(document.hidden) return;
   const el=document.createElement('div');
   el.className='milana';
-  el.textContent='♥️';
+  el.innerHTML='<img src="/assets/witch.png" alt="">';
   // even vertical distribution
   milanaYSeed = (milanaYSeed + 37) % 60;
   const y = 18 + milanaYSeed + (Math.random()*6 -3);
@@ -204,6 +205,8 @@ setTimeout(()=>{ spawnMilana(); setTimeout(()=>spawnMilana(), 1200); setTimeout(
 
 function updateHostUI(){
   const isHost=me===host;
+  if(guestPlayerLock) guestPlayerLock.style.display=isHost?'none':'block';
+  if(unmuteBtn && !isHost) unmuteBtn.style.display='none';
   if(hostHint){
     if(isHost){
       hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
@@ -219,6 +222,7 @@ if(unmuteBtn){
   // показывать кнопку звука всем (мобильный автоплей без звука)
   setTimeout(()=>{ unmuteBtn.style.display='block'; }, 900);
   unmuteBtn.onclick=()=>{
+    if(me!==host) return;
     try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
     try{ if(ytPlayer){ ytPlayer.unMute(); try{ytPlayer.setVolume(100);}catch{} } }catch{}
     try{ iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
@@ -236,6 +240,7 @@ function avatarHtml(ava, size){
 }
 function renderParticipants(users,h){
   host=h||host;
+  users = [...new Map(users.map(u=>[typeof u==='string'?u:u.username, u])).values()];
   // if usersDetailed provided, build map
   // users may be array of strings or objects; handled in caller
   updateHostUI();
