@@ -22,7 +22,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 
 .topbar { height:58px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid var(--border); background:var(--bg); position:fixed; top:0; left:0; right:0; z-index:10; transition: transform 0.3s ease; }
 .topbar.hidden { transform: translateY(-100%); }
-.logo { font-family:'CoralineCat',cursive; letter-spacing:0.04em; font-size:20px; display:flex; align-items:center; }
+.logo { font-family:'CoralineCat', sans-serif; letter-spacing:0.04em; font-size:20px; display:flex; align-items:center; }
 .logo i { width:28px; height:28px; background:#fff; color:#000; display:grid; place-items:center; border-radius:8px; font-style:normal; font-weight:900; font-size:14px; }
 .nav-right { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); }
 .nav-right b { color:#fff; font-weight:600; }
@@ -433,7 +433,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .welcome-modal { max-width:420px; width:100%; background:linear-gradient(145deg,#2a1510,#160b09); border:1px solid #6b301d; border-radius:24px; padding:40px 32px 32px; text-align:center; animation:pop .3s ease; box-shadow:0 20px 70px rgba(55,12,5,.4); }
 .welcome-icon { margin-bottom:16px; filter:drop-shadow(0 6px 18px rgba(240,125,30,.18)); }
 .welcome-icon svg { display:block; margin:0 auto; }
-.welcome-title { position:relative; display:inline-block; font-family:'CoralineCat',cursive; font-size:40px; font-weight:400; letter-spacing:0.12em; margin-bottom:14px; color:#d8757d; text-shadow:0 3px 18px rgba(163,31,53,.28); }
+.welcome-title { position:relative; display:inline-block; font-family:'CoralineCat', sans-serif; font-size:40px; font-weight:400; letter-spacing:0.12em; margin-bottom:14px; color:#d8757d; text-shadow:0 3px 18px rgba(163,31,53,.28); }
 .welcome-title::after { content:""; position:absolute; left:50%; bottom:-10px; width:34px; height:1px; background:#a31f35; transform:translateX(-50%); opacity:.9; }
 .welcome-text { font-family:'TDIzbushka',serif; font-size:15px; color:#d0a58c; line-height:1.7; margin-bottom:0; }
 .welcome-text + .welcome-text { margin-top:8px; }
