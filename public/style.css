@@ -461,6 +461,9 @@ html, body { background:#160709; }
 .player { background:#1b080d; border-color:#54202b; }
 .side-card, .msg .bubble, .reaction-pill { background:#210a10; border-color:#4a1b26; }
 .code-box, .link-row input, .participant, .chat-input input, .ava-grid button { background:#19070c; border-color:#4a1b26; }
+#participantsCard, #bansCard { background:#240c12 !important; border-color:#54202b !important; }
+#participantsCard .participant, #bansCard .participant { background:#32101a !important; border-color:#702333 !important; }
+#participantsCard .participant.host { background:#451521 !important; border-color:#a33a4e !important; }
 .card-icon, .avatar-btn, .msg-avatar { background:#32101a; border-color:#54202b; }
 .welcome-modal { background:linear-gradient(145deg,#351019,#19070c); border-color:#702333; }
 .halloween-notice-modal { padding-top:34px; }

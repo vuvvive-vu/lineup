@@ -124,6 +124,7 @@ let roomBans=[];
 let iframe=null;
 let vkPlayer=null, ytPlayer=null, ytReady=false;
 let suppressSync=false; // prevent echo loop
+let lastHostMuted=null;
 
 async function loadRoom(){
   const r=await fetch('/api/rooms/'+code);
@@ -228,6 +229,7 @@ if(unmuteBtn){
     try{ iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
     try{ iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
     try{ iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+    sendSync('unmute', 0);
     unmuteBtn.style.display='none';
   };
 }
@@ -395,6 +397,15 @@ function initVK(){
     vkPlayer=VK.VideoPlayer(iframe);
   }catch(e){ console.log('vk init fail',e); return; }
   let lastBroadcast=0;
+  setInterval(()=>{
+    if(me!==host || !vkPlayer) return;
+    try{
+      const volume=vkPlayer.getVolume();
+      const muted=volume===0;
+      if(lastHostMuted===true && !muted) sendSync('unmute',0);
+      lastHostMuted=muted;
+    }catch{}
+  },700);
   // host -> broadcast
   vkPlayer.on(VK.VideoPlayer.Events.STARTED, (st)=>{ if(me===host && !suppressSync) sendSync('play', st.time); });
   vkPlayer.on(VK.VideoPlayer.Events.RESUMED, (st)=>{ if(me===host && !suppressSync) sendSync('play', st.time); });
@@ -433,6 +444,14 @@ function initYT(){
     events:{
       onReady:()=>{
         ytReady=true;
+        setInterval(()=>{
+          if(me!==host || !ytReady || !ytPlayer) return;
+          try{
+            const muted=ytPlayer.isMuted();
+            if(lastHostMuted===true && !muted) sendSync('unmute',0);
+            lastHostMuted=muted;
+          }catch{}
+        },700);
         // polling for seek detection (host)
         let last=0;
         setInterval(()=>{
@@ -483,6 +502,14 @@ function applySync(action,time){
   suppressSync=true;
   setTimeout(()=> suppressSync=false, 800);
 
+  if(action==='unmute'){
+    try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
+    try{ if(ytPlayer){ ytPlayer.unMute(); ytPlayer.setVolume(100); } }catch{}
+    try{ iframe?.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
+    try{ iframe?.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
+    try{ iframe?.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+    return;
+  }
   if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
     try{
       if(action==='play'){
