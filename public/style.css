@@ -4,14 +4,14 @@
   src: url('/fonts/CoralineCat.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 @font-face {
   font-family: 'TDIzbushka';
   src: url('/fonts/TDIzbushka.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  font-display: optional;
+  font-display: swap;
 }
 :root { --bg:#160709; --card:#240c12; --card2:#2d1018; --border:#54202b; --muted:#b7838d; --accent:#a31f35; --radius:20px; }
 html,body { height:100%; background:var(--bg); color:#fff; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
