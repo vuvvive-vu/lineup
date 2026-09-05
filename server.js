@@ -787,6 +787,8 @@ app.get('/api/rooms/:code', (req, res) => {
 
 // WebSocket
 const roomClients = new Map(); // code -> Set(ws)
+const roomDisconnectTimers = new Map();
+const hostDisconnectTimers = new Map();
 
 function uniquePresence(clients) {
   const users = new Map();
@@ -829,6 +831,13 @@ wss.on('connection', async (ws, req) => {
 
   if (!roomClients.has(code)) roomClients.set(code, new Set());
   const clients = roomClients.get(code);
+  const disconnectKey = `${code}:${ws.username}`;
+  clearTimeout(roomDisconnectTimers.get(disconnectKey));
+  roomDisconnectTimers.delete(disconnectKey);
+  clearTimeout(roomDisconnectTimers.get(code));
+  roomDisconnectTimers.delete(code);
+  clearTimeout(hostDisconnectTimers.get(code));
+  hostDisconnectTimers.delete(code);
   for (const oldClient of clients) {
     if (oldClient.username === ws.username) {
       oldClient.replaced = true;
@@ -969,24 +978,34 @@ wss.on('connection', async (ws, req) => {
     }
     if(!stillOnline && ws.userId) ephemeralUsers.delete(ws.userId);
     if (set.size === 0) {
-      roomClients.delete(code);
-      if (rooms[code]) {
-        delete rooms[code];
-        saveJson(ROOMS_FILE, rooms);
-        console.log(`Room ${code} deleted (empty)`);
-      }
+      const timer=setTimeout(()=>{
+        if(roomClients.get(code)?.size===0){
+          roomClients.delete(code);
+          if (rooms[code]) {
+            delete rooms[code];
+            saveJson(ROOMS_FILE, rooms);
+            console.log(`Room ${code} deleted (empty)`);
+          }
+        }
+        roomDisconnectTimers.delete(code);
+      },5000);
+      roomDisconnectTimers.set(code,timer);
       return;
     }
     if (wasHost && rooms[code]) {
-       const remainingWs=[...set];
-       const remainingUsers=uniquePresence(remainingWs);
-       const remaining=remainingUsers.map(c=>c.username);
-      const newHost = remaining[Math.floor(Math.random() * remaining.length)];
-      const oldHost = rooms[code].host;
-      rooms[code].host = newHost;
-      saveJson(ROOMS_FILE, rooms);
-      broadcast(code, { type: 'host_change', oldHost, newHost });
-       broadcast(code, { type: 'presence', users: remaining, usersDetailed: remainingUsers, count: remaining.length, host: newHost });
+      const timer=setTimeout(()=>{
+        if(!roomClients.get(code)?.size || [...roomClients.get(code)].some(c=>c.username===ws.username)) return;
+        const remainingWs=[...set];
+        const remainingUsers=uniquePresence(remainingWs);
+        const remaining=remainingUsers.map(c=>c.username);
+        const newHost = remaining[Math.floor(Math.random() * remaining.length)];
+        const oldHost = rooms[code].host;
+        rooms[code].host = newHost;
+        saveJson(ROOMS_FILE, rooms);
+        broadcast(code, { type: 'host_change', oldHost, newHost });
+        broadcast(code, { type: 'presence', users: remaining, usersDetailed: remainingUsers, count: remaining.length, host: newHost });
+      },5000);
+      hostDisconnectTimers.set(code,timer);
       broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
       return;
     }
