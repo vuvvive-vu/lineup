@@ -788,6 +788,20 @@ app.get('/api/rooms/:code', (req, res) => {
 // WebSocket
 const roomClients = new Map(); // code -> Set(ws)
 
+function uniquePresence(clients) {
+  const users = new Map();
+  for (const client of clients) {
+    if (!users.has(client.username)) {
+      users.set(client.username, {
+        username: client.username,
+        displayName: client.displayName || client.username,
+        avatar: client.avatar || ''
+      });
+    }
+  }
+  return [...users.values()];
+}
+
 wss.on('connection', async (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const code = (url.searchParams.get('code')||'').toUpperCase();
@@ -814,7 +828,15 @@ wss.on('connection', async (ws, req) => {
   }
 
   if (!roomClients.has(code)) roomClients.set(code, new Set());
-  roomClients.get(code).add(ws);
+  const clients = roomClients.get(code);
+  for (const oldClient of clients) {
+    if (oldClient.username === ws.username) {
+      oldClient.replaced = true;
+      clients.delete(oldClient);
+      try { oldClient.close(4001, 'Replaced by a newer connection'); } catch {}
+    }
+  }
+  clients.add(ws);
 
   const enriched = [];
   for (const m of rooms[code].messages.slice(-100)) {
@@ -831,8 +853,8 @@ wss.on('connection', async (ws, req) => {
   }
   ws.send(JSON.stringify({ type: 'init', room: rooms[code], host: rooms[code].host, messages: enriched, bans: rooms[code].bans || [] }));
   broadcast(code, { type: 'user_join', username: ws.username, avatar: ws.avatar, count: roomClients.get(code).size }, ws);
-  const presenceUsers=[...roomClients.get(code)].map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
-  broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: roomClients.get(code).size, host: rooms[code].host });
+  const presenceUsers=uniquePresence(clients);
+  broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: presenceUsers.length, host: rooms[code].host });
 
   ws.on('message', (data) => {
     try {
@@ -931,6 +953,11 @@ wss.on('connection', async (ws, req) => {
   ws.on('close', () => {
     const set = roomClients.get(code);
     if (!set) return;
+    if (ws.replaced) {
+      const presenceUsers=uniquePresence(set);
+      broadcast(code, { type: 'presence', users: presenceUsers.map(u=>u.username), usersDetailed: presenceUsers, count: presenceUsers.length, host: rooms[code]?.host });
+      return;
+    }
     const wasHost = rooms[code] && rooms[code].host === ws.username;
     set.delete(ws);
     // ephemeral user cleanup if no more connections with that id
@@ -951,22 +978,22 @@ wss.on('connection', async (ws, req) => {
       return;
     }
     if (wasHost && rooms[code]) {
-      const remainingWs=[...set];
-      const remaining=remainingWs.map(c=>c.username);
+       const remainingWs=[...set];
+       const remainingUsers=uniquePresence(remainingWs);
+       const remaining=remainingUsers.map(c=>c.username);
       const newHost = remaining[Math.floor(Math.random() * remaining.length)];
       const oldHost = rooms[code].host;
       rooms[code].host = newHost;
       saveJson(ROOMS_FILE, rooms);
       broadcast(code, { type: 'host_change', oldHost, newHost });
-      const presenceUsers2=remainingWs.map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
-      broadcast(code, { type: 'presence', users: remaining, usersDetailed: presenceUsers2, count: set.size, host: newHost });
+       broadcast(code, { type: 'presence', users: remaining, usersDetailed: remainingUsers, count: remaining.length, host: newHost });
       broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
       return;
     }
     broadcast(code, { type: 'user_leave', username: ws.username, count: set.size });
     if (rooms[code]) {
-      const presenceUsers3=[...set].map(c=>({username:c.username, displayName:c.displayName||c.username, avatar:c.avatar||''}));
-      broadcast(code, { type: 'presence', users: presenceUsers3.map(u=>u.username), usersDetailed: presenceUsers3, count: set.size, host: rooms[code].host });
+       const presenceUsers3=uniquePresence(set);
+       broadcast(code, { type: 'presence', users: presenceUsers3.map(u=>u.username), usersDetailed: presenceUsers3, count: presenceUsers3.length, host: rooms[code].host });
     }
   });
 });
