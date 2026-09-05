@@ -125,6 +125,7 @@ let iframe=null;
 let vkPlayer=null, ytPlayer=null, ytReady=false;
 let suppressSync=false; // prevent echo loop
 let lastHostMuted=null;
+let audioSyncPending=false;
 
 async function loadRoom(){
   const r=await fetch('/api/rooms/'+code);
@@ -208,7 +209,6 @@ setTimeout(()=>{ spawnMilana(); setTimeout(()=>spawnMilana(), 1200); setTimeout(
 function updateHostUI(){
   const isHost=me===host;
   if(guestPlayerLock) guestPlayerLock.style.display=isHost?'none':'block';
-  if(unmuteBtn && !isHost) unmuteBtn.style.display='none';
   if(hostHint){
     if(isHost){
       hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
@@ -224,14 +224,14 @@ if(unmuteBtn){
   // показывать кнопку звука всем (мобильный автоплей без звука)
   setTimeout(()=>{ unmuteBtn.style.display='block'; }, 900);
   unmuteBtn.onclick=()=>{
-    if(me!==host) return;
     try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
     try{ if(ytPlayer){ ytPlayer.unMute(); try{ytPlayer.setVolume(100);}catch{} } }catch{}
     try{ iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
     try{ iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
     try{ iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
-    sendSync('unmute', 0);
+    if(me===host) sendSync('unmute', 0);
     unmuteBtn.style.display='none';
+    audioSyncPending=false;
   };
 }
 let presenceAvatars={};
@@ -397,6 +397,7 @@ function initVK(){
   try{
     vkPlayer=VK.VideoPlayer(iframe);
   }catch(e){ console.log('vk init fail',e); return; }
+  if(audioSyncPending) applySync('unmute',0);
   let lastBroadcast=0;
   setInterval(()=>{
     if(me!==host || !vkPlayer) return;
@@ -445,6 +446,7 @@ function initYT(){
     events:{
       onReady:()=>{
         ytReady=true;
+        if(audioSyncPending) applySync('unmute',0);
         setInterval(()=>{
           if(me!==host || !ytReady || !ytPlayer) return;
           try{
@@ -504,11 +506,14 @@ function applySync(action,time){
   setTimeout(()=> suppressSync=false, 800);
 
   if(action==='unmute'){
+    audioSyncPending=true;
+    if(unmuteBtn) unmuteBtn.style.display='block';
     try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
     try{ if(ytPlayer){ ytPlayer.unMute(); ytPlayer.setVolume(100); } }catch{}
     try{ iframe?.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
     try{ iframe?.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
     try{ iframe?.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+    audioSyncPending=false;
     return;
   }
   if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
