@@ -132,7 +132,8 @@ async function loadRoom(){
   room=await r.json();
   host=room.host;
   document.getElementById('roomTitleTop').textContent=room.title;
-  document.getElementById('roomCodeTop').textContent=room.code;
+  const roomCodeTop=document.getElementById('roomCodeTop');
+  if(roomCodeTop) roomCodeTop.textContent=room.code;
   codeBox.textContent=room.code;
   linkBox.value=location.origin+'/room.html?code='+room.code;
   document.getElementById('roomInfo').textContent=`Видео: ${room.videoUrl}`;
