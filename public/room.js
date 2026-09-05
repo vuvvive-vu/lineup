@@ -220,18 +220,32 @@ function updateHostUI(){
   }
 }
 const unmuteBtn=document.getElementById('unmuteBtn');
+function tryUnmute(){
+  let attempted=false;
+  try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(100); attempted=true; } }catch{}
+  try{ if(ytPlayer){ ytPlayer.unMute(); ytPlayer.setVolume(100); attempted=true; } }catch{}
+  try{ if(iframe) iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
+  try{ if(iframe) iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
+  try{ if(iframe) iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+  return attempted;
+}
 if(unmuteBtn){
   // показывать кнопку звука всем (мобильный автоплей без звука)
   setTimeout(()=>{ unmuteBtn.style.display='block'; }, 900);
   unmuteBtn.onclick=()=>{
-    try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
-    try{ if(ytPlayer){ ytPlayer.unMute(); try{ytPlayer.setVolume(100);}catch{} } }catch{}
-    try{ iframe.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
-    try{ iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
-    try{ iframe.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
+    audioSyncPending=true;
+    tryUnmute();
     if(me===host) sendSync('unmute', 0);
-    unmuteBtn.style.display='none';
-    audioSyncPending=false;
+    let attempts=0;
+    const retry=setInterval(()=>{
+      attempts++;
+      const ready=tryUnmute();
+      if(ready || attempts>=10){
+        clearInterval(retry);
+        audioSyncPending=false;
+        unmuteBtn.style.display='none';
+      }
+    },500);
   };
 }
 let presenceAvatars={};
@@ -508,12 +522,7 @@ function applySync(action,time){
   if(action==='unmute'){
     audioSyncPending=true;
     if(unmuteBtn) unmuteBtn.style.display='block';
-    try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(1); } }catch{}
-    try{ if(ytPlayer){ ytPlayer.unMute(); ytPlayer.setVolume(100); } }catch{}
-    try{ iframe?.contentWindow.postMessage({method:'unmute'},'*'); }catch{}
-    try{ iframe?.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*'); }catch{}
-    try{ iframe?.contentWindow.postMessage({type:'player', action:'unmute'},'*'); }catch{}
-    audioSyncPending=false;
+    tryUnmute();
     return;
   }
   if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
