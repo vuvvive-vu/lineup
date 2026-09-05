@@ -907,7 +907,7 @@ wss.on('connection', async (ws, req) => {
           ws.send(JSON.stringify({ type: 'error', text: 'Только хост может управлять плеером' }));
           return;
         }
-        broadcast(code, { type: 'sync', action: msg.action, time: msg.time, from: ws.username }, null);
+        broadcast(code, { type: 'sync', action: msg.action, time: msg.time, playing: !!msg.playing, from: ws.username }, null);
       }
       if (msg.type === 'ban') {
         if (ws.username !== rooms[code].host) {

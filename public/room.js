@@ -114,7 +114,6 @@ const linkBox=document.getElementById('linkBox');
 const participantsList=document.getElementById('participantsList');
 const pCount=document.getElementById('pCount');
 const hostHint=document.getElementById('hostHint');
-const guestPlayerLock=document.getElementById('guestPlayerLock');
 const typingEl=document.getElementById('typing');
 let currentAvatar=localStorage.getItem('rave_ava')||'😎';
 let currentBio=localStorage.getItem('rave_bio')||'';
@@ -208,7 +207,6 @@ setTimeout(()=>{ spawnMilana(); setTimeout(()=>spawnMilana(), 1200); setTimeout(
 
 function updateHostUI(){
   const isHost=me===host;
-  if(guestPlayerLock) guestPlayerLock.style.display=isHost?'none':'block';
   if(hostHint){
     if(isHost){
       hostHint.textContent='Ты — хост 👑 Видео синхронно у всех — управляй плеером как обычно';
@@ -219,7 +217,7 @@ function updateHostUI(){
     }
   }
 }
-const unmuteBtn=document.getElementById('unmuteBtn');
+const unmuteBtn=null;
 function tryUnmute(){
   let attempted=false;
   try{ if(vkPlayer){ vkPlayer.unmute(); vkPlayer.setVolume(100); attempted=true; } }catch{}
@@ -418,8 +416,14 @@ function initVK(){
     try{
       const volume=vkPlayer.getVolume();
       const muted=volume===0;
-      if(lastHostMuted===true && !muted) sendSync('unmute',0);
       lastHostMuted=muted;
+      const state=vkPlayer.getState();
+      const playing=state===VK.VideoPlayer.States.PLAYING;
+      const now=Date.now();
+      if(now-lastBroadcast>900){
+        lastBroadcast=now;
+        sendSync('state', vkPlayer.getCurrentTime(), playing);
+      }
     }catch{}
   },700);
   // host -> broadcast
@@ -461,16 +465,15 @@ function initYT(){
       onReady:()=>{
         ytReady=true;
         if(audioSyncPending) applySync('unmute',0);
+        // polling for seek detection (host)
+        let last=0;
         setInterval(()=>{
           if(me!==host || !ytReady || !ytPlayer) return;
           try{
-            const muted=ytPlayer.isMuted();
-            if(lastHostMuted===true && !muted) sendSync('unmute',0);
-            lastHostMuted=muted;
+            const state=ytPlayer.getPlayerState();
+            sendSync('state', ytPlayer.getCurrentTime()||0, state===1);
           }catch{}
         },700);
-        // polling for seek detection (host)
-        let last=0;
         setInterval(()=>{
           if(me!==host||!ytReady||suppressSync) return;
           try{
@@ -506,25 +509,21 @@ function initYT(){
   },3000);
 }
 
-function sendSync(action,time){
+function sendSync(action,time,playing){
   if(me!==host) return;
   if(!ws||ws.readyState!==1) return;
   const t= typeof time==='number'? time : 0;
-  ws.send(JSON.stringify({type:'sync', action, time:t}));
+  ws.send(JSON.stringify({type:'sync', action, time:t, playing:!!playing}));
 }
 
-function applySync(action,time){
+function applySync(action,time,playing){
   const t= typeof time==='number'? time:0;
   // suppress echo for vk/yt events
   suppressSync=true;
   setTimeout(()=> suppressSync=false, 800);
 
-  if(action==='unmute'){
-    audioSyncPending=true;
-    if(unmuteBtn) unmuteBtn.style.display='block';
-    tryUnmute();
-    return;
-  }
+  if(action==='unmute') return;
+  if(action==='state') action=playing ? 'play' : 'pause';
   if(iframe && iframe.src.includes('youtube.com') && ytReady && ytPlayer){
     try{
       if(action==='play'){
@@ -655,7 +654,7 @@ function connect(){
       if(data.action==='time'){
         applySync('time', data.time);
       } else {
-        applySync(data.action, data.time);
+        applySync(data.action, data.time, data.playing);
       }
     }
     if(data.type==='error'){}
