@@ -444,6 +444,13 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .welcome-btn:hover { background:#e8e8e8; transform:translateY(-1px); box-shadow:0 4px 20px rgba(255,255,255,.15); }
 .welcome-btn:active { transform:scale(0.98); }
 
+/* profile modals follow the burgundy theme */
+.profile-view-modal { background:#240c12 !important; border-color:#54202b !important; }
+.profile-view-modal > div:first-child button.x { background:#32101a !important; border-color:#702333 !important; }
+.profile-view-modal [id$="InfoCard"], .profile-view-modal [id$="ProfileCard"] { background:#2d1018 !important; border-color:#54202b !important; }
+.profile-modal { background:#240c12 !important; border-color:#54202b !important; }
+.profile-modal .handle-input { background:#1b080d !important; }
+
 /* dark burgundy theme */
 html, body { background:#160709; }
 .topbar, .player-wrap, .chat, .side { background:#160709; }
