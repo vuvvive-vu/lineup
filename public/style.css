@@ -316,8 +316,8 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 }
 /* legacy alias */
 .creator-badge-text { display:inline-block; background: linear-gradient(135deg, #e0f2ff, #bae6ff); color:#0a3a52; padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; margin-top:6px; box-shadow: 0 2px 10px rgba(224,242,255,0.4); }
-.profile-badge-picker { width:100%; margin-top:12px; position:relative; }
-.profile-badge-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; background:#1b080d; color:#fff; border:1px solid #54202b; border-radius:12px; padding:10px 12px; font-size:12px; font-weight:700; }
+.profile-badge-picker { width:100%; position:relative; }
+.profile-badge-toggle { width:100%; display:flex; align-items:center; justify-content:space-between; background:#0a0a0a; color:#fff; border:1px solid var(--border); border-radius:12px; padding:12px 14px; font-size:14px; font-weight:400; font-family:inherit; text-align:left; }
 .profile-badge-toggle svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; transition:transform .2s ease; }
 .profile-badge-picker.open .profile-badge-toggle svg { transform:rotate(180deg); }
 .profile-badge-options { max-height:0; overflow:hidden; opacity:0; transition:max-height .25s ease, opacity .2s ease; }
