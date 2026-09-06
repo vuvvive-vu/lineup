@@ -45,7 +45,8 @@ function token(){ return localStorage.getItem('rave_token'); }
 const BADGE_PRESETS_CLIENT = {
   founder: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
   developer: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true }, // legacy alias
-  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true }
+  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true },
+  boo: { label: 'BOO!', theme: 'pumpkin', icon: null, glow: true, witches: true }
 };
 
 function setToken(t, displayName, username, ava, bio, badgeOrCreator){
@@ -737,7 +738,7 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
   const heartIcon = avaWrap.querySelector('.heart-icon');
   const currentBadge = avaWrap.dataset.badge || null;
   // если тот же бейдж и частицы уже есть - не пересоздаём
-  if (currentBadge === badge && badge && (avaWrap.querySelectorAll('.snowflake').length >= 10 || avaWrap.querySelectorAll('.petal').length >= 8)) {
+  if (currentBadge === badge && badge && (avaWrap.querySelectorAll('.snowflake').length >= 10 || avaWrap.querySelectorAll('.petal').length >= 8 || avaWrap.querySelectorAll('.boo-witch').length >= 3)) {
     const cfgEarly = BADGE_PRESETS_CLIENT[badge];
     if (crownIcon) crownIcon.style.display = (cfgEarly && cfgEarly.icon==='crown' ? 'block' : 'none');
     if (heartIcon) heartIcon.style.display = (cfgEarly && cfgEarly.icon==='heart' ? 'block' : 'none');
@@ -745,9 +746,10 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
     return;
   }
   // очистить старые бейдж-классы
-  avaWrap.classList.remove('creator-badge', 'badge-developer', 'badge-founders_wife', 'badge-snow');
+  avaWrap.classList.remove('creator-badge', 'badge-developer', 'badge-founders_wife', 'badge-boo', 'badge-snow');
   avaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
   avaWrap.querySelectorAll('.petal').forEach(s => s.remove());
+  avaWrap.querySelectorAll('.boo-witch').forEach(s => s.remove());
   delete avaWrap.dataset.badge;
   if (crownIcon) crownIcon.style.display = 'none';
   if (heartIcon) heartIcon.style.display = 'none';
@@ -773,6 +775,21 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
   }
   if (cfg.snow) createSnowflakes(avaWrap);
   if (cfg.petals) createPetals(avaWrap);
+  if (cfg.witches) createBooWitches(avaWrap);
+}
+
+function createBooWitches(container) {
+  container.querySelectorAll('.boo-witch').forEach(s => s.remove());
+  [0, 1, 2].forEach((i) => {
+    const witch = document.createElement('img');
+    witch.className = 'boo-witch';
+    witch.src = '/assets/witch.png';
+    witch.alt = '';
+    witch.style.setProperty('--boo-y', `${28 + i * 24}%`);
+    witch.style.setProperty('--boo-delay', `${i * -2.2}s`);
+    witch.style.setProperty('--boo-size', `${22 + (i % 2) * 5}px`);
+    container.appendChild(witch);
+  });
 }
 
 function createPetals(container) {

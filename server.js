@@ -18,6 +18,7 @@ const JWT_EXPIRES = '30d';
 const BADGE_PRESETS = {
   founder: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
   founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true },
+  boo: { label: 'BOO!', theme: 'pumpkin', icon: null, glow: true, witches: true },
 };
 const ALLOWED_BADGES = Object.keys(BADGE_PRESETS);
 

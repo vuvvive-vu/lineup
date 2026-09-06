@@ -8,7 +8,8 @@ if(!token) location.href='/?needAuth=1';
 const BADGE_PRESETS_CLIENT_R = {
   founder: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
   developer: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
-  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true }
+  founders_wife: { label: "FOUNDER'S WIFE", theme: 'sakura', icon: 'heart', glow: true, petals: true },
+  boo: { label: 'BOO!', theme: 'pumpkin', icon: null, glow: true, witches: true }
 };
 function getBadgeLocalR(){ const b=localStorage.getItem('rave_badge'); if(b) { let v=b.toLowerCase(); if(v==='developer') v='founder'; return v; } if(localStorage.getItem('rave_isCreator')==='1') return 'founder'; return null; }
 function setBadgeLocalR(badge){ if(badge){ localStorage.setItem('rave_badge', String(badge).toLowerCase()); localStorage.setItem('rave_isCreator','1'); } else { localStorage.removeItem('rave_badge'); localStorage.setItem('rave_isCreator','0'); } }
@@ -16,16 +17,17 @@ function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
   if(!avaWrap) return;
   const heartIcon = avaWrap.querySelector('.heart-icon');
   const cur=avaWrap.dataset.badge||null;
-  if(cur===badge && badge && (avaWrap.querySelectorAll('.snowflake').length>=10 || avaWrap.querySelectorAll('.petal').length>=8)){
+  if(cur===badge && badge && (avaWrap.querySelectorAll('.snowflake').length>=10 || avaWrap.querySelectorAll('.petal').length>=8 || avaWrap.querySelectorAll('.boo-witch').length>=3)){
     const cfgEarly=BADGE_PRESETS_CLIENT_R[badge];
     if(crownIcon) crownIcon.style.display=(cfgEarly && cfgEarly.icon==='crown'?'block':'none');
     if(heartIcon) heartIcon.style.display=(cfgEarly && cfgEarly.icon==='heart'?'block':'none');
     if(badgeEl) badgeEl.style.display=badge && !isGuest?'inline-block':'none';
     return;
   }
-  avaWrap.classList.remove('creator-badge','badge-developer','badge-founders_wife','badge-snow');
+  avaWrap.classList.remove('creator-badge','badge-developer','badge-founders_wife','badge-boo','badge-snow');
   avaWrap.querySelectorAll('.snowflake').forEach(s=>s.remove());
   avaWrap.querySelectorAll('.petal').forEach(s=>s.remove());
+  avaWrap.querySelectorAll('.boo-witch').forEach(s=>s.remove());
   delete avaWrap.dataset.badge;
   if(crownIcon) crownIcon.style.display='none';
   if(heartIcon) heartIcon.style.display='none';
@@ -41,6 +43,21 @@ function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
   if(badgeEl){ badgeEl.textContent=cfg.label||badge.toUpperCase(); badgeEl.style.display='inline-block'; }
   if(cfg.snow) createSnowflakesRoom(avaWrap);
   if(cfg.petals) createPetalsRoom(avaWrap);
+  if(cfg.witches) createBooWitchesRoom(avaWrap);
+}
+
+function createBooWitchesRoom(container){
+  container.querySelectorAll('.boo-witch').forEach(s=>s.remove());
+  [0,1,2].forEach((i)=>{
+    const witch=document.createElement('img');
+    witch.className='boo-witch';
+    witch.src='/assets/witch.png';
+    witch.alt='';
+    witch.style.setProperty('--boo-y', `${28+i*24}%`);
+    witch.style.setProperty('--boo-delay', `${i*-2.2}s`);
+    witch.style.setProperty('--boo-size', `${22+(i%2)*5}px`);
+    container.appendChild(witch);
+  });
 }
 
 function createPetalsRoom(container){

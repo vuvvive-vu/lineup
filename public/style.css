@@ -283,6 +283,12 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
   box-shadow: 0 2px 12px rgba(255,158,191,.45), 0 0 20px rgba(255,182,217,.3) !important;
   border-color: rgba(255,182,217,.4) !important;
 }
+.badge-boo { position:relative; }
+.badge-boo .profile-ava-large { border-color:#f28c28 !important; box-shadow:0 0 22px rgba(242,140,40,.55),0 0 42px rgba(163,31,53,.25); animation:booGlow 3s ease-in-out infinite; }
+.badge-boo .creator-badge-text { background:linear-gradient(135deg,#ffb347,#e86b16) !important; color:#321205 !important; box-shadow:0 2px 12px rgba(242,140,40,.5) !important; }
+@keyframes booGlow { 0%,100%{box-shadow:0 0 22px rgba(242,140,40,.45),0 0 42px rgba(163,31,53,.2)} 50%{box-shadow:0 0 32px rgba(242,140,40,.75),0 0 52px rgba(163,31,53,.35)} }
+.boo-witch { position:absolute; left:-34px; top:var(--boo-y); width:var(--boo-size); height:auto; pointer-events:none; z-index:6; opacity:.9; filter:drop-shadow(0 0 5px rgba(242,140,40,.8)); animation:booFly 7s ease-in-out var(--boo-delay) infinite alternate; }
+@keyframes booFly { from { transform:translateX(0) rotate(-5deg); } to { transform:translateX(250px) rotate(5deg); } }
 @keyframes sakuraGlow {
   0%,100% { box-shadow: 0 0 22px rgba(255,182,217,.45), 0 0 40px rgba(255,158,191,.18); }
   50% { box-shadow: 0 0 30px rgba(255,182,217,.65), 0 0 50px rgba(255,158,191,.3); }
