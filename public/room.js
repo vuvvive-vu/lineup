@@ -303,21 +303,21 @@ function renderBans(){
     el.appendChild(d);
   });
 }
-function addMessage({username,text,ts,avatar,image},isMe){
+function addMessage({username,text,ts,avatar,image,system},isMe){
   if(typingUsers[username]){ delete typingUsers[username]; renderTyping(); }
   const ava=avatar||getAvatarFor(username, '😎');
   const mid=`${username}-${ts}`;
   const d=document.createElement('div');
-  d.className='msg'+(isMe?' me':'');
+   d.className='msg'+(isMe?' me':'')+(system?' system-msg':'');
   d.dataset.id=mid;
   const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const avaInner=isPhotoAva(ava)?`<img src="${ava}" alt="">`:escapeHtml(ava);
-  const avaEl=`<div class="msg-avatar" data-user="${escapeHtml(username)}" title="${escapeHtml(username)}">${avaInner}</div>`;
+   const avaEl=`<div class="msg-avatar"${system?'':' data-user="'+escapeHtml(username)+'" title="'+escapeHtml(username)+'"'}>${avaInner}</div>`;
   const imgHtml=image ? `<img class="msg-image" src="${image}" alt="photo" loading="lazy" />` : '';
   const textHtml=text ? escapeHtml(text) : '';
   d.innerHTML=`${avaEl}<div class="msg-content"><div class="meta">${escapeHtml(username)} · ${t}</div><div class="bubble" data-id="${mid}">${textHtml}${imgHtml}</div><div class="reactions" id="react-${mid}" style="display:none;gap:4px;margin-top:4px;"></div></div>`;
   const avaDom=d.querySelector('.msg-avatar');
-  if(avaDom) avaDom.onclick=()=> openViewProfile(username);
+   if(avaDom && !system) avaDom.onclick=()=> openViewProfile(username);
 
   const bubble=d.querySelector('.bubble');
   setupLongPress(bubble, mid, username);

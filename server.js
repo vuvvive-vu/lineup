@@ -771,7 +771,12 @@ app.post('/api/rooms', async (req, res) => {
     embedUrl,
     host: user.username,
     createdAt: new Date().toISOString(),
-    messages: [],
+     messages: [{
+       username: 'Togetherly System',
+       text: 'Поддержите проект подпиской на телеграм канал t.me/togetherlyonl\n\nПриятного просмотра!🎬',
+       ts: Date.now(),
+       system: true
+     }],
     bans: []
   };
   rooms[code] = room;

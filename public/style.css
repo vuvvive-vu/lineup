@@ -122,6 +122,9 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .msg-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
 .msg-content { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
 .msg .meta { font-size:11px; color:var(--muted); }
+.system-msg .msg-avatar { background:#a31f35; border-color:#d8757d; color:#fff; }
+.system-msg .meta { color:#d8757d; font-weight:700; }
+.system-msg .bubble { white-space:pre-line; }
 .msg .bubble { background:#111; border:1px solid var(--border); padding:9px 12px; border-radius:14px; font-size:13px; line-height:1.45; transition: transform .15s ease, border-color .15s ease; word-break:break-word; cursor:pointer; position:relative; user-select:none; }
 .msg .bubble:hover { border-color:#2a2a2a; }
 .msg:hover .bubble { transform: none; }
