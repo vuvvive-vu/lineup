@@ -140,12 +140,12 @@
         <div id="changePhotoLink" data-i18n="Изменить фотографию" style="font-size:14px;color:#4ade80;cursor:pointer;margin-top:10px;font-weight:600;">Изменить фотографию</div>
         <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <div style="font-size:11px;color:var(--muted);margin-top:6px;">до 2MB • PNG, JPG, WEBP</div>
-          <div class="field" style="margin-top:14px;">
-            <label>Бейджи</label>
-            <div class="profile-badge-picker" id="profileBadgePicker" style="display:none;"><button type="button" class="profile-badge-toggle" id="profileBadgeToggle"><span id="profileBadgeCurrent">Бейдж</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="profile-badge-options" id="profileBadgeOptions"></div></div>
-          </div>
       </div>
-      <div class="field" style="margin-top:18px;">
+      <div class="field" style="margin-top:14px;" id="profileBadgeField">
+        <label data-i18n="Бейджи">Бейджи</label>
+        <div class="profile-badge-picker" id="profileBadgePicker" style="display:none;width:100%;"><button type="button" class="profile-badge-toggle" id="profileBadgeToggle"><span id="profileBadgeCurrent">Бейдж</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="profile-badge-options" id="profileBadgeOptions"></div></div>
+      </div>
+      <div class="field" style="margin-top:14px;">
         <label data-i18n="Имя">Имя</label>
         <input id="eDisplayName" placeholder="ваше имя" maxlength="20" data-i18n-placeholder="ваше имя" />
       </div>

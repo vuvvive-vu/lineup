@@ -1100,10 +1100,10 @@ function openEditRoom(){
 function buildProfileBadgePickerRoomUI(badges, active){
   const picker=document.getElementById('profileBadgePicker'), options=document.getElementById('profileBadgeOptions');
   if(!picker||!options) return;
-  const label=document.getElementById('profileBadgeLabel');
+  const field=document.getElementById('profileBadgeField');
   const curEl=document.getElementById('profileBadgeCurrent');
   picker.style.display=badges.length?'block':'none';
-  if(label) label.style.display=badges.length?'block':'none';
+  if(field) field.style.display=badges.length?'':'none';
   if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[active]?.label||'Без бейджа';
   if(active && window.pendingActiveBadgeRoom===undefined) window.pendingActiveBadgeRoom=active;
   const activeToUse=window.pendingActiveBadgeRoom||active;

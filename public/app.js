@@ -887,10 +887,10 @@ function buildProfileBadgePickerUI(badges, active){
   const picker=document.getElementById('profileBadgePicker');
   const options=document.getElementById('profileBadgeOptions');
   if(!picker||!options) return;
-  const label=document.querySelector('.profile-badge-label');
+  const field=document.getElementById('profileBadgeField');
   const curEl=document.getElementById('profileBadgeCurrent');
   picker.style.display=badges.length?'block':'none';
-  if(label) label.style.display=badges.length?'block':'none';
+  if(field) field.style.display=badges.length?'':'none';
   if(curEl) curEl.textContent=(BADGE_PRESETS_CLIENT[active]?.label||'Без бейджа');
   // pending default = active if not set yet
   if(active && window.pendingActiveBadge===undefined) window.pendingActiveBadge=active;
