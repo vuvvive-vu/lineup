@@ -74,7 +74,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .card:hover { border-color:#2d2d2d; transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,0,0,.5); }
 .card-icon { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; background:#1c1c1c; border:1px solid var(--border); transition: transform .2s ease; flex:0 0 44px; }
 .card-icon svg { width:21px; height:21px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.card:hover .card-icon { transform: scale(1.05) rotate(3deg); }
+.card:hover .card-icon { transform: scale(1.05); }
 .card h3 { font-size:17px; font-weight:700; }
 .card p { color:var(--muted); font-size:13px; line-height:1.5; margin-top:2px; }
 .card .btn-primary { margin-top:auto; transition: transform .15s ease, background .15s ease; }
