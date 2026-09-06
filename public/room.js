@@ -138,7 +138,7 @@ async function loadRoom(){
   linkBox.value=location.origin+'/room.html?code='+room.code;
   document.getElementById('roomInfo').textContent=`Видео: ${room.videoUrl}`;
   document.getElementById('platformBadge').textContent=room.platform.toUpperCase();
-  document.getElementById('hostBadge').textContent='хост: '+room.host;
+  document.getElementById('hostBadge').textContent='Хост: '+room.host;
 
   let src=room.embedUrl;
   const raw=room.videoUrl||src;
@@ -187,16 +187,17 @@ function spawnMilana(){
   // even vertical distribution
   milanaYSeed = (milanaYSeed + 37) % 60;
   const y = 18 + milanaYSeed + (Math.random()*6 -3);
-  // side zones only (not over player center) - keep in dark gutters
-  const isLeft = Math.random() < 0.5;
-  const x = isLeft ? (5 + Math.random()*9) : (85 + Math.random()*9);
-  el.style.left=x+'%';
+  // Match the lobby scale and keep the decoration from covering the room UI.
+  const x = 4 + Math.random()*88;
+  const isLeft = x > 28 && x < 72;
+  const finalX = isLeft ? (Math.random()<0.5 ? (6+Math.random()*14) : (80+Math.random()*14)) : x;
+  el.style.left=finalX+'%';
   el.style.top=y+'%';
   const dur = 13 + Math.random()*2.5;
   el.style.animationDuration=dur+'s';
   // tiny stagger for smoothness, not sharp
   el.style.animationDelay='0.08s';
-  el.style.fontSize=(14 + Math.random()*1.5)+'px';
+  el.style.width=(24 + Math.random()*10)+'px';
   // subtle opacity variation
   el.style.opacity = (0.11 + Math.random()*0.04).toString();
   target.appendChild(el);
@@ -639,7 +640,7 @@ function connect(){
     }
     if(data.type==='host_change'){
       host=data.newHost;
-      document.getElementById('hostBadge').textContent='хост: '+data.newHost;
+      document.getElementById('hostBadge').textContent='Хост: '+data.newHost;
       updateHostUI();
     }
     if(data.type==='user_join'){}
