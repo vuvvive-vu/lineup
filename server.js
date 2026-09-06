@@ -22,6 +22,10 @@ const BADGE_PRESETS = {
 };
 const ALLOWED_BADGES = Object.keys(BADGE_PRESETS);
 
+// BOO! автovыдача до конца Хэллоуина (всем зарегистрированным при первом заходе)
+const BOO_AUTO_UNTIL = new Date(process.env.BOO_AUTO_UNTIL || '2026-11-01T00:00:00Z');
+function isBooAutoActive() { return Date.now() < BOO_AUTO_UNTIL.getTime(); }
+
 // Creator fallback - для миграции старого @owner без badge
 const CREATOR_USERNAME = process.env.CREATOR_USERNAME || 'owner';
 let CREATOR_ID = process.env.CREATOR_ID || null;
@@ -626,16 +630,34 @@ app.get('/api/me', async (req, res) => {
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   const isGuest = !user.email;
-  const badge = getBadgeState(user);
-  res.json({ 
-    displayName: user.display_name || user.displayName || user.username, 
-    username: user.username || null, 
-    avatar: user.avatar || '', 
-    bio: user.bio || '', 
-    email: user.email || null, 
-    emailVerified: user.email_verified || false, 
+  let badge = getBadgeState(user);
+  let booJustGranted = false;
+  // Автовыдача BOO! зарегистрированным до конца Хэллоуина (не меняем активный бейдж)
+  if (!isGuest && isBooAutoActive() && !badge.badges.includes('boo')) {
+    const newBadges = [...badge.badges, 'boo'];
+    const active = badge.activeBadge;
+    try {
+      if (db.isEnabled()) {
+        await db.setUserBadges(user.id, newBadges, active);
+      } else {
+        user.badges = newBadges;
+        user.active_badge = active;
+        user.badge = active;
+      }
+      badge = { badges: newBadges, activeBadge: active, badge: active };
+      booJustGranted = true;
+    } catch (e) { console.error('boo auto-grant error:', e.message); }
+  }
+  res.json({
+    displayName: user.display_name || user.displayName || user.username,
+    username: user.username || null,
+    avatar: user.avatar || '',
+    bio: user.bio || '',
+    email: user.email || null,
+    emailVerified: user.email_verified || false,
     isGuest,
     ...badge,
+    booJustGranted,
     isCreator: !!badge.activeBadge
   });
 });

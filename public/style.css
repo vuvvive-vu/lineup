@@ -466,6 +466,9 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .welcome-text a { color:#d8757d; text-decoration:underline; text-underline-offset:3px; text-decoration-color:#702333; transition:text-decoration-color .2s; }
 .welcome-text a:hover { text-decoration-color:#c24858; }
 .welcome-footer { font-family:'TDIzbushka',serif; font-size:13px; color:#9b6851; margin:24px 0 24px; line-height:1.6; letter-spacing:0.02em; }
+.boo-howto { text-align:left; background:#1b080d; border:1px solid #54202b; border-radius:14px; padding:14px 16px; margin:16px 0 20px; }
+.boo-howto-title { font-size:13px; font-weight:700; color:#ff9d3d; margin-bottom:8px; }
+.boo-howto ol { margin:0; padding-left:20px; font-size:13px; line-height:1.65; color:#d0a58c; font-family:'TDIzbushka',serif; }
 .welcome-btn { width:100%; background:#fff; color:#000; border:none; padding:14px; border-radius:999px; font-family:'TDIzbushka',serif; font-weight:700; font-size:14px; cursor:pointer; transition:all .2s; }
 .welcome-btn:hover { background:#e8e8e8; transform:translateY(-1px); box-shadow:0 4px 20px rgba(255,255,255,.15); }
 .welcome-btn:active { transform:scale(0.98); }

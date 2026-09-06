@@ -971,7 +971,7 @@ let currentUsernameRoom=localStorage.getItem('rave_user')||'';
 (async()=>{
   try{
     const r=await fetch('/api/me', {headers:{Authorization:'Bearer '+token}});
-    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); setBadgeLocalR(j.badge || (j.isCreator ? 'founder' : null)); }
+    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); setBadgeLocalR(j.activeBadge || j.badge || (j.isCreator ? 'founder' : null)); try{ if(j.badges) localStorage.setItem('rave_badges', JSON.stringify(j.badges)); }catch{} if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModalRoom(); }
   }catch{}
   injectProfileBtn();
 })();
@@ -1097,19 +1097,50 @@ function openEditRoom(){
   if(editModalRoom) editModalRoom.classList.add('show');
   setTimeout(()=>{ const st=document.getElementById('eUsernameStatus'); if(eUsernameRoom && st) eUsernameRoom.dispatchEvent(new Event('input')); }, 50);
 }
+function buildProfileBadgePickerRoomUI(badges, active){
+  const picker=document.getElementById('profileBadgePicker'), options=document.getElementById('profileBadgeOptions');
+  if(!picker||!options) return;
+  const label=document.getElementById('profileBadgeLabel');
+  const curEl=document.getElementById('profileBadgeCurrent');
+  picker.style.display=badges.length?'block':'none';
+  if(label) label.style.display=badges.length?'block':'none';
+  if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[active]?.label||'Без бейджа';
+  if(active && window.pendingActiveBadgeRoom===undefined) window.pendingActiveBadgeRoom=active;
+  const activeToUse=window.pendingActiveBadgeRoom||active;
+  if(curEl && activeToUse) curEl.textContent=BADGE_PRESETS_CLIENT_R[activeToUse]?.label||activeToUse.toUpperCase();
+  options.innerHTML='<div><div></div></div>';
+  const inner=options.firstChild.firstChild;
+  badges.forEach(b=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='profile-badge-option'+(b===activeToUse?' active':''); btn.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); btn.onclick=()=>{ window.pendingActiveBadgeRoom=b; if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); inner.querySelectorAll('button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); picker.classList.remove('open'); applyBadgeToProfileR(document.getElementById('pAvaWrap'),document.getElementById('pCrownIcon'),document.getElementById('pCreatorBadge'),b,false); }; inner.appendChild(btn); });
+}
 function loadProfileBadgePickerRoom(){
   const picker=document.getElementById('profileBadgePicker'), options=document.getElementById('profileBadgeOptions'), toggle=document.getElementById('profileBadgeToggle');
   if(!picker||!options||!toggle) return;
+  toggle.onclick=()=>picker.classList.toggle('open');
+  try{
+    const cached=JSON.parse(localStorage.getItem('rave_badges')||'[]');
+    const cachedActive=localStorage.getItem('rave_badge')||null;
+    if(cached.length) buildProfileBadgePickerRoomUI(cached, cachedActive);
+    else {
+      // fallback single badge
+      const single=getBadgeLocalR();
+      if(single) buildProfileBadgePickerRoomUI([single], single);
+    }
+  }catch{}
   fetch('/api/me',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
     const badges=j.badges||[], active=j.activeBadge||j.badge;
-    picker.style.display=badges.length?'block':'none';
-    const curEl=document.getElementById('profileBadgeCurrent');
-    if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[active]?.label||'Без бейджа';
-    options.innerHTML='<div><div></div></div>';
-    const inner=options.firstChild.firstChild;
-    badges.forEach(b=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='profile-badge-option'+(b===active?' active':''); btn.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); btn.onclick=()=>{ window.pendingActiveBadgeRoom=b; if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); inner.querySelectorAll('button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); picker.classList.remove('open'); applyBadgeToProfileR(document.getElementById('pAvaWrap'),document.getElementById('pCrownIcon'),document.getElementById('pCreatorBadge'),b,false); }; inner.appendChild(btn); });
+    // кэшируем для мгновенного показа в следующий раз
+    try{ localStorage.setItem('rave_badges', JSON.stringify(badges)); }catch{}
+    if(active) setBadgeLocalR(active);
+    buildProfileBadgePickerRoomUI(badges, active);
+    if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModalRoom();
   }).catch(()=>{});
-  toggle.onclick=()=>picker.classList.toggle('open');
+}
+function showBooModalRoom(){
+  const m=document.getElementById('booModal');
+  if(!m) return;
+  m.classList.add('show');
+  const btn=document.getElementById('booContinue');
+  if(btn) btn.onclick=()=>{ m.classList.remove('show'); sessionStorage.setItem('boo_granted_shown','1'); };
 }
 function closeEditRoom(){ if(editModalRoom) editModalRoom.classList.remove('show'); }
 if(profileModalRoom){
