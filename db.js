@@ -61,6 +61,8 @@ async function initSchema() {
   if (!existing.includes('reset_expires')) await pool.query('ALTER TABLE users ADD COLUMN reset_expires TIMESTAMP');
   if (!existing.includes('display_name')) await pool.query('ALTER TABLE users ADD COLUMN display_name VARCHAR(64)');
   if (!existing.includes('badge')) await pool.query("ALTER TABLE users ADD COLUMN badge TEXT DEFAULT NULL");
+  if (!existing.includes('badges')) await pool.query("ALTER TABLE users ADD COLUMN badges TEXT DEFAULT '[]'");
+  if (!existing.includes('active_badge')) await pool.query("ALTER TABLE users ADD COLUMN active_badge TEXT DEFAULT NULL");
   // ensure username is lowercase unique index
   try { await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username))'); } catch {}
   // backfill display_name for old rows
@@ -79,7 +81,7 @@ function genToken() {
 
 async function getUserById(id) {
   const { rows } = await pool.query(
-    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge FROM users WHERE id=$1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge FROM users WHERE id=$1',
     [id]
   );
   return rows[0] || null;
@@ -87,7 +89,7 @@ async function getUserById(id) {
 
 async function getUserByUsername(username) {
   const { rows } = await pool.query(
-    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1',
     [username]
   );
   return rows[0] || null;
@@ -139,13 +141,20 @@ async function setUserBadge(id, badge) {
   return getUserById(id);
 }
 
+async function setUserBadges(id, badges, activeBadge) {
+  const list = [...new Set((Array.isArray(badges) ? badges : []).map(v => String(v).toLowerCase().slice(0,32)))];
+  const active = list.includes(activeBadge) ? activeBadge : (list[0] || null);
+  await pool.query('UPDATE users SET badges=$1, active_badge=$2, badge=$2 WHERE id=$3', [JSON.stringify(list), active, id]);
+  return getUserById(id);
+}
+
 async function countUsers() {
   const { rows } = await pool.query('SELECT COUNT(*) AS c FROM users');
   return Number(rows[0].c);
 }
 
 async function getAllUsers() {
-  const { rows } = await pool.query('SELECT id, username, display_name, email, avatar, bio, email_verified, badge, created_at FROM users ORDER BY created_at DESC');
+  const { rows } = await pool.query('SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge, created_at FROM users ORDER BY created_at DESC');
   return rows;
 }
 
@@ -153,7 +162,7 @@ async function getAllUsers() {
 
 async function getUserByEmail(email) {
   const { rows } = await pool.query(
-    'SELECT id, username, display_name, email, password_hash, avatar, bio, email_verified, badge, verify_token, reset_token, reset_expires FROM users WHERE email=$1 LIMIT 1',
+    'SELECT id, username, display_name, email, password_hash, avatar, bio, email_verified, badge, badges, active_badge, verify_token, reset_token, reset_expires FROM users WHERE email=$1 LIMIT 1',
     [email]
   );
   return rows[0] || null;
@@ -226,7 +235,7 @@ module.exports = {
   get poolRef(){ return pool; },
   getUserById, getUserByUsername, getUserByEmail,
   createAccount, createAccountWithAuth,
-  deleteAccount, updateUserProfileById, setUserBadge,
+  deleteAccount, updateUserProfileById, setUserBadge, setUserBadges,
   countUsers, getAllUsers,
   setVerifyToken, verifyEmail, verifyEmailByCode,
   setResetToken, resetPassword, verifyPassword,

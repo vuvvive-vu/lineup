@@ -91,6 +91,10 @@ function setBadgeLocal(badge) {
     localStorage.setItem('rave_isCreator', '0');
   }
 }
+function setBadgeStateLocal(badges, active) {
+  localStorage.setItem('rave_badges', JSON.stringify(Array.isArray(badges) ? badges : []));
+  setBadgeLocal(active || null);
+}
 function getDisplayName(){ return localStorage.getItem('rave_display') || localStorage.getItem('rave_user') || 'гость'; }
 function getUsername(){ return localStorage.getItem('rave_user') || ''; }
 async function logout(){
@@ -721,9 +725,9 @@ function openProfile(){
     if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    let badge = j.badge || (j.isCreator ? 'founder' : null);
-    if (badge === 'developer') badge = 'founder';
-    setBadgeLocal(badge);
+     let badge = j.activeBadge || j.badge || (j.isCreator ? 'founder' : null);
+     if (badge === 'developer') badge = 'founder';
+     setBadgeStateLocal(j.badges || (badge ? [badge] : []), badge);
     // Show badge (server truth)
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
@@ -780,14 +784,17 @@ function applyBadgeToProfile(avaWrap, crownIcon, badgeEl, badge, isGuest) {
 
 function createBooWitches(container) {
   container.querySelectorAll('.boo-witch').forEach(s => s.remove());
-  [0, 1, 2].forEach((i) => {
+  [0, 1, 2, 3, 4, 5, 6].forEach((i) => {
     const witch = document.createElement('img');
     witch.className = 'boo-witch';
     witch.src = '/assets/witch.png';
     witch.alt = '';
-    witch.style.setProperty('--boo-y', `${28 + i * 24}%`);
-    witch.style.setProperty('--boo-delay', `${i * -2.2}s`);
-    witch.style.setProperty('--boo-size', `${22 + (i % 2) * 5}px`);
+    witch.style.top = `${12 + (i % 4) * 22}%`;
+    witch.style.left = `${i % 2 ? 8 : 78}%`;
+    witch.style.setProperty('--boo-delay', `${i * -1.7}s`);
+    witch.style.setProperty('--boo-size', `${20 + (i % 3) * 5}px`);
+    witch.style.setProperty('--boo-x', `${i % 2 ? 210 : -210}px`);
+    witch.style.setProperty('--boo-y', `${i % 2 ? -34 : 34}px`);
     container.appendChild(witch);
   });
 }
@@ -858,11 +865,32 @@ function openEdit(){
     eEmail.textContent = em || '—';
   }
   renderAvaLargeElNew(eAvaLarge, ava, disp);
+  loadProfileBadgePicker();
   hideError(pError);
   profileModal.classList.remove('show');
   if(editModal) editModal.classList.add('show');
   // trigger handle check to show current status
   setTimeout(()=>{ const st=document.getElementById('eUsernameStatus'); if(eUsername && st){ eUsername.dispatchEvent(new Event('input')); } }, 50);
+}
+function loadProfileBadgePicker(){
+  const picker=document.getElementById('profileBadgePicker');
+  const options=document.getElementById('profileBadgeOptions');
+  const toggle=document.getElementById('profileBadgeToggle');
+  if(!picker||!options||!toggle) return;
+  fetch('/api/me',{headers:{Authorization:'Bearer '+token()}}).then(r=>r.json()).then(j=>{
+    const badges=j.badges||[]; const active=j.activeBadge||j.badge;
+    picker.style.display=badges.length?'block':'none';
+    const curEl=document.getElementById('profileBadgeCurrent');
+    if(curEl) curEl.textContent=(BADGE_PRESETS_CLIENT[active]?.label||'Без бейджа');
+    options.innerHTML='<div><div></div></div>';
+    const inner=options.firstChild.firstChild;
+    badges.forEach(b=>{
+      const button=document.createElement('button'); button.type='button'; button.className='profile-badge-option'+(b===active?' active':''); button.textContent=BADGE_PRESETS_CLIENT[b]?.label||b.toUpperCase();
+      button.onclick=()=>{ window.pendingActiveBadge=b; if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT[b]?.label||b.toUpperCase(); options.querySelectorAll('button').forEach(x=>x.classList.remove('active')); button.classList.add('active'); picker.classList.remove('open'); applyBadgeToProfile(document.getElementById('pAvaWrap'),document.getElementById('pCrownIcon'),document.getElementById('pCreatorBadge'),b,false); };
+      inner.appendChild(button);
+    });
+  }).catch(()=>{});
+  toggle.onclick=()=>picker.classList.toggle('open');
 }
 function closeEdit(){ if(editModal) editModal.classList.remove('show'); }
 profileModal.addEventListener('click', e=>{ if(e.target===profileModal) closeProfile(); });
@@ -924,7 +952,7 @@ pSave.onclick=async()=>{
     const r=await fetch('/api/me', {
       method:'PUT',
       headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token() },
-      body: JSON.stringify({ displayName:newDisplay, username:newHandle, avatar:selectedAva, bio:newBio })
+       body: JSON.stringify({ displayName:newDisplay, username:newHandle, avatar:selectedAva, bio:newBio, activeBadge:window.pendingActiveBadge })
     });
     const j=await r.json();
     if(!r.ok) throw new Error(j.error||'Ошибка');
@@ -933,7 +961,7 @@ pSave.onclick=async()=>{
     localStorage.setItem('rave_user', j.username);
     localStorage.setItem('rave_ava', j.avatar);
     localStorage.setItem('rave_bio', j.bio);
-    setBadgeLocal(j.badge || (j.isCreator ? 'founder' : null));
+     setBadgeStateLocal(j.badges || [], j.activeBadge || j.badge || null);
     currentAvatar=j.avatar; currentBio=j.bio; currentUsername=j.username; currentDisplayName=j.displayName;
     const avaBtn=document.getElementById('profileBtn');
     if(avaBtn){

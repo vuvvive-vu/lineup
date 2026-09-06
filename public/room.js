@@ -48,14 +48,17 @@ function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
 
 function createBooWitchesRoom(container){
   container.querySelectorAll('.boo-witch').forEach(s=>s.remove());
-  [0,1,2].forEach((i)=>{
+  [0,1,2,3,4,5,6].forEach((i)=>{
     const witch=document.createElement('img');
     witch.className='boo-witch';
     witch.src='/assets/witch.png';
     witch.alt='';
-    witch.style.setProperty('--boo-y', `${28+i*24}%`);
-    witch.style.setProperty('--boo-delay', `${i*-2.2}s`);
-    witch.style.setProperty('--boo-size', `${22+(i%2)*5}px`);
+    witch.style.top=`${12+(i%4)*22}%`;
+    witch.style.left=`${i%2 ? 8 : 78}%`;
+    witch.style.setProperty('--boo-delay', `${i*-1.7}s`);
+    witch.style.setProperty('--boo-size', `${20+(i%3)*5}px`);
+    witch.style.setProperty('--boo-x', `${i%2 ? 210 : -210}px`);
+    witch.style.setProperty('--boo-y', `${i%2 ? -34 : 34}px`);
     container.appendChild(witch);
   });
 }
@@ -1038,8 +1041,8 @@ function openProfileRoom(){
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    const badge = j.badge || (j.isCreator ? 'founder' : null);
-    setBadgeLocalR(badge);
+     const badge = j.activeBadge || j.badge || (j.isCreator ? 'founder' : null);
+     setBadgeLocalR(badge);
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
@@ -1088,10 +1091,25 @@ function openEditRoom(){
   const eEmail=document.getElementById('eEmail');
   if(eEmail) eEmail.textContent=localStorage.getItem('rave_email')||'—';
   renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
+  loadProfileBadgePickerRoom();
   pErrorRoom.classList.remove('show'); pErrorRoom.style.display='none';
   profileModalRoom.classList.remove('show');
   if(editModalRoom) editModalRoom.classList.add('show');
   setTimeout(()=>{ const st=document.getElementById('eUsernameStatus'); if(eUsernameRoom && st) eUsernameRoom.dispatchEvent(new Event('input')); }, 50);
+}
+function loadProfileBadgePickerRoom(){
+  const picker=document.getElementById('profileBadgePicker'), options=document.getElementById('profileBadgeOptions'), toggle=document.getElementById('profileBadgeToggle');
+  if(!picker||!options||!toggle) return;
+  fetch('/api/me',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
+    const badges=j.badges||[], active=j.activeBadge||j.badge;
+    picker.style.display=badges.length?'block':'none';
+    const curEl=document.getElementById('profileBadgeCurrent');
+    if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[active]?.label||'Без бейджа';
+    options.innerHTML='<div><div></div></div>';
+    const inner=options.firstChild.firstChild;
+    badges.forEach(b=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='profile-badge-option'+(b===active?' active':''); btn.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); btn.onclick=()=>{ window.pendingActiveBadgeRoom=b; if(curEl) curEl.textContent=BADGE_PRESETS_CLIENT_R[b]?.label||b.toUpperCase(); inner.querySelectorAll('button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); picker.classList.remove('open'); applyBadgeToProfileR(document.getElementById('pAvaWrap'),document.getElementById('pCrownIcon'),document.getElementById('pCreatorBadge'),b,false); }; inner.appendChild(btn); });
+  }).catch(()=>{});
+  toggle.onclick=()=>picker.classList.toggle('open');
 }
 function closeEditRoom(){ if(editModalRoom) editModalRoom.classList.remove('show'); }
 if(profileModalRoom){
@@ -1153,7 +1171,7 @@ if(profileModalRoom){
     if(!/^[a-z0-9_-]{3,20}$/.test(newHandle)){ pErrorRoom.textContent='Имя пользователя 3-20: a-z, 0-9, -_'; pErrorRoom.style.display=''; pErrorRoom.classList.add('show'); return; }
     pSaveRoom.disabled=true; pSaveRoom.textContent='Сохранение...';
     try{
-      const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({displayName:newDisplay, username:newHandle, avatar:selectedAvaRoom, bio:newBio}) });
+       const r=await fetch('/api/me', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify({displayName:newDisplay, username:newHandle, avatar:selectedAvaRoom, bio:newBio, activeBadge:window.pendingActiveBadgeRoom}) });
       const j=await r.json();
       if(!r.ok) throw new Error(j.error||'Ошибка');
       localStorage.setItem('rave_token', j.token);
@@ -1161,7 +1179,7 @@ if(profileModalRoom){
       localStorage.setItem('rave_user', j.username);
       localStorage.setItem('rave_ava', j.avatar);
       localStorage.setItem('rave_bio', j.bio);
-      setBadgeLocalR(j.badge || (j.isCreator ? 'founder' : null));
+       setBadgeLocalR(j.activeBadge || j.badge || (j.isCreator ? 'founder' : null));
       currentAvatar=j.avatar; currentDisplayNameRoom=j.displayName; currentUsernameRoom=j.username;
       const btn=document.getElementById('profileBtnRoom');
       if(btn) renderAvaBtnRoom(btn, j.avatar, j.displayName);

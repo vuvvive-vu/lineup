@@ -191,9 +191,8 @@ async function refreshAccounts(){
       const created=a.created ? new Date(a.created).toLocaleDateString('ru') : '—';
       const userListRaw=$('#usersBody')?.textContent||'';
       const isOnline=userListRaw.includes(a.username);
-      const isWife = a.badge === 'founders_wife';
-      const badgeStyle = isWife ? 'background:linear-gradient(135deg,#FFD0E8,#FF9EBF);color:#5a1430;border-color:#FF9EBF;' : 'background:linear-gradient(135deg,#e0f2ff,#bae6ff);color:#0a3a52;border-color:#bae6ff;';
-      const badge=a.badge ? `<span class="pill" style="${badgeStyle}font-weight:700;">${esc(a.badge.toUpperCase())}</span>` : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
+       const badges=a.badges|| (a.badge?[a.badge]:[]);
+       const badge=badges.length ? badges.map(b=>`<span class="pill" style="font-weight:700;">${esc(b==='founders_wife'?"FOUNDER'S WIFE":b.toUpperCase())}</span>`).join(' ') : '<span style="color:#5a5a5a;font-size:11px;">—</span>';
       return `<tr>
         <td>${avaHtml}</td>
         <td><b>${esc(a.username)}</b><div style="font-size:10px;color:#5a5a5a;">${esc(a.id).slice(0,8)}</div></td>
@@ -203,7 +202,7 @@ async function refreshAccounts(){
           ${badge}
           ${isOnline?'<span class="pill" style="color:#34c759;border-color:#1f6b2a;">онлайн</span>':''}
           <button class="icon-btn" style="font-size:11px;padding:6px 10px;background:#1a0f0f;color:#ff8a8a;border-color:#3a2020;" onclick="deleteAccount('${esc(a.id)}','${esc(a.username)}')">Удалить</button>
-          <button class="admin-plus" title="Бейджи" onclick="openBadgePicker('${esc(a.id)}','${esc(a.badge||'')}','${esc(a.username)}')">+</button>
+           <button class="admin-plus" title="Управление бейджами" onclick="openBadgePicker('${esc(a.id)}','${encodeURIComponent(JSON.stringify(badges))}','${esc(a.activeBadge||a.badge||'')}','${esc(a.username)}')">Бейджи</button>
         </td>
       </tr>`;
     }).join('');
@@ -248,18 +247,19 @@ async function setBadge(id, badge){
   refresh();
 }
 let pickerUserId=null;
-function openBadgePicker(id, currentBadge, username){
+function openBadgePicker(id, encodedBadges, activeBadge, username){
+   const currentBadges=JSON.parse(decodeURIComponent(encodedBadges||'%5B%5D'));
   pickerUserId=id;
   const picker=$('#badgePicker');
   const cur=$('#pickerCurrent');
   const title=$('#pickerTitle');
   title.textContent='Бейджи — @'+username;
-  cur.textContent = currentBadge ? 'Текущий: '+currentBadge.toUpperCase() : 'Нет бейджа';
+   cur.textContent = currentBadges.length ? 'Выдано: '+currentBadges.join(', ') : 'Нет бейджей';
   // highlight active
   picker.querySelectorAll('.badge-opt').forEach(b=>{
-    b.classList.toggle('active', b.dataset.badge === (currentBadge||''));
+     b.classList.toggle('active', currentBadges.includes(b.dataset.badge));
   });
-  picker.classList.add('show');
+   picker.dataset.badges=JSON.stringify(currentBadges); picker.dataset.active=activeBadge||''; picker.classList.add('show');
 }
 function closeBadgePicker(){
   const picker=$('#badgePicker');
@@ -269,8 +269,15 @@ function closeBadgePicker(){
 async function pickBadge(badge){
   if(!pickerUserId) return;
   // badge '' means снять
-  const val = badge || null;
-  await setBadge(pickerUserId, val);
+   const picker=$('#badgePicker');
+   const list=JSON.parse(picker.dataset.badges||'[]');
+   const next=badge ? (list.includes(badge)?list.filter(x=>x!==badge):[...list,badge]) : [];
+   picker.dataset.badges=JSON.stringify(next);
+   await setBadges(pickerUserId,next,picker.dataset.active||next[0]||null);
+}
+async function setBadges(id,badges,activeBadge){
+  const r=await fetch(`/api/admin/accounts/${id}/badge`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({badges,activeBadge})});
+  const j=await r.json(); if(!r.ok) return alert(j.error||'Ошибка'); closeBadgePicker(); refresh();
 }
 $('#aLogout').onclick=()=>{ localStorage.removeItem('admin_token'); location.reload(); };
 // close picker on backdrop

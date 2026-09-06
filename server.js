@@ -52,6 +52,22 @@ function getBadge(user) {
   return null;
 }
 
+function getBadgeState(user) {
+  const legacy = getBadge(user);
+  let owned = [];
+  try { owned = Array.isArray(user?.badges) ? user.badges : JSON.parse(user?.badges || '[]'); } catch {}
+  owned = [...new Set(owned.map(v => String(v).toLowerCase()).filter(v => ALLOWED_BADGES.includes(v)))];
+  if (!owned.length && legacy) owned = [legacy];
+  let active = String(user?.active_badge || legacy || '').toLowerCase();
+  if (!owned.includes(active)) active = owned[0] || null;
+  return { badges: owned, activeBadge: active, badge: active };
+}
+
+function badgeResponse(user) {
+  const state = getBadgeState(user);
+  return { ...state, isCreator: !!state.activeBadge };
+}
+
 // для совместимости старый вызов isCreator теперь проксирует на getBadge
 function isCreator(userOrUsername) {
   const b = typeof userOrUsername === 'string' ? (userOrUsername.toLowerCase() === CREATOR_USERNAME.toLowerCase() ? 'founder' : null) : getBadge(userOrUsername);
@@ -377,20 +393,20 @@ app.post('/api/login', async (req, res) => {
     const user = { displayName: d, avatar: avatar||'', bio: bio||'' };
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
-      const badge = getBadge(created);
+      const st = getBadgeState(created);
       return res.json({ 
         token: makeToken(created.id), 
         displayName: created.display_name, 
         username: created.username, 
         avatar: created.avatar, 
         bio: created.bio,
-        badge,
-        isCreator: !!badge
+        ...st,
+        isCreator: !!st.activeBadge
       });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
-    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, badge: null, isCreator: false });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, badges: [], activeBadge: null, badge: null, isCreator: false });
   }catch(e){ console.error('/api/login error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -424,7 +440,7 @@ app.post('/api/auth/register-email', async (req, res) => {
       const device = detectDevice(req.headers['user-agent']);
       const emailSent = await sendVerifyCode(email, code, displayName, device);
       const token = makeToken(user.id);
-      const badge = getBadge(user);
+      const st = getBadgeState(user);
       return res.json({ 
         token, 
         displayName: user.display_name, 
@@ -434,8 +450,8 @@ app.post('/api/auth/register-email', async (req, res) => {
         email, 
         emailVerified: false, 
         codeSent: emailSent,
-        badge,
-        isCreator: !!badge
+        ...st,
+        isCreator: !!st.activeBadge
       });
     }
 
@@ -467,7 +483,7 @@ app.post('/api/auth/login-email', async (req, res) => {
       const user = await db.verifyPassword(email, password);
       if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
       const token = makeToken(user.id);
-      const badge = getBadge(user);
+      const st = getBadgeState(user);
       return res.json({ 
         token, 
         displayName: user.display_name, 
@@ -476,8 +492,8 @@ app.post('/api/auth/login-email', async (req, res) => {
         bio: user.bio || '', 
         email: user.email, 
         emailVerified: user.email_verified,
-        badge,
-        isCreator: !!badge
+        ...st,
+        isCreator: !!st.activeBadge
       });
     }
 
@@ -487,7 +503,7 @@ app.post('/api/auth/login-email', async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const token = makeToken(user.id);
-    const badge = getBadge(user);
+    const st2 = getBadgeState(user);
     res.json({ 
       token, 
       displayName: user.displayName, 
@@ -496,8 +512,8 @@ app.post('/api/auth/login-email', async (req, res) => {
       bio: user.bio, 
       email: user.email, 
       emailVerified: user.emailVerified,
-      badge,
-      isCreator: !!badge
+      ...st2,
+      isCreator: !!st2.activeBadge
     });
   } catch (e) {
     console.error('Login error:', e);
@@ -610,7 +626,7 @@ app.get('/api/me', async (req, res) => {
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
   const isGuest = !user.email;
-  const badge = getBadge(user);
+  const badge = getBadgeState(user);
   res.json({ 
     displayName: user.display_name || user.displayName || user.username, 
     username: user.username || null, 
@@ -619,41 +635,41 @@ app.get('/api/me', async (req, res) => {
     email: user.email || null, 
     emailVerified: user.email_verified || false, 
     isGuest,
-    badge,
-    isCreator: !!badge
+    ...badge,
+    isCreator: !!badge.activeBadge
   });
 });
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, email FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, badges, active_badge, email FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
     if (rows[0]) {
-      const badge = getBadge(rows[0]);
+      const badge = getBadgeState(rows[0]);
       return res.json({ 
         displayName: rows[0].display_name, 
         username: rows[0].username, 
         avatar: rows[0].avatar || '', 
         bio: rows[0].bio || '',
-        badge,
-        isCreator: !!badge
+        ...badge,
+        isCreator: !!badge.activeBadge
       });
     }
   }
   const u = [...ephemeralUsers.values()].find(x=> (x.username && x.username.toLowerCase()===req.params.username.toLowerCase()) || x.displayName===req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
-  const badge = getBadge(u);
+  const badge = getBadgeState(u);
   res.json({ 
     displayName: u.displayName || u.username, 
     username: u.username || null, 
     avatar: u.avatar || '', 
     bio: u.bio || '',
-    badge,
-    isCreator: !!badge
+    ...badge,
+    isCreator: !!badge.activeBadge
   });
 });
 app.put('/api/me', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ','');
   const user = await parseToken(token);
   if (!user) return res.status(401).json({ error: 'Не авторизован' });
-  let { displayName, username, avatar, bio } = req.body;
+  let { displayName, username, avatar, bio, activeBadge } = req.body;
   const isGuest = !user.email;
   if (isGuest && username) return res.status(403).json({ error: 'Гости не могут менять username' });
   displayName = displayName !== undefined ? displayName.trim() : (user.display_name || user.displayName || user.username);
@@ -696,21 +712,26 @@ app.put('/api/me', async (req, res) => {
   if (db.isEnabled()) {
     await db.updateUserProfileById(user.id, { displayName, username, avatar, bio });
     const updated = await db.getUserById(user.id);
+    const state = getBadgeState(updated);
+    if (activeBadge !== undefined && state.badges.includes(activeBadge)) {
+      await db.setUserBadges(user.id, state.badges, activeBadge);
+    }
+    const finalUser = await db.getUserById(user.id);
     const newToken = makeToken(user.id);
     // если создатель сменил ник - запомнить новый ID и обновить fallback
     if (wasCreator) {
       CREATOR_ID = String(updated.id);
       console.log(`[CREATOR] Ник сменен @${user.username} -> @${updated.username}, новый ID закэширован: ${CREATOR_ID}. Добавь CREATOR_ID=${CREATOR_ID} в env на Render для сохранения после рестарта!`);
     }
-    const badgeUpd = getBadge(updated);
+    const badgeUpd = getBadgeState(finalUser);
     return res.json({ 
       displayName: updated.display_name, 
       username: updated.username, 
       avatar: updated.avatar, 
       bio: updated.bio, 
       token: newToken,
-      badge: badgeUpd,
-      isCreator: !!badgeUpd
+      ...badgeUpd,
+      isCreator: !!badgeUpd.activeBadge
     });
   }
   if (!isGuest) {
@@ -728,9 +749,9 @@ app.put('/api/me', async (req, res) => {
     ephemeralUsers.set(user.id, { id: user.id, displayName, avatar: avatar || '', bio: bio || '' });
   }
   const newToken = makeToken(user.id);
-  const fresh = { id: user.id, username, badge: user.badge };
-  const badgeNew = getBadge(fresh);
-  res.json({ displayName, username, avatar: avatar || '', bio: bio || '', token: newToken, badge: badgeNew, isCreator: !!badgeNew });
+  const fresh = { id: user.id, username, badge: user.badge, badges: user.badges, active_badge: user.active_badge };
+  const badgeNew = getBadgeState(fresh);
+  res.json({ displayName, username, avatar: avatar || '', bio: bio || '', token: newToken, ...badgeNew, isCreator: !!badgeNew.activeBadge });
 });
 app.get('/api/check-username', async (req, res) => {
   let { username } = req.query;
@@ -1132,36 +1153,34 @@ app.get('/api/admin/accounts', async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (db.isEnabled()) {
     const users = await db.getAllUsers();
-    return res.json({ accounts: users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', badge: u.badge || null, created: u.created_at })) });
+     return res.json({ accounts: users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar || '😎', bio: u.bio || '', ...getBadgeState(u), created: u.created_at })) });
   }
   const accounts = [];
   for (const [id, u] of ephemeralEmailUsers) {
-    accounts.push({ id, username: u.username || id, avatar: u.avatar || '😎', bio: u.bio || '', badge: u.badge || null, created: null });
+     accounts.push({ id, username: u.username || id, avatar: u.avatar || '😎', bio: u.bio || '', ...getBadgeState(u), created: null });
   }
   res.json({ accounts });
 });
 
 app.put('/api/admin/accounts/:id/badge', async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
-  let { badge } = req.body || {};
-  if (badge === '' || badge === null) badge = null;
-  if (badge !== null) {
-    badge = String(badge).toLowerCase().trim();
-    if (badge === 'developer') badge = 'founder'; // legacy alias
-    if (!ALLOWED_BADGES.includes(badge)) return res.status(400).json({ error: 'Неизвестный бейдж. Доступные: ' + ALLOWED_BADGES.join(', ') });
-  }
+   let { badges, activeBadge } = req.body || {};
+   badges = Array.isArray(badges) ? badges.map(v => String(v).toLowerCase().trim()) : [];
+   if (badges.some(b => !ALLOWED_BADGES.includes(b))) return res.status(400).json({ error: 'Неизвестный бейдж. Доступные: ' + ALLOWED_BADGES.join(', ') });
   const id = req.params.id;
   if (db.isEnabled()) {
     const user = await db.getUserById(id);
     if (!user) return res.status(404).json({ error: 'Аккаунт не найден' });
-    await db.setUserBadge(id, badge);
-    return res.json({ ok: true, badge });
+     const updated = await db.setUserBadges(id, badges, activeBadge);
+     return res.json({ ok: true, ...getBadgeState(updated) });
   }
   // ephemeral mode
   for (const [email, u] of ephemeralEmailUsers) {
     if (u.id === id) {
-      u.badge = badge;
-      return res.json({ ok: true, badge });
+       u.badges = badges;
+       u.active_badge = badges.includes(activeBadge) ? activeBadge : (badges[0] || null);
+       u.badge = u.active_badge;
+       return res.json({ ok: true, ...getBadgeState(u) });
     }
   }
   res.status(404).json({ error: 'Аккаунт не найден' });
