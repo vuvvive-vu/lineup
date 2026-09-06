@@ -125,6 +125,7 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 .system-msg .msg-avatar { background:#a31f35; border-color:#d8757d; color:#fff; }
 .system-msg .meta { color:#d8757d; font-weight:700; }
 .system-msg .bubble { white-space:pre-line; }
+.system-msg .bubble a { color:#f0a1aa; text-decoration:underline; text-underline-offset:2px; }
 .msg .bubble { background:#111; border:1px solid var(--border); padding:9px 12px; border-radius:14px; font-size:13px; line-height:1.45; transition: transform .15s ease, border-color .15s ease; word-break:break-word; cursor:pointer; position:relative; user-select:none; }
 .msg .bubble:hover { border-color:#2a2a2a; }
 .msg:hover .bubble { transform: none; }

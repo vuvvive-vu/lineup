@@ -854,8 +854,9 @@ wss.on('connection', async (ws, req) => {
 
   const enriched = [];
   for (const m of rooms[code].messages.slice(-100)) {
-    let ava = '😎';
-    if (db.isEnabled()) {
+     const isSystemMessage = m.system || m.username === 'Togetherly System' || m.username === 'ADMIN';
+     let ava = isSystemMessage ? '⚙️' : '😎';
+     if (!isSystemMessage && db.isEnabled()) {
       try {
         const mu = await db.getUserByUsername(m.username);
         if (mu?.avatar) ava = mu.avatar;
@@ -1072,11 +1073,11 @@ app.post('/api/admin/broadcast', (req,res)=>{
   if(!isAdmin(req)) return res.status(401).json({error:'Unauthorized'});
   const { text } = req.body;
   if(!text || !text.trim()) return res.status(400).json({error:'Текст пустой'});
-  const msg={ username:'ADMIN', text: text.trim().slice(0,500), ts: Date.now() };
+   const msg={ username:'Togetherly System', text: text.trim().slice(0,500), ts: Date.now(), system:true };
   for(const code of Object.keys(rooms)){
     rooms[code].messages.push(msg);
     if(rooms[code].messages.length>200) rooms[code].messages.shift();
-    broadcast(code, { type:'chat', ...msg, avatar:'👑' });
+     broadcast(code, { type:'chat', ...msg, avatar:'⚙️' });
   }
   saveJson(ROOMS_FILE, rooms);
   res.json({ok:true});
@@ -1088,7 +1089,7 @@ app.post('/api/admin/rooms/:code/close', (req,res)=>{
   if(!r) return res.status(404).json({error:'Room not found'});
   const set=roomClients.get(code);
   if(set){
-    broadcast(code, { type:'chat', username:'ADMIN', text:`Комната ${code} закрыта админом`, ts: Date.now(), avatar:'👑' });
+     broadcast(code, { type:'chat', username:'Togetherly System', text:`Комната ${code} закрыта админом`, ts: Date.now(), avatar:'⚙️', system:true });
     for(const c of [...set]){ try{c.close(1008,'Room closed by admin');}catch{} }
     roomClients.delete(code);
   }
@@ -1114,7 +1115,7 @@ app.post('/api/admin/users/:username/kick', (req,res)=>{
     for(const c of [...set]){
       if(c.username===uname){
         try{
-          c.send(JSON.stringify({ type:'chat', username:'ADMIN', text:`${uname} кикнут админом`, ts: Date.now(), avatar:'👑' }));
+           c.send(JSON.stringify({ type:'chat', username:'Togetherly System', text:`${uname} кикнут админом`, ts: Date.now(), avatar:'⚙️', system:true }));
           c.close(1008,'Kicked by admin');
         }catch{}
         kicked++;
