@@ -422,6 +422,7 @@ if(authBtnEl){
           setToken(j.token,j.displayName||displayName,j.username,j.avatar,j.bio, j.badge || (j.isCreator ? 'founder' : null));
           localStorage.setItem('rave_email', j.email||email);
           showLobby(j.displayName||displayName,currentAvatar);
+          if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModal();
         }
       } else {
         const r=await fetch('/api/auth/login-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
@@ -442,6 +443,7 @@ if(authBtnEl){
           setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio, j.badge || (j.isCreator ? 'founder' : null));
           localStorage.setItem('rave_email', j.email||email);
           showLobby(j.displayName||j.username,currentAvatar);
+          if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModal();
         }
       }
     }catch(e){ showError(authError,e.message); }
@@ -485,6 +487,7 @@ if(verifyCodeBtn){
       if(window._pendingVerifyEmail) localStorage.setItem('rave_email', window._pendingVerifyEmail);
       window._pendingToken=null;
       showLobby(currentDisplayName||currentUsername,currentAvatar);
+      if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModal();
     }catch(e){ verifyCodeError.textContent=e.message; verifyCodeError.style.display=''; }
     finally{ verifyCodeBtn.disabled=false; }
   };
