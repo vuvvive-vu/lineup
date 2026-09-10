@@ -42,28 +42,6 @@ function showError(el, msg){
 function hideError(el){ el.classList.remove('show'); }
 
 function token(){ return localStorage.getItem('rave_token'); }
-function formatJoinedShort(iso){
-  if(!iso) return '…';
-  try{
-    const d = new Date(iso);
-    if(isNaN(d)) return '…';
-    return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
-  }catch{ return '…'; }
-}
-function formatJoinedFull(iso){
-  if(!iso) return '…';
-  try{
-    const d = new Date(iso);
-    if(isNaN(d)) return '…';
-    return d.toLocaleString('ru-RU',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  }catch{ return '…'; }
-}
-function renderJoined(shortElId, fullElId, iso){
-  const s = shortElId ? document.getElementById(shortElId) : null;
-  const f = fullElId ? document.getElementById(fullElId) : null;
-  if(s) s.textContent = formatJoinedShort(iso);
-  if(f) f.textContent = formatJoinedFull(iso);
-}
 const BADGE_PRESETS_CLIENT = {
   founder: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true },
   developer: { label: 'FOUNDER', theme: 'snow', icon: 'crown', glow: true, snow: true }, // legacy alias
@@ -188,7 +166,6 @@ const T={
   'Проверка...':'Checking...',
   // Room
   'Профиль':'Profile','Описание':'Description','Сохранить':'Save',
-  'на сайте с':'member since',
   'Выбери аватар или загрузи фото':'Choose an avatar or upload a photo',
   '📷 Загрузить фото':'📷 Upload photo',
   'Выйти из аккаунта':'Log out','Сменить аккаунт':'Switch account',
@@ -237,7 +214,7 @@ async function checkAuth(){
     if(!r.ok) throw new Error();
     const j = await r.json();
     currentAvatar=j.avatar||localStorage.getItem('rave_ava')||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||j.username||localStorage.getItem('rave_display')||currentUsername;
-    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); if(j.createdAt) try{ localStorage.setItem('rave_joined', j.createdAt); }catch{} { let bd=j.badge||(j.isCreator?'founder':null); if(bd==='developer') bd='founder'; setBadgeLocal(bd); }
+    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); { let bd=j.badge||(j.isCreator?'founder':null); if(bd==='developer') bd='founder'; setBadgeLocal(bd); }
     if(!j.emailVerified && j.email){
       showAuth();
       inVerification=true;
@@ -296,12 +273,9 @@ function showLobby(displayName, avatar){
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : letterFor(nameForLetter);
   const avaCls = isPhoto(avatar) ? ' has-photo letter-avatar' : ' letter-avatar';
   const bg = isPhoto(avatar) ? '' : ` style="background:${avatarBg(nameForLetter)};color:#fff;"`;
-  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="friendsBtnNav" title="Друзья" style="position:relative;">👤<span class="fr-dot" style="display:none;"></span></button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
+  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
-  const _frBtn=document.getElementById('friendsBtnNav');
-  if(_frBtn && typeof renderFriendsModal==='function'){ _frBtn.onclick=()=>{ friendsModal.classList.add('show'); document.getElementById('friendsSearch').value=''; document.getElementById('friendsSearchResults').innerHTML=''; renderFriendsModal(); if(typeof frUpdateNavBadge==='function') frUpdateNavBadge(); }; }
-  if(typeof frUpdateNavBadge==='function') frUpdateNavBadge();
   applyTranslations();
 }
 
@@ -447,7 +421,6 @@ if(authBtnEl){
         } else {
           setToken(j.token,j.displayName||displayName,j.username,j.avatar,j.bio, j.badge || (j.isCreator ? 'founder' : null));
           localStorage.setItem('rave_email', j.email||email);
-          if(j.createdAt) try{ localStorage.setItem('rave_joined', j.createdAt); }catch{}
           showLobby(j.displayName||displayName,currentAvatar);
           if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModal();
         }
@@ -456,7 +429,6 @@ if(authBtnEl){
         const j=await r.json();
         if(!r.ok) throw new Error(j.error||'Ошибка');
         currentAvatar=j.avatar||''; currentBio=j.bio||''; currentUsername=j.username; currentDisplayName=j.displayName||j.username;
-        if(j.createdAt) try{ localStorage.setItem('rave_joined', j.createdAt); }catch{}
         if(!j.emailVerified){
           window._pendingToken=j.token;
           window._pendingVerifyEmail=email;
@@ -566,7 +538,6 @@ if(quickAuthBtn){
       setToken(j.token,j.displayName||j.username,j.username,j.avatar,j.bio);
       currentAvatar=j.avatar||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||displayName;
       localStorage.removeItem('rave_email');
-      if(j.createdAt) try{ localStorage.setItem('rave_joined', j.createdAt); }catch{}
       showLobby(j.displayName||displayName,currentAvatar);
     }catch(e){ showError(authError,e.message); }
     finally{ quickAuthBtn.disabled=false; }
@@ -742,7 +713,7 @@ function openProfile(){
   selectedAva=ava;
   if(pViewDisplayName) pViewDisplayName.textContent=disp||'?';
   if(pViewUsername) pViewUsername.textContent= handle ? '@'+handle : 'гость';
-  if(pViewBio){ pViewBio.textContent=bio||'—'; const _br=document.getElementById('pBioRow'); if(_br) _br.style.display = bio ? '' : 'none'; }
+  if(pViewBio) pViewBio.textContent=bio||'—';
   // avatar view
   renderAvaLargeElNew(pAvaLarge, ava, disp);
   renderAvaLargeElNew(eAvaLarge, ava, disp);
@@ -759,22 +730,12 @@ function openProfile(){
   const creatorBadgeSync = document.getElementById('pCreatorBadge');
   const avaWrapSync = document.getElementById('pAvaWrap');
   applyBadgeToProfile(avaWrapSync, crownIconSync, creatorBadgeSync, localBadge, localIsGuest);
-  // joined date — мгновенно из кэша
-  try{ renderJoined('pViewJoinedDate', null, localStorage.getItem('rave_joined')||null); }catch{}
-  try{
-    const _jb=document.getElementById('pViewJoined'); if(_jb) _jb.style.display = localIsGuest ? 'none' : 'inline-flex';
-    const _jr=document.getElementById('pJoinedRow'); if(_jr) _jr.style.display = localIsGuest ? 'none' : '';
-  }catch{}
   // confirm via server (update if changed)
   fetch('/api/me', { headers:{ Authorization:'Bearer '+token() }}).then(r=>r.json()).then(j=>{
     const guest = j.isGuest;
     if(openEditBtn) openEditBtn.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    try{
-      const _jb2=document.getElementById('pViewJoined'); if(_jb2) _jb2.style.display = (guest || !j.createdAt) ? 'none' : 'inline-flex';
-      const _jr2=document.getElementById('pJoinedRow'); if(_jr2) _jr2.style.display = (guest || !j.createdAt) ? 'none' : '';
-    }catch{}
      let badge = j.activeBadge || j.badge || (j.isCreator ? 'founder' : null);
      if (badge === 'developer') badge = 'founder';
      setBadgeStateLocal(j.badges || (badge ? [badge] : []), badge);
@@ -783,7 +744,6 @@ function openProfile(){
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
     applyBadgeToProfile(avaWrap, crownIcon, creatorBadge, badge, guest);
-    if(j.createdAt){ try{ localStorage.setItem('rave_joined', j.createdAt); }catch{} renderJoined('pViewJoinedDate', null, j.createdAt); }
   }).catch(()=>{});
   profileModal.classList.add('show');
 }
@@ -1045,7 +1005,7 @@ pSave.onclick=async()=>{
     // update view if still open
     if(pViewDisplayName) pViewDisplayName.textContent=j.displayName;
     if(pViewUsername) pViewUsername.textContent='@'+j.username;
-    if(pViewBio){ pViewBio.textContent=j.bio||'—'; const _br=document.getElementById('pBioRow'); if(_br) _br.style.display = j.bio ? '' : 'none'; }
+    if(pViewBio) pViewBio.textContent=j.bio||'—';
   }catch(e){ showError(pError, e.message); }
   finally{ pSave.disabled=false; pSave.textContent='Сохранить'; }
 };

@@ -13,9 +13,6 @@ const BADGE_PRESETS_CLIENT_R = {
 };
 function getBadgeLocalR(){ const b=localStorage.getItem('rave_badge'); if(b) { let v=b.toLowerCase(); if(v==='developer') v='founder'; return v; } if(localStorage.getItem('rave_isCreator')==='1') return 'founder'; return null; }
 function setBadgeLocalR(badge){ if(badge){ localStorage.setItem('rave_badge', String(badge).toLowerCase()); localStorage.setItem('rave_isCreator','1'); } else { localStorage.removeItem('rave_badge'); localStorage.setItem('rave_isCreator','0'); } }
-function formatJoinedShortR(iso){ if(!iso) return '…'; try{ const d=new Date(iso); if(isNaN(d)) return '…'; return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }catch{ return '…'; } }
-function formatJoinedFullR(iso){ if(!iso) return '…'; try{ const d=new Date(iso); if(isNaN(d)) return '…'; return d.toLocaleString('ru-RU',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch{ return '…'; } }
-function renderJoinedR(shortId, fullId, iso){ const s=shortId?document.getElementById(shortId):null; const f=fullId?document.getElementById(fullId):null; if(s) s.textContent=formatJoinedShortR(iso); if(f) f.textContent=formatJoinedFullR(iso); }
 function applyBadgeToProfileR(avaWrap, crownIcon, badgeEl, badge, isGuest){
   if(!avaWrap) return;
   const heartIcon = avaWrap.querySelector('.heart-icon');
@@ -101,7 +98,6 @@ const T={
 "Выйти из аккаунта":"Log out","Сменить аккаунт":"Switch account",
 "Имя":"Name","Имя пользователя":"Username","имя пользователя":"username","О себе":"About","о себе":"about",
 "Отмена":"Cancel","Готово":"Done","Изменить фотографию":"Change photo","Изм.":"Edit","в сети":"online",
-"на сайте с":"member since",
 "например, Валентин":"e.g. Valentin","ваше имя":"your name",
 "Это имя уже занято.":"This username is taken.","Имя пользователя должно содержать не меньше 3 символов.":"Username must be at least 3 characters.",
 "Можно использовать a-z, 0-9 и -_. Минимальная длина - 3 символа.":"You can use a-z, 0-9 and -_. Minimum length - 3 characters.",
@@ -975,7 +971,7 @@ let currentUsernameRoom=localStorage.getItem('rave_user')||'';
 (async()=>{
   try{
     const r=await fetch('/api/me', {headers:{Authorization:'Bearer '+token}});
-    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); if(j.createdAt) try{ localStorage.setItem('rave_joined', j.createdAt); }catch{} setBadgeLocalR(j.activeBadge || j.badge || (j.isCreator ? 'founder' : null)); try{ if(j.badges) localStorage.setItem('rave_badges', JSON.stringify(j.badges)); }catch{} if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModalRoom(); }
+    if(r.ok){ const j=await r.json(); currentAvatar=j.avatar||''; currentBio=j.bio||''; currentDisplayNameRoom=j.displayName||j.username||''; currentUsernameRoom=j.username||''; localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(j.displayName) localStorage.setItem('rave_display', j.displayName); if(j.username) localStorage.setItem('rave_user', j.username); if(j.email) localStorage.setItem('rave_email', j.email); setBadgeLocalR(j.activeBadge || j.badge || (j.isCreator ? 'founder' : null)); try{ if(j.badges) localStorage.setItem('rave_badges', JSON.stringify(j.badges)); }catch{} if(j.booJustGranted && !sessionStorage.getItem('boo_granted_shown')) showBooModalRoom(); }
   }catch{}
   injectProfileBtn();
 })();
@@ -1024,7 +1020,7 @@ function openProfileRoom(){
   const pViewBioEl=document.getElementById('pViewBio');
   if(pViewDisp) pViewDisp.textContent=disp||'?';
   if(pViewUser) pViewUser.textContent= handle ? '@'+handle : 'гость';
-  if(pViewBioEl){ pViewBioEl.textContent=bio||'—'; const _br=document.getElementById('pBioRow'); if(_br) _br.style.display = bio ? '' : 'none'; }
+  if(pViewBioEl) pViewBioEl.textContent=bio||'—';
   renderAvaLargeRoomEl(pAvaLargeRoom, ava, disp);
   if(eAvaLargeRoom) renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
   pErrorRoom.classList.remove('show'); pErrorRoom.textContent=''; pErrorRoom.style.display='none';
@@ -1039,28 +1035,18 @@ function openProfileRoom(){
   const creatorBadgeSyncR = document.getElementById('pCreatorBadge');
   const avaWrapSyncR = document.getElementById('pAvaWrap');
   applyBadgeToProfileR(avaWrapSyncR, crownIconSyncR, creatorBadgeSyncR, localBadgeR, localIsGuestRoom);
-  try{ renderJoinedR('pViewJoinedDate', null, localStorage.getItem('rave_joined')||null); }catch{}
-  try{
-    const _jb=document.getElementById('pViewJoined'); if(_jb) _jb.style.display = localIsGuestRoom ? 'none' : 'inline-flex';
-    const _jr=document.getElementById('pJoinedRow'); if(_jr) _jr.style.display = localIsGuestRoom ? 'none' : '';
-  }catch{}
   // confirm via server (update if changed)
   fetch('/api/me', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()).then(j=>{
     const guest=j.isGuest;
     if(openEditBtnRoom) openEditBtnRoom.style.display = guest ? 'none' : '';
     const card=document.getElementById('profileInfoCard');
     if(card) card.style.display = guest ? 'none' : '';
-    try{
-      const _jb2=document.getElementById('pViewJoined'); if(_jb2) _jb2.style.display = (guest || !j.createdAt) ? 'none' : 'inline-flex';
-      const _jr2=document.getElementById('pJoinedRow'); if(_jr2) _jr2.style.display = (guest || !j.createdAt) ? 'none' : '';
-    }catch{}
      const badge = j.activeBadge || j.badge || (j.isCreator ? 'founder' : null);
      setBadgeLocalR(badge);
     const crownIcon = document.getElementById('pCrownIcon');
     const creatorBadge = document.getElementById('pCreatorBadge');
     const avaWrap = document.getElementById('pAvaWrap');
     applyBadgeToProfileR(avaWrap, crownIcon, creatorBadge, badge, guest);
-    if(j.createdAt){ try{ localStorage.setItem('rave_joined', j.createdAt); }catch{} renderJoinedR('pViewJoinedDate', null, j.createdAt); }
   }).catch(()=>{});
   profileModalRoom.classList.add('show');
 }
@@ -1264,85 +1250,16 @@ const vAvaLarge=document.getElementById('vAvaLarge');
 const vUsername=document.getElementById('vUsername');
 const vHandle=document.getElementById('vHandle');
 const vBio=document.getElementById('vBio');
-// --- friend actions (room view profile) ---
-function frReqR(path, opts){
-  opts=opts||{};
-  return fetch(path, { method: opts.method||'GET', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+(localStorage.getItem('rave_token')||'') }, body: opts.body?JSON.stringify(opts.body):undefined }).then(async r=>{
-    const j=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(j.error||'Ошибка');
-    return j;
-  });
-}
-let frRoomToastTimer=null;
-function frRoomToast(msg){
-  let el=document.getElementById('frToast');
-  if(!el){ el=document.createElement('div'); el.id='frToast'; document.body.appendChild(el); }
-  el.textContent=msg;
-  el.classList.add('show');
-  clearTimeout(frRoomToastTimer);
-  frRoomToastTimer=setTimeout(()=>el.classList.remove('show'), 3500);
-}
-async function renderRoomFriendActions(username, isGuest){
-  const box=document.getElementById('vFrActions');
-  if(!box) return;
-  const myHandle=localStorage.getItem('rave_user')||'';
-  if(isGuest || !username || !localStorage.getItem('rave_token') || !myHandle || username.toLowerCase()===myHandle.toLowerCase()){ box.innerHTML=''; return; }
-  box.innerHTML='<button class="fr-action ghost" disabled>…</button>';
-  try{
-    const rel=await frReqR('/api/relationship/'+encodeURIComponent(username));
-    const st=rel.status;
-    let html='';
-    if(st==='none') html='<button class="fr-action primary" id="vFrAdd">＋ Добавить в друзья</button>';
-    else if(st==='pending_sent') html='<button class="fr-action ghost" id="vFrCancel">Отменить заявку</button>';
-    else if(st==='pending_received') html='<button class="fr-action primary" id="vFrAccept">✓ Принять заявку</button><button class="fr-action ghost" id="vFrReject">Отклонить</button>';
-    else if(st==='accepted') html='<button class="fr-action ghost" id="vFrRemove">✓ Друзья</button>';
-    box.innerHTML=html;
-    const rerender=()=>renderRoomFriendActions(username, false);
-    const add=document.getElementById('vFrAdd');
-    if(add) add.onclick=async()=>{
-      add.disabled=true;
-      try{ const r=await frReqR('/api/friend-requests',{method:'POST',body:{username}}); frRoomToast(r.autoAccepted?'Теперь вы друзья':'Заявка отправлена'); rerender(); }
-      catch(e){ frRoomToast(e.message); add.disabled=false; }
-    };
-    const cancel=document.getElementById('vFrCancel');
-    if(cancel) cancel.onclick=async()=>{
-      cancel.disabled=true;
-      try{ await frReqR('/api/friend-requests/'+rel.requestId+'/cancel',{method:'POST'}); frRoomToast('Заявка отменена'); rerender(); }
-      catch(e){ frRoomToast(e.message); cancel.disabled=false; }
-    };
-    const acc=document.getElementById('vFrAccept');
-    if(acc) acc.onclick=async()=>{
-      acc.disabled=true;
-      try{ await frReqR('/api/friend-requests/'+rel.requestId+'/accept',{method:'POST'}); frRoomToast('Заявка принята'); rerender(); }
-      catch(e){ frRoomToast(e.message); acc.disabled=false; }
-    };
-    const rej=document.getElementById('vFrReject');
-    if(rej) rej.onclick=async()=>{
-      rej.disabled=true;
-      try{ await frReqR('/api/friend-requests/'+rel.requestId+'/reject',{method:'POST'}); rerender(); }
-      catch(e){ frRoomToast(e.message); rej.disabled=false; }
-    };
-    const rem=document.getElementById('vFrRemove');
-    if(rem) rem.onclick=async()=>{
-      if(!confirm('Удалить пользователя из друзей?')){ rerender(); return; }
-      rem.disabled=true;
-      try{ await frReqR('/api/friends/remove',{method:'POST',body:{username}}); frRoomToast('Удалено из друзей'); rerender(); }
-      catch(e){ frRoomToast(e.message); rem.disabled=false; }
-    };
-  }catch{ box.innerHTML=''; }
-}
-
 function openViewProfile(username){
   // username here is handle; fetch user data
-  renderJoinedR('vJoinedDate', null, null);
   fetch(`/api/users/${encodeURIComponent(username)}`).then(r=>r.json()).then(u=>{
     const ava=u.avatar||presenceAvatars[username]||'';
     const disp=u.displayName||u.username||username;
     const handle=u.username||null;
     const bio=u.bio||'';
     const isGuest = !handle || String(handle).startsWith('guest:');
-    const badge = u.activeBadge || u.badge || (u.isCreator ? 'founder' : null);
-
+    const badge = u.badge || (u.isCreator ? 'founder' : null);
+    
     if(ava && ava.startsWith('data:image/')){ vAvaLarge.innerHTML=`<img src="${ava}" alt="">`; vAvaLarge.classList.add('has-photo'); vAvaLarge.style.background=''; vAvaLarge.style.color=''; }
     else { vAvaLarge.textContent=letterForRoom(disp); vAvaLarge.style.background=avatarBgRoom(disp); vAvaLarge.style.color='#fff'; vAvaLarge.classList.remove('has-photo'); vAvaLarge.style.backgroundImage='none'; }
     vUsername.textContent=disp;
@@ -1352,23 +1269,14 @@ function openViewProfile(username){
       if(vHandle) vHandle.textContent='@'+handle;
       vBio.textContent=bio||'—';
       vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
-      const _vbr=document.getElementById('vBioRow'); if(_vbr) _vbr.style.display = bio ? '' : 'none';
     }
-    renderJoinedR('vJoinedDate', null, u.createdAt||null);
-    const vJoined=document.getElementById('vJoined');
-    if(vJoined) vJoined.style.display = (isGuest || !u.createdAt) ? 'none' : 'inline-flex';
-    const vJoinedRow=document.getElementById('vJoinedRow');
-    if(vJoinedRow) vJoinedRow.style.display = (isGuest || !u.createdAt) ? 'none' : '';
-
+    
     // Show badge - всё оформление привязано к бейджу
     const vCrownIcon = document.getElementById('vCrownIcon');
     const vCreatorBadge = document.getElementById('vCreatorBadge');
     const vAvaWrap = document.getElementById('vAvaWrap');
     applyBadgeToProfileR(vAvaWrap, vCrownIcon, vCreatorBadge, badge, isGuest);
-
-    // friend actions
-    renderRoomFriendActions(u.username||username, isGuest);
-
+    
     viewProfileModal.classList.add('show');
   }).catch(()=>{
     const ava=presenceAvatars[username]||'';
@@ -1381,8 +1289,6 @@ function openViewProfile(username){
     if(card) card.style.display = isGuest ? 'none' : '';
     if(!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent='@'+username;
     if(!isGuest) vBio.textContent='—';
-    { const _vbr=document.getElementById('vBioRow'); if(_vbr) _vbr.style.display='none'; }
-    { const _fa=document.getElementById('vFrActions'); if(_fa) _fa.innerHTML=''; }
     
     // Hide creator badge on error
     const vCrownIcon = document.getElementById('vCrownIcon');
