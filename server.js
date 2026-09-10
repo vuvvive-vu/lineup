@@ -165,6 +165,55 @@ let rooms = loadJson(ROOMS_FILE, {});
 const ephemeralUsers = new Map();
 const ephemeralEmailUsers = new Map();
 
+// --- Online tracking: "в сети" / "был(а) ..." ---
+const ONLINE_WINDOW_MS = 3 * 60 * 1000; // считаем онлайн если активность < 3 мин
+const onlineSeen = new Map(); // userId -> ms
+const wsOnlineCount = new Map(); // userId -> active ws count
+const lastSeenDbWrite = new Map(); // userId -> ms (throttle DB writes)
+function toIsoOrNull(v) {
+  if (!v) return null;
+  try {
+    const d = v instanceof Date ? v : new Date(v);
+    if (isNaN(d)) return null;
+    return d.toISOString();
+  } catch { return null; }
+}
+function touchOnlineById(id) {
+  if (!id) return;
+  const now = Date.now();
+  onlineSeen.set(String(id), now);
+  // memory-mode: храним прямо на объекте
+  try {
+    const eu = ephemeralUsers.get(String(id));
+    if (eu) eu.lastSeen = new Date(now).toISOString();
+    for (const [, obj] of ephemeralEmailUsers) {
+      if (String(obj.id) === String(id)) { obj.lastSeen = new Date(now).toISOString(); break; }
+    }
+  } catch {}
+  // DB: пишем не чаще раза в минуту
+  if (db.isEnabled()) {
+    const last = lastSeenDbWrite.get(String(id)) || 0;
+    if (now - last > 60000) {
+      lastSeenDbWrite.set(String(id), now);
+      db.touchLastSeen(String(id)).catch(() => {});
+    }
+  }
+}
+function getOnlineInfo(user) {
+  if (!user) return { isOnline: false, lastSeen: null };
+  const id = String(user.id);
+  const now = Date.now();
+  const wsCount = wsOnlineCount.get(id) || 0;
+  let seen = onlineSeen.get(id) || null;
+  const fromUser = toIsoOrNull(user.last_seen || user.lastSeen);
+  if (!seen && fromUser) {
+    try { seen = new Date(fromUser).getTime(); } catch {}
+  }
+  const lastSeen = seen ? new Date(seen).toISOString() : fromUser;
+  const isOnline = wsCount > 0 || (seen !== null && (now - seen) < ONLINE_WINDOW_MS);
+  return { isOnline, lastSeen };
+}
+
 db.initDb().catch(e => console.error('DB init error:', e.message));
 
 function makeToken(accountId) {
@@ -336,9 +385,10 @@ app.post('/api/auth', async (req, res) => {
     bio = (bio || '').toString().slice(0, 120);
     const user = { displayName, avatar: avatar || '', bio: '' };
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, username: null, displayName, avatar: avatar || '', bio: '' });
+    const createdAt = new Date().toISOString();
+    ephemeralUsers.set(id, { id, username: null, displayName, avatar: avatar || '', bio: '', createdAt });
     const token = makeToken(id);
-    res.json({ token, displayName, username: null, avatar: avatar || '', bio: '' });
+    res.json({ token, displayName, username: null, avatar: avatar || '', bio: '', createdAt });
   } catch (e) { console.error('/api/auth error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -354,11 +404,12 @@ app.post('/api/register', async (req, res) => {
     const user = { displayName: d, avatar: avatar || '', bio: bio || '' };
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
-      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio });
+      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio, createdAt: created.created_at || null });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
-    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio });
+    const createdAt = new Date().toISOString();
+    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio, createdAt });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, createdAt });
   } catch (e) { console.error('/api/register error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -371,11 +422,12 @@ app.post('/api/login', async (req, res) => {
     if (db.isEnabled()) {
       const created = await db.createAccount(user);
       const st = getBadgeState(created);
-      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio, ...st, isCreator: !!st.activeBadge });
+      return res.json({ token: makeToken(created.id), displayName: created.display_name, username: created.username, avatar: created.avatar, bio: created.bio, createdAt: created.created_at || null, ...st, isCreator: !!st.activeBadge });
     }
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio });
-    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, badges: [], activeBadge: null, badge: null, isCreator: false });
+    const createdAtLogin = new Date().toISOString();
+    ephemeralUsers.set(id, { id, displayName: d, avatar: user.avatar, bio: user.bio, createdAt: createdAtLogin });
+    res.json({ token: makeToken(id), displayName: d, avatar: user.avatar, bio: user.bio, createdAt: createdAtLogin, badges: [], activeBadge: null, badge: null, isCreator: false });
   } catch (e) { console.error('/api/login error:', e); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
@@ -408,17 +460,18 @@ app.post('/api/auth/register-email', async (req, res) => {
       const emailSent = await sendVerifyCode(email, code, displayName, device);
       const token = makeToken(user.id);
       const st = getBadgeState(user);
-      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email, emailVerified: false, codeSent: emailSent, ...st, isCreator: !!st.activeBadge });
+      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email, emailVerified: false, codeSent: emailSent, createdAt: user.created_at || new Date().toISOString(), ...st, isCreator: !!st.activeBadge });
     }
 
     if (ephemeralEmailUsers.has(email)) return res.status(400).json({ error: 'Email уже зарегистрирован' });
     if ([...ephemeralEmailUsers.values()].some(u => u.username === username)) return res.status(400).json({ error: 'Это имя пользователя уже занято' });
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const passwordHash = await bcrypt.hash(password, 10);
-    ephemeralEmailUsers.set(email, { id, displayName, username, email, passwordHash, avatar: '', bio: '', emailVerified: false, verifyCode: code });
+    const createdAtEphem = new Date().toISOString();
+    ephemeralEmailUsers.set(email, { id, displayName, username, email, passwordHash, avatar: '', bio: '', emailVerified: false, verifyCode: code, createdAt: createdAtEphem });
     console.log(`[AUTH] Код для ${email}: ${code}`);
     const token = makeToken(id);
-    res.json({ token, displayName, username, avatar: '', bio: '', email, emailVerified: false, codeSent: false });
+    res.json({ token, displayName, username, avatar: '', bio: '', email, emailVerified: false, codeSent: false, createdAt: createdAtEphem });
   } catch (e) {
     console.error('Register error:', e);
     res.status(500).json({ error: 'Ошибка регистрации' });
@@ -439,7 +492,7 @@ app.post('/api/auth/login-email', async (req, res) => {
       if (!user) return res.status(401).json({ error: 'Неверный email или пароль' });
       const token = makeToken(user.id);
       const st = getBadgeState(user);
-      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email: user.email, emailVerified: user.email_verified, ...st, isCreator: !!st.activeBadge });
+      return res.json({ token, displayName: user.display_name, username: user.username, avatar: user.avatar || '', bio: user.bio || '', email: user.email, emailVerified: user.email_verified, createdAt: user.created_at || null, ...st, isCreator: !!st.activeBadge });
     }
 
     const user = ephemeralEmailUsers.get(email);
@@ -448,7 +501,7 @@ app.post('/api/auth/login-email', async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const token = makeToken(user.id);
     const st2 = getBadgeState(user);
-    res.json({ token, displayName: user.displayName, username: user.username, avatar: user.avatar, bio: user.bio, email: user.email, emailVerified: user.emailVerified, ...st2, isCreator: !!st2.activeBadge });
+    res.json({ token, displayName: user.displayName, username: user.username, avatar: user.avatar, bio: user.bio, email: user.email, emailVerified: user.emailVerified, createdAt: user.createdAt || null, ...st2, isCreator: !!st2.activeBadge });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Ошибка входа' });
@@ -574,6 +627,8 @@ app.get('/api/me', async (req, res) => {
       booJustGranted = true;
     } catch (e) { console.error('boo auto-grant error:', e.message); }
   }
+  touchOnlineById(user.id);
+  const _nowIso = new Date().toISOString();
   res.json({
     displayName: user.display_name || user.displayName || user.username,
     username: user.username || null,
@@ -582,6 +637,9 @@ app.get('/api/me', async (req, res) => {
     email: user.email || null,
     emailVerified: user.email_verified || false,
     isGuest,
+    createdAt: user.created_at || user.createdAt || null,
+    isOnline: true,
+    lastSeen: _nowIso,
     ...badge,
     booJustGranted,
     isCreator: !!badge.activeBadge
@@ -589,16 +647,274 @@ app.get('/api/me', async (req, res) => {
 });
 
 app.get('/api/users/:username', async (req, res) => {
+  try {
+    const _tok = (req.headers.authorization || '').replace('Bearer ', '');
+    if (_tok) { try { const _me = await parseToken(_tok); if (_me) touchOnlineById(_me.id); } catch {} }
+  } catch {}
   if (db.isEnabled()) {
-    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, badges, active_badge, email FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, badges, active_badge, email, created_at, last_seen FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
     if (rows[0]) {
       const badge = getBadgeState(rows[0]);
-      return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '', ...badge, isCreator: !!badge.activeBadge });
+      const on = getOnlineInfo(rows[0]);
+      return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '', createdAt: rows[0].created_at || null, isOnline: on.isOnline, lastSeen: on.lastSeen, ...badge, isCreator: !!badge.activeBadge });
     }
   }
-  const u = [...ephemeralUsers.values()].find(x => (x.username && x.username.toLowerCase() === req.params.username.toLowerCase()) || x.displayName === req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
+  const u = [...ephemeralUsers.values()].find(x => (x.username && x.username.toLowerCase() === req.params.username.toLowerCase()) || x.displayName === req.params.username)
+    || [...ephemeralEmailUsers.values()].find(x => x.username && x.username.toLowerCase() === req.params.username.toLowerCase())
+    || { displayName: req.params.username, username: null, avatar: '', bio: '' };
   const badge = getBadgeState(u);
-  res.json({ displayName: u.displayName || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '', ...badge, isCreator: !!badge.activeBadge });
+  const on2 = getOnlineInfo(u);
+  res.json({ displayName: u.displayName || u.display_name || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '', createdAt: u.createdAt || u.created_at || null, isOnline: on2.isOnline, lastSeen: on2.lastSeen, ...badge, isCreator: !!badge.activeBadge });
+});
+
+// --- Friends system ---
+
+const memFriendRequests = new Map(); // memory-mode store (DB mode uses friend_requests table)
+
+function frRowDbToApi(r) {
+  return r && { id: r.id, senderId: r.sender_id, receiverId: r.receiver_id, status: r.status, createdAt: r.created_at, respondedAt: r.responded_at };
+}
+function findMemUserById(id) {
+  return [...ephemeralEmailUsers.values()].find(u => String(u.id) === String(id)) || ephemeralUsers.get(id) || null;
+}
+function findMemUserByUsername(username) {
+  const q = String(username || '').toLowerCase();
+  return [...ephemeralEmailUsers.values()].find(u => u.username && u.username.toLowerCase() === q) || null;
+}
+function memUserCard(u) {
+  return { id: u.id, username: u.username, displayName: u.displayName || u.username, avatar: u.avatar || '' };
+}
+
+const FR = {
+  async getById(id) { return db.isEnabled() ? frRowDbToApi(await db.frGetById(id)) : (memFriendRequests.get(id) || null); },
+  async listBetween(aId, bId) {
+    if (db.isEnabled()) return (await db.frListBetween(aId, bId)).map(frRowDbToApi);
+    return [...memFriendRequests.values()].filter(r => (String(r.senderId) === String(aId) && String(r.receiverId) === String(bId)) || (String(r.senderId) === String(bId) && String(r.receiverId) === String(aId)));
+  },
+  async insert(senderId, receiverId) {
+    if (db.isEnabled()) return frRowDbToApi(await db.frInsert(senderId, receiverId));
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const row = { id, senderId: String(senderId), receiverId: String(receiverId), status: 'pending', createdAt: new Date().toISOString(), respondedAt: null };
+    memFriendRequests.set(id, row);
+    return row;
+  },
+  async setStatus(id, status) {
+    if (db.isEnabled()) return frRowDbToApi(await db.frSetStatus(id, status));
+    const r = memFriendRequests.get(id);
+    if (!r) return null;
+    r.status = status;
+    r.respondedAt = new Date().toISOString();
+    return r;
+  },
+  async remove(id) {
+    if (db.isEnabled()) return db.frDelete(id);
+    memFriendRequests.delete(id);
+  },
+  async incoming(userId) {
+    if (db.isEnabled()) return db.frIncoming(userId);
+    return [...memFriendRequests.values()]
+      .filter(r => String(r.receiverId) === String(userId) && r.status === 'pending')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, user: memUserCard(findMemUserById(r.senderId) || { id: r.senderId, username: 'unknown', displayName: 'unknown' }) }));
+  },
+  async outgoing(userId) {
+    if (db.isEnabled()) return db.frOutgoing(userId);
+    return [...memFriendRequests.values()]
+      .filter(r => String(r.senderId) === String(userId) && r.status === 'pending')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, user: memUserCard(findMemUserById(r.receiverId) || { id: r.receiverId, username: 'unknown', displayName: 'unknown' }) }));
+  },
+  async friends(userId) {
+    if (db.isEnabled()) return db.frFriends(userId);
+    const ids = new Set();
+    for (const r of memFriendRequests.values()) {
+      if (r.status !== 'accepted') continue;
+      if (String(r.senderId) === String(userId)) ids.add(r.receiverId);
+      else if (String(r.receiverId) === String(userId)) ids.add(r.senderId);
+    }
+    return [...ids].map(findMemUserById).filter(Boolean).map(memUserCard)
+      .sort((a, b) => a.username.localeCompare(b.username));
+  }
+};
+
+// pluggable notifications: stored in memory, clients poll /api/friends/summary;
+// later this hook can also push via WS / email without touching call sites
+const userNotifications = new Map();
+function notifyUser(userId, payload) {
+  try {
+    if (!userId) return;
+    const list = userNotifications.get(String(userId)) || [];
+    list.push({ ...payload, at: new Date().toISOString() });
+    userNotifications.set(String(userId), list.slice(-20));
+  } catch {}
+}
+
+async function getAuthUser(req) {
+  const u = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+  if (u) touchOnlineById(u.id);
+  return u;
+}
+function requireAccount(me) { return !!(me && me.username && me.email); }
+
+async function findUserByUsernameAny(username) {
+  if (db.isEnabled()) return db.getUserByUsername(username);
+  return findMemUserByUsername(username);
+}
+
+app.get('/api/search/users', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const q = String(req.query.q || '').trim().replace(/^@+/, '').toLowerCase();
+    if (q.length < 3 || !/^[a-z0-9_-]+$/.test(q)) return res.json({ users: [] });
+    let users;
+    if (db.isEnabled()) {
+      users = await db.searchUsersByPrefix(q, me.id);
+    } else {
+      users = [...ephemeralEmailUsers.values()]
+        .filter(u => u.username && u.username.toLowerCase().startsWith(q) && String(u.id) !== String(me.id))
+        .sort((a, b) => a.username.localeCompare(b.username)).slice(0, 8)
+        .map(memUserCard);
+    }
+    res.json({ users });
+  } catch (e) {
+    console.error('/api/search/users error:', e);
+    res.status(500).json({ error: 'Ошибка поиска' });
+  }
+});
+
+app.get('/api/relationship/:username', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const target = await findUserByUsernameAny(req.params.username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (String(target.id) === String(me.id)) return res.json({ status: 'self', requestId: null });
+    const rows = await FR.listBetween(me.id, target.id);
+    const accepted = rows.find(r => r.status === 'accepted');
+    if (accepted) return res.json({ status: 'accepted', requestId: accepted.id });
+    const sent = rows.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+    if (sent) return res.json({ status: 'pending_sent', requestId: sent.id });
+    const received = rows.find(r => r.status === 'pending' && String(r.receiverId) === String(me.id));
+    if (received) return res.json({ status: 'pending_received', requestId: received.id });
+    res.json({ status: 'none', requestId: null });
+  } catch (e) {
+    console.error('/api/relationship error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/friend-requests', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    if (!requireAccount(me)) return res.status(403).json({ error: 'Друзья доступны только для аккаунтов с именем пользователя' });
+    const username = String(req.body?.username || '').trim().replace(/^@+/, '').toLowerCase();
+    if (!username) return res.status(400).json({ error: 'Укажите username' });
+    const target = await findUserByUsernameAny(username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (String(target.id) === String(me.id)) return res.status(400).json({ error: 'Нельзя отправить заявку самому себе' });
+    if (!requireAccount(target)) return res.status(400).json({ error: 'У этого пользователя нет имени пользователя' });
+
+    const rows = await FR.listBetween(me.id, target.id);
+    const accepted = rows.find(r => r.status === 'accepted');
+    if (accepted) return res.status(400).json({ error: 'Вы уже друзья' });
+    const received = rows.find(r => r.status === 'pending' && String(r.receiverId) === String(me.id));
+    if (received) {
+      // встречные заявки — сразу дружим
+      const row = await FR.setStatus(received.id, 'accepted');
+      notifyUser(target.id, { type: 'friend_accept', username: me.username, text: `@${me.username} принял(а) вашу заявку в друзья` });
+      return res.json({ status: 'accepted', requestId: row?.id || null, autoAccepted: true });
+    }
+    const sent = rows.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+    if (sent) return res.status(400).json({ error: 'Заявка уже отправлена' });
+    for (const r of rows) { if (r.status !== 'pending') await FR.remove(r.id); } // чистим rejected-историю
+    const row = await FR.insert(String(me.id), String(target.id));
+    notifyUser(target.id, { type: 'friend_request', username: me.username, text: `@${me.username} отправил(а) вам заявку в друзья` });
+    res.json({ status: 'pending_sent', requestId: row.id });
+  } catch (e) {
+    console.error('POST /api/friend-requests error:', e);
+    res.status(500).json({ error: 'Ошибка отправки заявки' });
+  }
+});
+
+async function handleFriendRequestAction(req, res, action) {
+  const me = await getAuthUser(req);
+  if (!me) return res.status(401).json({ error: 'Не авторизован' });
+  const row = await FR.getById(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (action === 'cancel') {
+    if (String(row.senderId) !== String(me.id)) return res.status(403).json({ error: 'Отменить может только отправитель' });
+    if (row.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+    await FR.remove(row.id);
+    return res.json({ status: 'cancelled', requestId: row.id });
+  }
+  if (String(row.receiverId) !== String(me.id)) return res.status(403).json({ error: 'Нет доступа к этой заявке' });
+  if (row.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+  const updated = await FR.setStatus(row.id, action === 'accept' ? 'accepted' : 'rejected');
+  if (action === 'accept') notifyUser(String(row.senderId), { type: 'friend_accept', username: me.username, text: `@${me.username} принял(а) вашу заявку в друзья` });
+  return res.json({ status: updated.status, requestId: updated.id });
+}
+app.post('/api/friend-requests/:id/accept', async (req, res) => {
+  try { await handleFriendRequestAction(req, res, 'accept'); } catch (e) { console.error('accept error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+app.post('/api/friend-requests/:id/reject', async (req, res) => {
+  try { await handleFriendRequestAction(req, res, 'reject'); } catch (e) { console.error('reject error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+app.post('/api/friend-requests/:id/cancel', async (req, res) => {
+  try { await handleFriendRequestAction(req, res, 'cancel'); } catch (e) { console.error('cancel error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friend-requests/incoming', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ requests: await FR.incoming(me.id) });
+  } catch (e) { console.error('incoming error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friend-requests/outgoing', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ requests: await FR.outgoing(me.id) });
+  } catch (e) { console.error('outgoing error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friends', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ friends: await FR.friends(me.id) });
+  } catch (e) { console.error('friends error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.post('/api/friends/remove', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const username = String(req.body?.username || '').trim().replace(/^@+/, '').toLowerCase();
+    const target = await findUserByUsernameAny(username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    const rows = await FR.listBetween(me.id, target.id);
+    const accepted = rows.find(r => r.status === 'accepted');
+    if (!accepted) return res.status(404).json({ error: 'Вы не друзья' });
+    await FR.remove(accepted.id);
+    res.json({ status: 'removed' });
+  } catch (e) { console.error('remove friend error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friends/summary', async (req, res) => {
+  try {
+    const me = await getAuthUser(req);
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const incoming = await FR.incoming(me.id);
+    res.json({
+      incoming: incoming.length,
+      lastIncomingUsername: incoming[0]?.user?.username || null,
+      friends: (await FR.friends(me.id)).length
+    });
+  } catch (e) { console.error('summary error:', e); res.status(500).json({ error: 'Ошибка' }); }
 });
 
 app.put('/api/me', async (req, res) => {
@@ -937,6 +1253,12 @@ wss.on('connection', async (ws, req) => {
     }
   }
   clients.add(ws);
+  try {
+    const _uid = String(user.id);
+    wsOnlineCount.set(_uid, (wsOnlineCount.get(_uid) || 0) + 1);
+    ws._onlineTracked = true;
+    touchOnlineById(_uid);
+  } catch {}
 
   const enriched = [];
   for (const m of rooms[code].messages.slice(-100)) {
@@ -1048,6 +1370,16 @@ wss.on('connection', async (ws, req) => {
   });
 
   ws.on('close', () => {
+    try {
+      if (ws._onlineTracked && ws.userId) {
+        const _uid = String(ws.userId);
+        const left = Math.max(0, (wsOnlineCount.get(_uid) || 1) - 1);
+        if (left === 0) wsOnlineCount.delete(_uid);
+        else wsOnlineCount.set(_uid, left);
+        touchOnlineById(_uid); // фиксируем время выхода для "был(а) ..."
+        ws._onlineTracked = false;
+      }
+    } catch {}
     const set = roomClients.get(code);
     if (!set) return;
     if (ws.replaced) {

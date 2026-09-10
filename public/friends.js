@@ -1,5 +1,37 @@
 // ======================= FRIENDS =======================
 
+function frPluralRu(n, one, few, many){
+  const m = Math.abs(n) % 100, d = m % 10;
+  if (m > 10 && m < 20) return many;
+  if (d > 1 && d < 5) return few;
+  if (d === 1) return one;
+  return many;
+}
+function frFormatLastSeen(iso){
+  if(!iso) return null;
+  try{
+    const d = new Date(iso);
+    if(isNaN(d)) return null;
+    const diff = Date.now() - d.getTime();
+    if(diff < 0) return 'в сети';
+    if(diff < 60*1000) return 'был(а) только что';
+    if(diff < 60*60*1000){ const m=Math.floor(diff/60000); return `был(а) ${m} ${frPluralRu(m,'минуту','минуты','минут')} назад`; }
+    if(diff < 24*60*60*1000){ const h=Math.floor(diff/3600000); return `был(а) ${h} ${frPluralRu(h,'час','часа','часов')} назад`; }
+    const yest = new Date(Date.now()-86400000);
+    const sameDay = (a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+    const hm = d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    if(sameDay(d, yest)) return `был(а) вчера в ${hm}`;
+    return `был(а) ${d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})} в ${hm}`;
+  }catch{ return null; }
+}
+function frRenderOnline(el, isOnline, lastSeen){
+  if(!el) return;
+  el.classList.remove('online-on','online-off');
+  if(isOnline){ el.textContent='в сети'; el.classList.add('online-on'); return; }
+  const s = frFormatLastSeen(lastSeen);
+  if(s){ el.textContent=s; el.classList.add('online-off'); }
+  else { el.textContent='—'; el.classList.add('online-off'); }
+}
 function frEsc(s){ return escapeHtml(s||''); }
 function frAvatarHtml(u, size){
   size = size || 44;
@@ -235,6 +267,7 @@ async function openViewProfileIndex(username){
   document.getElementById('vpHandle').textContent='@'+username;
   document.getElementById('vpBio').textContent='…';
   document.getElementById('vpActions').innerHTML='';
+  try{ frRenderOnline(document.getElementById('vpOnline'), false, null); document.getElementById('vpOnline').textContent='…'; }catch{}
   try{
     const [u, rel] = await Promise.all([
       fetch('/api/users/'+encodeURIComponent(username)).then(r=>r.json()),
@@ -245,6 +278,7 @@ async function openViewProfileIndex(username){
     else { vpAvaLarge.textContent=letterFor(disp); vpAvaLarge.style.background=avatarBg(disp); vpAvaLarge.style.color='#fff'; vpAvaLarge.classList.remove('has-photo'); }
     document.getElementById('vpDisplayName').textContent=disp;
     document.getElementById('vpHandle').textContent=u.username?'@'+u.username:'';
+    try{ frRenderOnline(document.getElementById('vpOnline'), !!u.isOnline, u.lastSeen||null); }catch{}
     const bio=(u.bio||'').trim();
     document.getElementById('vpBio').textContent=bio||'—';
     document.getElementById('vpBioRow').style.display=bio?'':'none';

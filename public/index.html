@@ -229,9 +229,13 @@
           <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="имя пользователя">имя пользователя</div>
           <div id="pViewUsername" style="font-size:15px;color:#4ade80;font-weight:600;margin-top:2px;">@...</div>
         </div>
-        <div class="info-row" style="padding:14px 16px;">
+        <div class="info-row" id="pBioRow" style="padding:14px 16px;">
           <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="о себе">о себе</div>
           <div id="pViewBio" style="font-size:14px;color:#e5e5e5;margin-top:2px;white-space:pre-wrap;word-break:break-word;min-height:18px;">—</div>
+        </div>
+        <div id="pJoinedRow" style="padding:14px 16px;border-top:1px solid #232323;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="на сайте с">на сайте с</div>
+          <div id="pViewJoinedDate" style="font-size:15px;color:#e5e5e5;font-weight:600;margin-top:2px;">—</div>
         </div>
       </div>
       <div style="height:12px;"></div>
@@ -279,6 +283,88 @@
       <button id="pLogout" class="btn-ghost" style="width:100%;margin-top:10px;padding:14px 20px;border-radius:999px;font-weight:700;font-size:15px;border:1px solid #232323;" data-i18n="Выйти из аккаунта">Выйти из аккаунта</button>
       <!-- keep hidden old pUsername compat -->
       <input id="pUsername" hidden />
+    </div>
+  </div>
+
+  <!-- FRIENDS MODAL -->
+  <div id="friendsModal" class="modal-bg">
+    <div class="modal" style="max-width:400px;max-height:86vh;display:flex;flex-direction:column;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn-ghost" id="friendsClose" style="border-radius:999px;padding:8px 14px;" data-i18n="Закрыть">Закрыть</button>
+        <h3 style="font-size:16px;" data-i18n="Друзья">Друзья</h3>
+        <span style="width:76px;"></span>
+      </div>
+      <div style="padding:0 16px 16px;overflow-y:auto;flex:1;min-height:0;">
+        <div class="field" style="margin-top:10px;">
+          <input id="friendsSearch" placeholder="Поиск по @username" data-i18n-placeholder="Поиск по @username" autocomplete="off" />
+        </div>
+        <div id="friendsSearchResults" style="margin-top:8px;"></div>
+        <div id="friendsIncomingSec" style="display:none;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;margin:14px 0 6px;" data-i18n="Входящие заявки">Входящие заявки</div>
+          <div id="friendsIncomingList"></div>
+        </div>
+        <div id="friendsOutgoingSec" style="display:none;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;margin:14px 0 6px;" data-i18n="Отправленные заявки">Отправленные заявки</div>
+          <div id="friendsOutgoingList"></div>
+        </div>
+        <div id="friendsListSec">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;margin:14px 0 6px;" data-i18n="Мои друзья">Мои друзья</div>
+          <div id="friendsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW PROFILE MODAL (other users) -->
+  <div id="viewProfileModalIndex" class="modal-bg">
+    <div class="modal profile-modal" style="max-width:380px;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn-ghost" id="vpClose" style="border-radius:999px;padding:8px 14px;" data-i18n="Закрыть">Закрыть</button>
+        <h3 style="font-size:16px;" data-i18n="Профиль">Профиль</h3>
+        <span style="width:76px;"></span>
+      </div>
+      <div class="profile-ava-wrap" id="vpAvaWrap" style="margin-top:8px;">
+        <svg class="crown-icon" style="display:none;" id="vpCrownIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 8L6.5 11L9.5 5L12 8.5L14.5 5L17.5 11L21 8L19.5 17H4.5L3 8Z" fill="url(#vpCrownGradient)" stroke="#BAE6FF" stroke-width="1.2" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="vpCrownGradient" x1="12" y1="2" x2="12" y2="20" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#e0f2ff"/>
+              <stop offset="1" stop-color="#bae6ff"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <svg class="heart-icon" style="display:none;" id="vpHeartIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21s-6.7-4.35-9.17-8.18C1.1 9.1 2.2 4.5 6.5 4.5c2.0 0 3.3 1.1 4.5 2.7C12.2 5.6 13.5 4.5 15.5 4.5 19.8 4.5 20.9 9.1 19.17 12.82 16.7 16.65 12 21 12 21z" fill="url(#vpHeartGradient)" stroke="#FFB6D9" stroke-width="1.2" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="vpHeartGradient" x1="12" y1="4.5" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FFD0E8"/>
+              <stop offset="1" stop-color="#FF7AA8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div id="vpAvaLarge" class="profile-ava-large" style="width:96px;height:96px;margin:0 auto;font-size:36px;"></div>
+        <div class="creator-badge-text" style="display:none;" id="vpCreatorBadge">FOUNDER</div>
+      </div>
+      <div style="text-align:center;padding:4px 24px 0;">
+        <div id="vpDisplayName" style="font-size:22px;font-weight:800;margin-top:14px;letter-spacing:-0.02em;text-align:center;word-break:break-word;"></div>
+        <div id="vpOnline" style="font-size:13px;color:#9a9a9a;margin-top:4px;text-align:center;" data-i18n="в сети">в сети</div>
+        <div id="vpActions" style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"></div>
+      </div>
+      <div id="viewProfileCardIndex" style="margin:16px;background:#161616;border:1px solid #232323;border-radius:20px;overflow:hidden;">
+        <div style="padding:14px 16px;border-bottom:1px solid #232323;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="имя пользователя">имя пользователя</div>
+          <div id="vpHandle" style="font-size:15px;color:#4ade80;font-weight:600;margin-top:2px;">@...</div>
+        </div>
+        <div id="vpBioRow" style="padding:14px 16px;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="о себе">о себе</div>
+          <div id="vpBio" style="font-size:14px;color:#e5e5e5;margin-top:2px;white-space:pre-wrap;word-break:break-word;min-height:18px;">—</div>
+        </div>
+        <div id="vpJoinedRow" style="padding:14px 16px;border-top:1px solid #232323;">
+          <div style="font-size:11px;color:#9a9a9a;letter-spacing:0.04em;text-transform:uppercase;" data-i18n="на сайте с">на сайте с</div>
+          <div id="vpJoinedDate" style="font-size:15px;color:#e5e5e5;font-weight:600;margin-top:2px;">—</div>
+        </div>
+      </div>
+      <div style="height:12px;"></div>
     </div>
   </div>
 
@@ -338,6 +424,7 @@
   </div>
 
 <script src="/app.js?v=20250825h"></script>
+<script src="/friends.js?v=1"></script>
 <script>localStorage.setItem('rave_lang','ru');</script>
 </body>
 </html>
