@@ -740,15 +740,55 @@ app.get('/api/search', async (req, res) => {
       console.log(`[search] rutube fail: ${e.message} — пробуем Dailymotion`);
       data = null;
     } finally { clearTimeout(timer); }
-    const results = ((data && data.results) || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10).map(v => ({
+    const results = [];
+    // Источник 0: VK (нужен VK_SERVICE_TOKEN; работает с любых IP + полный синк плеера)
+    const VK_TOKEN = process.env.VK_SERVICE_TOKEN || '';
+    if (VK_TOKEN) {
+      try {
+        const vkUrl = 'https://api.vk.com/method/video.search?q=' + encodeURIComponent(q) + '&count=10&adult=0&search_own=0&hd=1&v=5.199&access_token=' + encodeURIComponent(VK_TOKEN);
+        const ctrl0 = new AbortController();
+        const timer0 = setTimeout(() => ctrl0.abort(), 12000);
+        try {
+          const r0 = await fetch(vkUrl, { signal: ctrl0.signal, headers: { 'User-Agent': 'togetherly/1.0' } });
+          const vk = await r0.json();
+          if (vk.error) {
+            console.log(`[search] vk_error=${vk.error.error_code} ${vk.error.error_msg}`);
+          } else {
+            for (const it of ((vk.response && vk.response.items) || [])) {
+              if (results.length >= 10 || !it || !it.id || !it.owner_id) continue;
+              let thumb = '';
+              if (Array.isArray(it.image) && it.image.length) {
+                const sorted = [...it.image].sort((a, b) => (a.width || 0) - (b.width || 0));
+                thumb = (sorted.find(i => (i.width || 0) >= 640) || sorted[sorted.length - 1] || {}).url || '';
+              }
+              results.push({
+                platform: 'vk',
+                title: it.title || 'Без названия',
+                videoUrl: `https://vk.com/video${it.owner_id}_${it.id}`,
+                thumbnail: thumb,
+                duration: fmtDur(it.duration),
+                durSec: Math.floor(Number(it.duration) || 0),
+                author: '',
+                views: Number(it.views) || 0,
+              });
+            }
+            console.log(`[search] q="${q}" vk_results=${results.length}`);
+          }
+        } finally { clearTimeout(timer0); }
+      } catch (e0) { console.log(`[search] vk fail: ${e0.message}`); }
+    }
+    for (const v of (((data && data.results) || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10))) {
+      if (results.length >= 10) break;
+      results.push({
       platform: 'rutube',
       title: v.title || 'Без названия',
       videoUrl: v.video_url || ('https://rutube.ru/video/' + v.id + '/'),
       thumbnail: v.thumbnail_url || '',
       duration: fmtDur(v.duration),
+      durSec: Math.floor(Number(v.duration) || 0),
       author: (v.author && v.author.name) || '',
       views: v.hits || 0,
-    }));
+    });}
     // Fallback: Dailymotion (без ключей, работает с любых IP — важно для хостинга,
     // т.к. RuTube с IP дата-центров часто отдаёт пусто)
     if (results.length < 10) {
@@ -772,6 +812,7 @@ app.get('/api/search', async (req, res) => {
                 videoUrl: 'https://www.dailymotion.com/video/' + v.id,
                 thumbnail: v.thumbnail_480_url || '',
                 duration: fmtDur(v.duration),
+                durSec: Math.floor(Number(v.duration) || 0),
                 author: (v.owner && v.owner.screenname) || '',
                 views: v.views_total || 0,
               });
@@ -780,6 +821,9 @@ app.get('/api/search', async (req, res) => {
         } finally { clearTimeout(timer2); }
       } catch (e2) { console.log(`[search] dailymotion fail: ${e2.message}`); }
     }
+    // длинные видео — первыми
+    results.sort((a, b) => (b.durSec || 0) - (a.durSec || 0));
+    for (const r of results) delete r.durSec;
     searchCache.set(key, { ts: Date.now(), results });
     if (searchCache.size > 100) searchCache.delete([...searchCache.keys()][0]);
     console.log(`[search] q="${q}" results=${results.length} (rutube+dailymotion)`);

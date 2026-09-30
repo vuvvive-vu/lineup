@@ -177,11 +177,16 @@
         <button class="plat" data-plat="youtube">YouTube</button>
         <button class="plat" data-plat="dailymotion">Dailymotion</button>
       </div>
+      <!-- ПОИСК ПО НАЗВАНИЮ (отключен: без VK-токена и RU-хостинга на проде находит только клипы).
+           Мёртвый код оставлен специально. Чтобы вернуть: раскомментировать этот блок.
+           Бэкенд: GET /api/search в server.js (рабочий). Фронт-логика в app.js (секция "video search", сама отключается если поля нет). -->
+      <!--
       <div class="field">
         <label>Найти фильм</label>
         <input id="videoSearch" placeholder="Введи название..." autocomplete="off" />
         <div id="searchResults" style="display:none;flex-direction:column;gap:8px;margin-top:8px;max-height:260px;overflow-y:auto;"></div>
       </div>
+      -->
       <div class="field">
         <label data-i18n="Название комнаты (необязательно)">Название комнаты (необязательно)</label>
         <input id="roomTitle" placeholder="Вечерний кинчик" data-i18n-placeholder="Вечерний кинчик" />
