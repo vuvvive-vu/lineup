@@ -237,6 +237,9 @@ function isValidVideoUrl(platform, url) {
     if (platform === 'youtube') {
       return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
     }
+    if (platform === 'dailymotion') {
+      return /^(https?:\/\/)?(www\.)?(dailymotion\.com\/video\/|dai\.ly\/)[\w]+/.test(url) || /geo\.dailymotion\.com\/player\.html\?video=[\w]+/.test(url);
+    }
   } catch { return false; }
   return false;
 }
@@ -292,6 +295,10 @@ function toEmbedUrl(platform, url) {
         try { id = new URL(url).searchParams.get('v'); } catch {}
       }
       if (id) return `https://www.youtube.com/embed/${id}?enablejsapi=1`;
+    }
+    if (url.includes('dailymotion.com') || url.includes('dai.ly')) {
+      const m = url.match(/(?:dailymotion\.com\/video\/|dai\.ly\/|video=)([\w]+)/);
+      if (m) return `https://geo.dailymotion.com/player.html?video=${m[1]}`;
     }
   } catch {}
   return url;
@@ -714,7 +721,7 @@ app.get('/api/search', async (req, res) => {
     const url = 'https://rutube.ru/api/search/video/?query=' + encodeURIComponent(q) + '&page=1&per_page=10';
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12000);
-    let data;
+    let data = null;
     try {
       const r = await fetch(url, {
         signal: ctrl.signal,
@@ -730,10 +737,10 @@ app.get('/api/search', async (req, res) => {
       if (!r.ok) throw new Error('RuTube ответил ' + r.status);
       data = await r.json();
     } catch (e) {
-      if (e && e.name === 'AbortError') throw new Error('RuTube не ответил (таймаут)');
-      throw e;
+      console.log(`[search] rutube fail: ${e.message} — пробуем Dailymotion`);
+      data = null;
     } finally { clearTimeout(timer); }
-    const results = (data.results || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10).map(v => ({
+    const results = ((data && data.results) || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10).map(v => ({
       platform: 'rutube',
       title: v.title || 'Без названия',
       videoUrl: v.video_url || ('https://rutube.ru/video/' + v.id + '/'),
@@ -742,9 +749,40 @@ app.get('/api/search', async (req, res) => {
       author: (v.author && v.author.name) || '',
       views: v.hits || 0,
     }));
+    // Fallback: Dailymotion (без ключей, работает с любых IP — важно для хостинга,
+    // т.к. RuTube с IP дата-центров часто отдаёт пусто)
+    if (results.length < 10) {
+      try {
+        const dmUrl = 'https://api.dailymotion.com/videos?search=' + encodeURIComponent(q) + '&limit=10&fields=id,title,thumbnail_480_url,duration,views_total,owner.screenname&language=ru';
+        const ctrl2 = new AbortController();
+        const timer2 = setTimeout(() => ctrl2.abort(), 12000);
+        try {
+          const r2 = await fetch(dmUrl, {
+            signal: ctrl2.signal,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' }
+          });
+          console.log(`[search] q="${q}" dailymotion_status=${r2.status}`);
+          if (r2.ok) {
+            const dm = await r2.json();
+            for (const v of (dm.list || [])) {
+              if (results.length >= 10 || !v || !v.id) continue;
+              results.push({
+                platform: 'dailymotion',
+                title: v.title || 'Без названия',
+                videoUrl: 'https://www.dailymotion.com/video/' + v.id,
+                thumbnail: v.thumbnail_480_url || '',
+                duration: fmtDur(v.duration),
+                author: (v.owner && v.owner.screenname) || '',
+                views: v.views_total || 0,
+              });
+            }
+          }
+        } finally { clearTimeout(timer2); }
+      } catch (e2) { console.log(`[search] dailymotion fail: ${e2.message}`); }
+    }
     searchCache.set(key, { ts: Date.now(), results });
     if (searchCache.size > 100) searchCache.delete([...searchCache.keys()][0]);
-    console.log(`[search] q="${q}" results=${results.length}`);
+    console.log(`[search] q="${q}" results=${results.length} (rutube+dailymotion)`);
     res.json({ results });
   } catch (e) {
     console.error('/api/search error:', e.message);
@@ -1050,9 +1088,9 @@ app.post('/api/rooms', async (req, res) => {
   let { platform, videoUrl, title } = req.body;
   if (!platform || !videoUrl) return res.status(400).json({ error: 'Выберите площадку и вставьте ссылку' });
   platform = platform.toLowerCase();
-  if (!['vk', 'rutube', 'youtube'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
+  if (!['vk', 'rutube', 'youtube', 'dailymotion'].includes(platform)) return res.status(400).json({ error: 'Неизвестная площадка' });
   if (!isValidVideoUrl(platform, videoUrl)) {
-    const examples = { vk: 'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube: 'Пример RuTube: https://rutube.ru/video/abc123...', youtube: 'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX' };
+    const examples = { vk: 'Пример VK: https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789', rutube: 'Пример RuTube: https://rutube.ru/video/abc123...', youtube: 'Пример YouTube: https://www.youtube.com/watch?v=XXXX или https://youtu.be/XXXX', dailymotion: 'Пример Dailymotion: https://www.dailymotion.com/video/xXXXXXX' };
     return res.status(400).json({ error: `Неверная ссылка для ${platform.toUpperCase()}. ${examples[platform]}` });
   }
   const embedUrl = toEmbedUrl(platform, videoUrl);

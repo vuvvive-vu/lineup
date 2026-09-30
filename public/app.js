@@ -566,15 +566,17 @@ const hint = $('#platformHint');
 const hints = {
   vk: 'Вставь обычную ссылку на VK видео, например https://vk.com/video-123456_789 или https://vkvideo.ru/video-123456_789 — мы покажем только плеер без ленты.',
   rutube: 'RuTube: скопируй ссылку на видео, например https://rutube.ru/video/xxxx — мы превратим её в плеер.',
-  youtube: 'YouTube: поддерживается youtu.be, youtube.com/watch?v=, и прямые embed ссылки.'
+  youtube: 'YouTube: поддерживается youtu.be, youtube.com/watch?v=, и прямые embed ссылки.',
+  dailymotion: 'Dailymotion: вставь ссылку вида https://www.dailymotion.com/video/xXXXXXX — работает без VPN и ключей.'
 };
-const labels = { vk:'Ссылка на видео VK', rutube:'Ссылка на RuTube', youtube:'Ссылка на YouTube' };
-const placeholders = { vk:'https://vk.com/video-123_456', rutube:'https://rutube.ru/video/xxx', youtube:'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+const labels = { vk:'Ссылка на видео VK', rutube:'Ссылка на RuTube', youtube:'Ссылка на YouTube', dailymotion:'Ссылка на Dailymotion' };
+const placeholders = { vk:'https://vk.com/video-123_456', rutube:'https://rutube.ru/video/xxx', youtube:'https://www.youtube.com/watch?v=dQw4w9WgXcQ', dailymotion:'https://www.dailymotion.com/video/xXXXXXX' };
 function isValidVideoUrlClient(plat, url){
   url=url.trim();
   if(plat==='vk') return /^(https?:\/\/)?(m\.)?(vk\.com|vk\.ru|vkvideo\.ru)\/video-?\d+_\d+/.test(url) || /video_ext\.php\?.*oid=-?\d+.*id=\d+/.test(url);
   if(plat==='rutube') return /^(https?:\/\/)?(www\.)?rutube\.ru\/(video|play\/embed)\/[a-f0-9]+/i.test(url);
   if(plat==='youtube') return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/.test(url);
+  if(plat==='dailymotion') return /^(https?:\/\/)?(www\.)?(dailymotion\.com\/video\/|dai\.ly\/)[\w]+/.test(url) || /geo\.dailymotion\.com\/player\.html\?video=[\w]+/.test(url);
   return false;
 }
 const videoUrlStatus=$('#videoUrlStatus');
@@ -616,7 +618,7 @@ function renderSearchResults(list){
     d.style.cssText='display:flex;gap:10px;align-items:center;text-align:left;background:#0a0a0a;border:1px solid var(--border);border-radius:12px;padding:8px;cursor:pointer;color:#fff;width:100%;';
     d.innerHTML=`${v.thumbnail?`<img src="${escapeHtmlSearch(v.thumbnail)}" style="width:72px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy" alt="">`:''}<span style="flex:1;min-width:0;"><span style="display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlSearch(v.title)}</span><span style="display:block;font-size:11px;color:#9a9a9a;margin-top:2px;">${escapeHtmlSearch(v.author||'')} ${v.duration?'• '+escapeHtmlSearch(v.duration):''}</span></span><span style="font-size:11px;color:#4ade80;font-weight:700;flex-shrink:0;">Выбрать</span>`;
     d.onclick=()=>{
-      setPlatform('rutube');
+      setPlatform(v.platform || 'rutube');
       videoUrl.value=v.videoUrl;
       validateVideoUrl();
       const titleEl=$('#roomTitle');
@@ -669,7 +671,7 @@ $('#createBtn').onclick = async ()=>{
   if(!url) return showError(err,'Вставь ссылку на видео');
   if(!isValidVideoUrlClient(platform, url)){
     validateVideoUrl();
-    const ex={ vk:'https://vk.com/video-123456_789', rutube:'https://rutube.ru/video/...', youtube:'https://youtu.be/...'};
+    const ex={ vk:'https://vk.com/video-123456_789', rutube:'https://rutube.ru/video/...', youtube:'https://youtu.be/...', dailymotion:'https://www.dailymotion.com/video/xXXXXXX'};
     return showError(err, `Неверная ссылка для ${platform.toUpperCase()}. Вставь правильную: ${ex[platform]}`);
   }
   $('#createBtn').disabled=true;
