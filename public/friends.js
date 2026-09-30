@@ -61,14 +61,103 @@ function frRelButton(u) {
 }
 
 function frUserRow(u, rightHtml, sub) {
-  return `<div class="fr-row">
+  const uname = frEsc(u.username || '');
+  return `<div class="fr-row fr-clickable" ${uname ? `data-fr-user="${uname}" title="Открыть профиль"` : ''}>
     ${frAvatarHtml(u)}
     <div class="fr-row-info">
       <div class="fr-row-name">${frEsc(u.displayName || u.username)}</div>
-      <div class="fr-row-handle">${u.username ? '@' + frEsc(u.username) : ''}${sub ? ` <span class="fr-sub">· ${frEsc(sub)}</span>` : ''}</div>
+      <div class="fr-row-handle">${u.username ? '@' + uname : ''}${sub ? ` <span class="fr-sub">· ${frEsc(sub)}</span>` : ''}</div>
     </div>
     <div class="fr-row-actions">${rightHtml || ''}</div>
   </div>`;
+}
+
+// --- friend profile popup (read-only, opens from any row) ---
+let frProfSeq = 0;
+function frProfileModalEl() {
+  let m = document.getElementById('frProfileModal');
+  if (m) return m;
+  m = document.createElement('div');
+  m.id = 'frProfileModal';
+  m.className = 'modal-bg';
+  m.innerHTML = `<div class="modal fr-profile-modal">
+    <div class="modal-head"><h3>Профиль</h3><button class="x" id="frProfileClose">✕</button></div>
+    <div id="frProfileBody"></div>
+  </div>`;
+  document.body.appendChild(m);
+  document.getElementById('frProfileClose').onclick = () => m.classList.remove('show');
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+  return m;
+}
+function frProfileActionBtn(rel, username, requestId) {
+  username = frEsc(username);
+  if (rel === 'self') return '';
+  if (rel === 'accepted') return `<button class="btn-ghost fr-profile-btn" data-fr-remove="${username}">✓ Друзья — удалить?</button>`;
+  if (rel === 'pending_sent') return `<button class="btn-ghost fr-profile-btn" data-fr-cancel-id="${frEsc(requestId || '')}">Заявка отправлена — отменить</button>`;
+  if (rel === 'pending_received') return `<button class="btn-primary fr-profile-btn" data-fr-accept-id="${frEsc(requestId || '')}">Принять заявку</button>`;
+  return `<button class="btn-primary fr-profile-btn" data-fr-add="${username}">Добавить в друзья</button>`;
+}
+async function openFrProfile(username) {
+  username = String(username || '').replace(/^@+/, '').trim();
+  if (!username) return;
+  const m = frProfileModalEl();
+  const body = document.getElementById('frProfileBody');
+  const mySeq = ++frProfSeq;
+  m.classList.add('show');
+  body.innerHTML = '<div class="fr-empty">Загрузка...</div>';
+  try {
+    const [u, rel] = await Promise.all([
+      fetch('/api/users/' + encodeURIComponent(username)).then(r => r.json()),
+      frReq('/api/relationship/' + encodeURIComponent(username)).catch(() => ({ status: 'none', requestId: null }))
+    ]);
+    if (mySeq !== frProfSeq) return;
+    if (!u || u.error) throw new Error((u && u.error) || 'Пользователь не найден');
+    const disp = u.displayName || u.username || username;
+    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(String(u.activeBadge || u.badge).toUpperCase())}</span>` : '';
+    body.innerHTML = `<div class="fr-profile-top">
+        ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
+        <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
+        <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
+        <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
+        <div class="fr-profile-actions">${frProfileActionBtn(rel.status, u.username || username, rel.requestId)}</div>
+      </div>`;
+    frBindActionButtons(body);
+    // after any action inside popup — refresh popup + friends list
+    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      setTimeout(() => { if (m.classList.contains('show')) openFrProfileRefresh(username); }, 600);
+    }, { once: true }));
+  } catch (e) {
+    if (mySeq !== frProfSeq) return;
+    body.innerHTML = `<div class="fr-empty">${frEsc(e.message)}</div>`;
+  }
+}
+async function openFrProfileRefresh(username) {
+  // silent refresh of open popup (keeps modal open, no flicker)
+  const body = document.getElementById('frProfileBody');
+  if (!body) return;
+  const mySeq = ++frProfSeq;
+  try {
+    const [u, rel] = await Promise.all([
+      fetch('/api/users/' + encodeURIComponent(username)).then(r => r.json()),
+      frReq('/api/relationship/' + encodeURIComponent(username)).catch(() => ({ status: 'none', requestId: null }))
+    ]);
+    if (mySeq !== frProfSeq) return;
+    const m = document.getElementById('frProfileModal');
+    if (!m || !m.classList.contains('show')) return;
+    const disp = u.displayName || u.username || username;
+    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(String(u.activeBadge || u.badge).toUpperCase())}</span>` : '';
+    body.innerHTML = `<div class="fr-profile-top">
+        ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
+        <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
+        <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
+        <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
+        <div class="fr-profile-actions">${frProfileActionBtn(rel.status, u.username || username, rel.requestId)}</div>
+      </div>`;
+    frBindActionButtons(body);
+    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      setTimeout(() => { if (m.classList.contains('show')) openFrProfileRefresh(username); }, 600);
+    }, { once: true }));
+  } catch {}
 }
 
 function frWhen(iso) {
@@ -89,6 +178,12 @@ async function frAct(path, btn, okMsg) {
 }
 
 function frBindActionButtons(root) {
+  root.querySelectorAll('[data-fr-user]').forEach(row => {
+    row.onclick = e => {
+      if (e.target.closest('button')) return;
+      openFrProfile(row.getAttribute('data-fr-user'));
+    };
+  });
   root.querySelectorAll('[data-fr-add]').forEach(b => b.onclick = async e => {
     e.stopPropagation(); b.disabled = true;
     try {
@@ -110,9 +205,13 @@ function frBindActionButtons(root) {
   });
 }
 
-async function renderFriendsModal() {
+let frRenderSeq = 0;
+let frDataKey = null;
+async function renderFriendsModal(opts) {
+  opts = opts || {};
   const modal = document.getElementById('friendsModal');
   if (!modal || !modal.classList.contains('show')) return;
+  const mySeq = ++frRenderSeq;
   const listEl = document.getElementById('friendsList');
   const incSec = document.getElementById('friendsIncomingSec');
   const incList = document.getElementById('friendsIncomingList');
@@ -120,13 +219,24 @@ async function renderFriendsModal() {
   const outList = document.getElementById('friendsOutgoingList');
   const countEl = document.getElementById('friendsCount');
   const guestHint = document.getElementById('friendsGuestHint');
-  listEl.innerHTML = '<div class="fr-empty">Загрузка...</div>';
+  // loading placeholder only on manual open / first paint — never on background refresh
+  if (opts.loading && !frDataKey) listEl.innerHTML = '<div class="fr-empty">Загрузка...</div>';
   try {
     const [f, inc, out] = await Promise.all([
       frReq('/api/friends'),
       frReq('/api/friend-requests/incoming'),
       frReq('/api/friend-requests/outgoing')
     ]);
+    if (mySeq !== frRenderSeq) return; // stale response — discard (fixes "need reopen" race)
+    if (!modal.classList.contains('show')) return;
+    // skip DOM update when nothing changed (silent background tick)
+    const key = JSON.stringify([
+      (f.friends || []).map(u => u.username),
+      (inc.requests || []).map(r => r.id),
+      (out.requests || []).map(r => r.id)
+    ]);
+    if (opts.silent && key === frDataKey) return;
+    frDataKey = key;
     if (guestHint) guestHint.style.display = 'none';
     if (countEl) countEl.textContent = (f.friends || []).length ? `· ${(f.friends || []).length}` : '';
     if ((inc.requests || []).length) {
@@ -143,9 +253,10 @@ async function renderFriendsModal() {
     } else { outSec.style.display = 'none'; outList.innerHTML = ''; }
     listEl.innerHTML = (f.friends || []).length
       ? f.friends.map(u => frUserRow(u, `<button class="fr-btn ghost" data-fr-remove="${frEsc(u.username)}" title="Удалить">✕</button>`)).join('')
-      : '<div class="fr-empty">Пока друзей нет — найди людей через поиск выше 👆</div>';
+      : '<div class="fr-empty">Пока друзей нет — найди людей через поиск выше</div>';
     frBindActionButtons(modal);
   } catch (e) {
+    if (mySeq !== frRenderSeq) return;
     if (/именем пользователя|Не авторизован/i.test(e.message || '') && guestHint) guestHint.style.display = '';
     listEl.innerHTML = `<div class="fr-empty">${frEsc(e.message)}</div>`;
     if (incSec) incSec.style.display = 'none';
@@ -181,7 +292,8 @@ function bindFriendsNav() {
     const s = document.getElementById('friendsSearch');
     if (s) { s.value = ''; }
     document.getElementById('friendsSearchResults').innerHTML = '';
-    renderFriendsModal();
+    frDataKey = null; // fresh paint on open
+    renderFriendsModal({ loading: true });
   };
   document.getElementById('friendsClose').onclick = () => modal.classList.remove('show');
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('show'); });
@@ -216,7 +328,7 @@ async function frTick() {
       }
     }
     const modal = document.getElementById('friendsModal');
-    if (modal && modal.classList.contains('show') && document.hasFocus()) renderFriendsModal();
+    if (modal && modal.classList.contains('show') && document.hasFocus()) renderFriendsModal({ silent: true });
   } catch {}
 }
 async function frUpdateNavBadge() { await frTick(); }

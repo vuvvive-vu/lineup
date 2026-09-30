@@ -534,3 +534,15 @@ html, body { background:#160709; }
 .fr-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#2d1018; border:1px solid #7b2938; color:#fff; font-size:13px; font-weight:600; padding:12px 18px; border-radius:999px; opacity:0; pointer-events:none; transition:all .25s ease; z-index:100; max-width:90vw; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.6); }
 .fr-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 @media(max-width:520px){ .friends-modal{ max-height:88vh; } }
+.fr-clickable { cursor:pointer; }
+.fr-clickable:hover .fr-row-name { text-decoration:underline; text-underline-offset:2px; }
+/* friend profile popup */
+.fr-profile-modal { max-width:360px; background:#1c080e; }
+.fr-profile-top { display:flex; flex-direction:column; align-items:center; text-align:center; padding:6px 4px 2px; animation:pop .18s ease; }
+.fr-profile-top .fr-ava { width:76px; height:76px; font-size:30px; border:1px solid #702333; }
+.fr-profile-name { font-size:20px; font-weight:800; margin-top:12px; letter-spacing:-.01em; display:flex; align-items:center; gap:8px; }
+.fr-profile-badge { font-size:10px; font-weight:800; letter-spacing:.06em; background:var(--accent); border-radius:999px; padding:3px 9px; }
+.fr-profile-handle { font-size:13px; color:#4ade80; margin-top:3px; font-weight:600; }
+.fr-profile-bio { font-size:13px; color:#e5e5e5; margin-top:10px; line-height:1.5; white-space:pre-wrap; word-break:break-word; max-width:100%; }
+.fr-profile-actions { margin-top:16px; width:100%; display:flex; flex-direction:column; gap:8px; }
+.fr-profile-btn { width:100%; padding:12px; font-size:14px; }
