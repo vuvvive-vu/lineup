@@ -504,3 +504,33 @@ html, body { background:#160709; }
 .modal-bg { background:rgba(18,2,7,.78); }
 .invite-row { background:#19070c; border-color:#4a1b26; }
 .invite-row input { background:transparent !important; border:0; }
+
+/* ================= FRIENDS (v2, halloween theme) ================= */
+.friends-modal { max-width:460px; max-height:82vh; overflow-y:auto; background:#1c080e; }
+.fr-count { color:var(--muted); font-weight:600; font-size:13px; }
+.fr-hint { background:#2d1018; border:1px solid var(--border); color:var(--muted); font-size:12px; padding:10px 12px; border-radius:12px; margin-bottom:12px; line-height:1.5; }
+.fr-sec { margin-top:14px; }
+.fr-sec-title { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:8px; font-weight:700; }
+.fr-list { display:flex; flex-direction:column; gap:8px; }
+.fr-empty { font-size:13px; color:var(--muted); padding:12px; text-align:center; background:#19070c; border:1px dashed #4a1b26; border-radius:12px; }
+.fr-row { display:flex; align-items:center; gap:10px; background:#19070c; border:1px solid #4a1b26; border-radius:14px; padding:8px 10px; transition:border-color .15s ease; }
+.fr-row:hover { border-color:#7b2938; }
+.fr-ava { width:44px; height:44px; border-radius:999px; display:grid; place-items:center; font-weight:800; font-size:18px; overflow:hidden; flex-shrink:0; border:1px solid #4a1b26; }
+.fr-ava img { width:100%; height:100%; object-fit:cover; display:block; }
+.fr-row-info { flex:1; min-width:0; }
+.fr-row-name { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fr-row-handle { font-size:12px; color:#4ade80; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fr-sub { color:#6a6a6a !important; }
+.fr-row-actions { display:flex; gap:6px; flex-shrink:0; }
+.fr-btn { min-width:36px; height:36px; padding:0 10px; border-radius:999px; border:1px solid #4a1b26; background:#2d1018; color:#fff; font-size:14px; font-weight:700; display:grid; place-items:center; transition:all .15s ease; }
+.fr-btn:hover { border-color:#7b2938; background:#3a1420; }
+.fr-btn:disabled { opacity:.5; cursor:wait; }
+.fr-btn.accept { background:var(--accent); border-color:var(--accent); }
+.fr-btn.accept:hover { filter:brightness(1.15); }
+.fr-btn.ghost { background:transparent; }
+#friendsBtnNav { position:relative; }
+#friendsBtnNav.has-incoming { border-color:#c24858; color:#fff; }
+.fr-dot { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; border-radius:999px; background:var(--accent); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; box-shadow:0 0 10px rgba(163,31,53,.7); }
+.fr-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#2d1018; border:1px solid #7b2938; color:#fff; font-size:13px; font-weight:600; padding:12px 18px; border-radius:999px; opacity:0; pointer-events:none; transition:all .25s ease; z-index:100; max-width:90vw; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.6); }
+.fr-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+@media(max-width:520px){ .friends-modal{ max-height:88vh; } }

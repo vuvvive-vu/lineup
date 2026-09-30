@@ -67,6 +67,24 @@ async function initSchema() {
   try { await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username))'); } catch {}
   // backfill display_name for old rows
   try { await pool.query("UPDATE users SET display_name = username WHERE display_name IS NULL OR display_name = ''"); } catch {}
+  // friend requests (togetherly friends system v2)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id VARCHAR(32) PRIMARY KEY,
+      sender_id VARCHAR(32) NOT NULL,
+      receiver_id VARCHAR(32) NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      responded_at TIMESTAMP,
+      CONSTRAINT fk_fr_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_fr_receiver FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT uq_fr_pair UNIQUE (sender_id, receiver_id),
+      CONSTRAINT ck_fr_self CHECK (sender_id <> receiver_id)
+    );
+  `);
+  try { await pool.query('CREATE INDEX IF NOT EXISTS fr_receiver_idx ON friend_requests (receiver_id, status)'); } catch {}
+  try { await pool.query('CREATE INDEX IF NOT EXISTS fr_sender_idx ON friend_requests (sender_id, status)'); } catch {}
+  try { await pool.query('CREATE INDEX IF NOT EXISTS fr_pair_idx ON friend_requests (sender_id, receiver_id, status)'); } catch {}
 }
 
 function genId() {
@@ -229,6 +247,97 @@ async function verifyPassword(email, password) {
   return user;
 }
 
+// --- friends (v2: unordered-pair safe, race-proof callers) ---
+
+async function searchUsersByPrefix(q, excludeId, limit = 8) {
+  const { rows } = await pool.query(
+    `SELECT id, username, display_name, avatar FROM users
+     WHERE lower(username) LIKE $1||'%'
+       AND id <> $2
+       AND email IS NOT NULL
+       AND username NOT LIKE 'guest\_%' ESCAPE '\'
+     ORDER BY username LIMIT $3`,
+    [String(q).toLowerCase(), excludeId, limit]
+  );
+  return rows.map(r => ({ id: r.id, username: r.username, displayName: r.display_name || r.username, avatar: r.avatar || '' }));
+}
+
+async function frGetById(id) {
+  const { rows } = await pool.query('SELECT * FROM friend_requests WHERE id=$1', [id]);
+  return rows[0] || null;
+}
+
+async function frListBetween(aId, bId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM friend_requests
+     WHERE (sender_id=$1 AND receiver_id=$2) OR (sender_id=$2 AND receiver_id=$1)`,
+    [aId, bId]
+  );
+  return rows;
+}
+
+async function frInsert(senderId, receiverId) {
+  const id = genId();
+  await pool.query('INSERT INTO friend_requests (id, sender_id, receiver_id) VALUES ($1,$2,$3)', [id, senderId, receiverId]);
+  return frGetById(id);
+}
+
+async function frSetStatus(id, status) {
+  const { rows } = await pool.query(
+    'UPDATE friend_requests SET status=$1, responded_at=NOW() WHERE id=$2 RETURNING *',
+    [status, id]
+  );
+  return rows[0] || null;
+}
+
+async function frDelete(id) {
+  await pool.query('DELETE FROM friend_requests WHERE id=$1', [id]);
+}
+
+async function frDeleteBetween(aId, bId, statuses = ['rejected']) {
+  await pool.query(
+    `DELETE FROM friend_requests
+     WHERE ((sender_id=$1 AND receiver_id=$2) OR (sender_id=$2 AND receiver_id=$1))
+       AND status = ANY($3)`,
+    [aId, bId, statuses]
+  );
+}
+
+function frUserCard(r) {
+  return { id: r.user_id, username: r.username, displayName: r.display_name || r.username, avatar: r.avatar || '' };
+}
+
+async function frIncoming(userId) {
+  const { rows } = await pool.query(
+    `SELECT fr.id, fr.status, fr.created_at, u.id AS user_id, u.username, u.display_name, u.avatar
+     FROM friend_requests fr JOIN users u ON u.id = fr.sender_id
+     WHERE fr.receiver_id=$1 AND fr.status='pending' ORDER BY fr.created_at DESC`,
+    [userId]
+  );
+  return rows.map(r => ({ id: r.id, status: r.status, createdAt: r.created_at, user: frUserCard(r) }));
+}
+
+async function frOutgoing(userId) {
+  const { rows } = await pool.query(
+    `SELECT fr.id, fr.status, fr.created_at, u.id AS user_id, u.username, u.display_name, u.avatar
+     FROM friend_requests fr JOIN users u ON u.id = fr.receiver_id
+     WHERE fr.sender_id=$1 AND fr.status='pending' ORDER BY fr.created_at DESC`,
+    [userId]
+  );
+  return rows.map(r => ({ id: r.id, status: r.status, createdAt: r.created_at, user: frUserCard(r) }));
+}
+
+async function frFriends(userId) {
+  const { rows } = await pool.query(
+    `SELECT u.id AS user_id, u.username, u.display_name, u.avatar
+     FROM friend_requests fr JOIN users u ON u.id = CASE WHEN fr.sender_id=$1 THEN fr.receiver_id ELSE fr.sender_id END
+     WHERE (fr.sender_id=$1 OR fr.receiver_id=$1) AND fr.status='accepted'
+     ORDER BY u.username`,
+    [userId]
+  );
+  return rows.map(frUserCard);
+}
+
 module.exports = {
   isEnabled, initDb,
   get pool(){ return pool; },
@@ -239,5 +348,8 @@ module.exports = {
   countUsers, getAllUsers,
   setVerifyToken, verifyEmail, verifyEmailByCode,
   setResetToken, resetPassword, verifyPassword,
-  genToken, genId, isValidHandle
+  genToken, genId, isValidHandle,
+  searchUsersByPrefix,
+  frGetById, frListBetween, frInsert, frSetStatus, frDelete, frDeleteBetween,
+  frIncoming, frOutgoing, frFriends
 };

@@ -110,6 +110,7 @@ async function logout(){
   localStorage.removeItem('rave_bio');
   localStorage.removeItem('rave_isCreator');
   localStorage.removeItem('rave_badge');
+  localStorage.removeItem('rave_isGuest');
   location.reload();
 }
 
@@ -214,7 +215,7 @@ async function checkAuth(){
     if(!r.ok) throw new Error();
     const j = await r.json();
     currentAvatar=j.avatar||localStorage.getItem('rave_ava')||''; currentBio=j.bio||''; currentUsername=j.username||''; currentDisplayName=j.displayName||j.username||localStorage.getItem('rave_display')||currentUsername;
-    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); { let bd=j.badge||(j.isCreator?'founder':null); if(bd==='developer') bd='founder'; setBadgeLocal(bd); }
+    localStorage.setItem('rave_ava', currentAvatar); localStorage.setItem('rave_bio', currentBio); if(currentDisplayName) localStorage.setItem('rave_display', currentDisplayName); if(currentUsername) localStorage.setItem('rave_user', currentUsername); if(j.email) localStorage.setItem('rave_email', j.email); else if(!j.isGuest) localStorage.setItem('rave_email', j.email||''); localStorage.setItem('rave_isGuest', j.isGuest ? '1' : '0'); { let bd=j.badge||(j.isCreator?'founder':null); if(bd==='developer') bd='founder'; setBadgeLocal(bd); }
     if(!j.emailVerified && j.email){
       showAuth();
       inVerification=true;
@@ -273,9 +274,12 @@ function showLobby(displayName, avatar){
   const avaHtml = isPhoto(avatar) ? `<img src="${avatar}" alt="ava">` : letterFor(nameForLetter);
   const avaCls = isPhoto(avatar) ? ' has-photo letter-avatar' : ' letter-avatar';
   const bg = isPhoto(avatar) ? '' : ` style="background:${avatarBg(nameForLetter)};color:#fff;"`;
-  navRight.innerHTML = `<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
+  const isGuestUser = localStorage.getItem('rave_isGuest') === '1' || !localStorage.getItem('rave_email');
+  const friendsBtn = isGuestUser ? '' : `<button class="btn-ghost" id="friendsBtnNav" title="Друзья" style="position:relative;">Друзья</button>`;
+  navRight.innerHTML = `${friendsBtn}<button class="avatar-btn${avaCls}" id="profileBtn" title="Профиль"${bg}>${avaHtml}</button><button class="btn-ghost" id="logoutBtn">Выйти</button>`;
   $('#logoutBtn').onclick = logout;
   $('#profileBtn').onclick = openProfile;
+  if(typeof bindFriendsNav === 'function') bindFriendsNav();
   applyTranslations();
 }
 
@@ -591,6 +595,57 @@ function validateVideoUrl(){
   }
 }
 videoUrl.addEventListener('input', validateVideoUrl);
+// --- video search (RuTube, без ключей) ---
+const videoSearch = $('#videoSearch');
+const searchResults = $('#searchResults');
+let searchTimer = null;
+function setPlatform(p){
+  const btn = document.querySelector(`.plat[data-plat="${p}"]`);
+  if(btn) btn.click();
+  else { platform = p; }
+}
+function escapeHtmlSearch(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderSearchResults(list){
+  if(!searchResults) return;
+  if(!list || !list.length){ searchResults.style.display='none'; searchResults.innerHTML=''; return; }
+  searchResults.style.display='flex';
+  searchResults.innerHTML='';
+  list.forEach(v=>{
+    const d=document.createElement('button');
+    d.type='button';
+    d.style.cssText='display:flex;gap:10px;align-items:center;text-align:left;background:#0a0a0a;border:1px solid var(--border);border-radius:12px;padding:8px;cursor:pointer;color:#fff;width:100%;';
+    d.innerHTML=`${v.thumbnail?`<img src="${escapeHtmlSearch(v.thumbnail)}" style="width:72px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;" loading="lazy" alt="">`:''}<span style="flex:1;min-width:0;"><span style="display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtmlSearch(v.title)}</span><span style="display:block;font-size:11px;color:#9a9a9a;margin-top:2px;">${escapeHtmlSearch(v.author||'')} ${v.duration?'• '+escapeHtmlSearch(v.duration):''}</span></span><span style="font-size:11px;color:#4ade80;font-weight:700;flex-shrink:0;">Выбрать</span>`;
+    d.onclick=()=>{
+      setPlatform('rutube');
+      videoUrl.value=v.videoUrl;
+      validateVideoUrl();
+      const titleEl=$('#roomTitle');
+      if(titleEl && !titleEl.value.trim()) titleEl.value=(v.title||'').slice(0,60);
+      searchResults.style.display='none';
+      videoUrl.scrollIntoView({behavior:'smooth', block:'center'});
+    };
+    searchResults.appendChild(d);
+  });
+}
+if(videoSearch){
+  videoSearch.addEventListener('input', ()=>{
+    clearTimeout(searchTimer);
+    const q=videoSearch.value.trim();
+    if(q.length<2){ renderSearchResults([]); return; }
+    searchTimer=setTimeout(async ()=>{
+      try{
+        searchResults.style.display='flex';
+        searchResults.innerHTML='<div style="font-size:12px;color:#9a9a9a;padding:8px;">Ищем...</div>';
+        const r=await fetch('/api/search?q='+encodeURIComponent(q));
+        const j=await r.json();
+        if(!r.ok) throw new Error(j.error||'Ошибка поиска');
+        if(videoSearch.value.trim()!==q) return;
+        renderSearchResults(j.results||[]);
+        if(!(j.results||[]).length) searchResults.innerHTML='<div style="font-size:12px;color:#9a9a9a;padding:8px;">Ничего не найдено. Попробуй другое название.</div>';
+      }catch(e){ searchResults.innerHTML=`<div style="font-size:12px;color:#ff6b6b;padding:8px;">${escapeHtmlSearch(e.message)}</div>`; }
+    }, 500);
+  });
+}
 platBtns.forEach(b=> b.onclick = ()=>{
   platBtns.forEach(x=> x.classList.remove('active'));
   b.classList.add('active');

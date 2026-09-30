@@ -694,6 +694,341 @@ app.get('/api/check-username', async (req, res) => {
   res.json({ available: !exists });
 });
 
+// --- Video search (MVP: RuTube, без ключей) ---
+const searchCache = new Map();
+const SEARCH_TTL = 10 * 60 * 1000;
+function fmtDur(sec) {
+  sec = Math.floor(Number(sec) || 0);
+  const m = Math.floor(sec / 60), s = String(sec % 60).padStart(2, '0');
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}:${String(m % 60).padStart(2, '0')}:${s}`;
+  return `${m}:${s}`;
+}
+app.get('/api/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').toString().trim().slice(0, 100);
+    if (!q || q.length < 2) return res.status(400).json({ error: 'Введи минимум 2 символа' });
+    const key = q.toLowerCase();
+    const cached = searchCache.get(key);
+    if (cached && Date.now() - cached.ts < SEARCH_TTL) return res.json({ results: cached.results, cached: true });
+    const url = 'https://rutube.ru/api/search/video/?query=' + encodeURIComponent(q) + '&page=1&per_page=10';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    let data;
+    try {
+      const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'togetherly/1.0' } });
+      if (!r.ok) throw new Error('RuTube ответил ' + r.status);
+      data = await r.json();
+    } finally { clearTimeout(timer); }
+    const results = (data.results || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10).map(v => ({
+      platform: 'rutube',
+      title: v.title || 'Без названия',
+      videoUrl: v.video_url || ('https://rutube.ru/video/' + v.id + '/'),
+      thumbnail: v.thumbnail_url || '',
+      duration: fmtDur(v.duration),
+      author: (v.author && v.author.name) || '',
+      views: v.hits || 0,
+    }));
+    searchCache.set(key, { ts: Date.now(), results });
+    if (searchCache.size > 100) searchCache.delete([...searchCache.keys()][0]);
+    res.json({ results });
+  } catch (e) {
+    console.error('/api/search error:', e.message);
+    res.status(500).json({ error: 'Поиск временно недоступен' });
+  }
+});
+
+// --- Friends system (v2: race-proof, rate-limited) ---
+
+const memFriendRequests = new Map(); // memory-mode store (DB mode uses friend_requests table)
+const frPairLocks = new Map(); // per-pair mutex against double-submit races
+function frPairKey(a, b) { return [String(a), String(b)].sort().join(':'); }
+async function withFrLock(a, b, fn) {
+  const key = frPairKey(a, b);
+  const prev = frPairLocks.get(key) || Promise.resolve();
+  let release;
+  const cur = new Promise(r => { release = r; });
+  frPairLocks.set(key, prev.then(() => cur));
+  await prev;
+  try { return await fn(); }
+  finally { release(); if (frPairLocks.get(key) === cur) frPairLocks.delete(key); }
+}
+
+function frRowDbToApi(r) {
+  return r && { id: r.id, senderId: r.sender_id, receiverId: r.receiver_id, status: r.status, createdAt: r.created_at, respondedAt: r.responded_at };
+}
+function findMemUserById(id) {
+  return [...ephemeralEmailUsers.values()].find(u => String(u.id) === String(id)) || ephemeralUsers.get(id) || null;
+}
+function findMemUserByUsername(username) {
+  const q = String(username || '').toLowerCase();
+  return [...ephemeralEmailUsers.values()].find(u => u.username && u.username.toLowerCase() === q) || null;
+}
+function memUserCard(u) {
+  return { id: u.id, username: u.username, displayName: u.displayName || u.username, avatar: u.avatar || '' };
+}
+
+const FR = {
+  async getById(id) { return db.isEnabled() ? frRowDbToApi(await db.frGetById(id)) : (memFriendRequests.get(id) || null); },
+  async listBetween(aId, bId) {
+    if (db.isEnabled()) return (await db.frListBetween(aId, bId)).map(frRowDbToApi);
+    return [...memFriendRequests.values()].filter(r => (String(r.senderId) === String(aId) && String(r.receiverId) === String(bId)) || (String(r.senderId) === String(bId) && String(r.receiverId) === String(aId)));
+  },
+  async insert(senderId, receiverId) {
+    if (db.isEnabled()) return frRowDbToApi(await db.frInsert(senderId, receiverId));
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const row = { id, senderId: String(senderId), receiverId: String(receiverId), status: 'pending', createdAt: new Date().toISOString(), respondedAt: null };
+    memFriendRequests.set(id, row);
+    return row;
+  },
+  async setStatus(id, status) {
+    if (db.isEnabled()) return frRowDbToApi(await db.frSetStatus(id, status));
+    const r = memFriendRequests.get(id);
+    if (!r) return null;
+    r.status = status;
+    r.respondedAt = new Date().toISOString();
+    return r;
+  },
+  async remove(id) {
+    if (db.isEnabled()) return db.frDelete(id);
+    memFriendRequests.delete(id);
+  },
+  async clearHistory(aId, bId) {
+    if (db.isEnabled()) return db.frDeleteBetween(aId, bId, ['rejected']);
+    for (const [id, r] of memFriendRequests) {
+      const pair = (String(r.senderId) === String(aId) && String(r.receiverId) === String(bId)) || (String(r.senderId) === String(bId) && String(r.receiverId) === String(aId));
+      if (pair && r.status !== 'pending' && r.status !== 'accepted') memFriendRequests.delete(id);
+    }
+  },
+  async incoming(userId) {
+    if (db.isEnabled()) return db.frIncoming(userId);
+    return [...memFriendRequests.values()]
+      .filter(r => String(r.receiverId) === String(userId) && r.status === 'pending')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, user: memUserCard(findMemUserById(r.senderId) || { id: r.senderId, username: 'unknown', displayName: 'unknown' }) }));
+  },
+  async outgoing(userId) {
+    if (db.isEnabled()) return db.frOutgoing(userId);
+    return [...memFriendRequests.values()]
+      .filter(r => String(r.senderId) === String(userId) && r.status === 'pending')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, user: memUserCard(findMemUserById(r.receiverId) || { id: r.receiverId, username: 'unknown', displayName: 'unknown' }) }));
+  },
+  async friends(userId) {
+    if (db.isEnabled()) return db.frFriends(userId);
+    const ids = new Set();
+    for (const r of memFriendRequests.values()) {
+      if (r.status !== 'accepted') continue;
+      if (String(r.senderId) === String(userId)) ids.add(r.receiverId);
+      else if (String(r.receiverId) === String(userId)) ids.add(r.senderId);
+    }
+    return [...ids].map(findMemUserById).filter(Boolean).map(memUserCard)
+      .sort((a, b) => a.username.localeCompare(b.username));
+  }
+};
+
+// in-memory notifications (poll via /api/friends/summary); survives per-process
+const userNotifications = new Map();
+function notifyUser(userId, payload) {
+  try {
+    if (!userId) return;
+    const list = userNotifications.get(String(userId)) || [];
+    list.push({ ...payload, at: new Date().toISOString() });
+    userNotifications.set(String(userId), list.slice(-20));
+  } catch {}
+}
+
+function requireAccount(me) { return !!(me && me.username && me.email); }
+async function findUserByUsernameAny(username) {
+  if (db.isEnabled()) return db.getUserByUsername(username);
+  return findMemUserByUsername(username);
+}
+function frRate(req, res, max = 20, windowMs = 60000) {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (!checkRateLimit('fr:' + ip, max, windowMs)) { res.status(429).json({ error: 'Слишком много запросов. Подожди минуту.' }); return false; }
+  return true;
+}
+
+app.get('/api/search/users', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const q = String(req.query.q || '').trim().replace(/^@+/, '').toLowerCase();
+    if (q.length < 2 || !/^[a-z0-9_-]+$/.test(q)) return res.json({ users: [] });
+    let users;
+    if (db.isEnabled()) {
+      users = await db.searchUsersByPrefix(q, me.id);
+    } else {
+      users = [...ephemeralEmailUsers.values()]
+        .filter(u => u.username && u.username.toLowerCase().startsWith(q) && String(u.id) !== String(me.id))
+        .sort((a, b) => a.username.localeCompare(b.username)).slice(0, 8)
+        .map(memUserCard);
+    }
+    // annotate with relationship status for instant UI
+    const out = [];
+    for (const u of users) {
+      const rows = await FR.listBetween(me.id, u.id);
+      const accepted = rows.find(r => r.status === 'accepted');
+      const sent = rows.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+      const received = rows.find(r => r.status === 'pending' && String(r.receiverId) === String(me.id));
+      out.push({ ...u, rel: accepted ? 'accepted' : sent ? 'pending_sent' : received ? 'pending_received' : 'none', requestId: (accepted || sent || received)?.id || null });
+    }
+    res.json({ users: out });
+  } catch (e) {
+    console.error('/api/search/users error:', e);
+    res.status(500).json({ error: 'Ошибка поиска' });
+  }
+});
+
+app.get('/api/relationship/:username', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const target = await findUserByUsernameAny(req.params.username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (String(target.id) === String(me.id)) return res.json({ status: 'self', requestId: null });
+    const rows = await FR.listBetween(me.id, target.id);
+    const accepted = rows.find(r => r.status === 'accepted');
+    if (accepted) return res.json({ status: 'accepted', requestId: accepted.id });
+    const sent = rows.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+    if (sent) return res.json({ status: 'pending_sent', requestId: sent.id });
+    const received = rows.find(r => r.status === 'pending' && String(r.receiverId) === String(me.id));
+    if (received) return res.json({ status: 'pending_received', requestId: received.id });
+    res.json({ status: 'none', requestId: null });
+  } catch (e) {
+    console.error('/api/relationship error:', e);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+app.post('/api/friend-requests', async (req, res) => {
+  try {
+    if (!frRate(req, res)) return;
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    if (!requireAccount(me)) return res.status(403).json({ error: 'Друзья доступны только аккаунтам с именем пользователя' });
+    const username = String(req.body?.username || '').trim().replace(/^@+/, '').toLowerCase();
+    if (!username) return res.status(400).json({ error: 'Укажите username' });
+    const target = await findUserByUsernameAny(username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (String(target.id) === String(me.id)) return res.status(400).json({ error: 'Нельзя отправить заявку самому себе' });
+    if (!requireAccount(target)) return res.status(400).json({ error: 'У этого пользователя нет имени пользователя' });
+
+    return await withFrLock(me.id, target.id, async () => {
+      const rows = await FR.listBetween(me.id, target.id);
+      const accepted = rows.find(r => r.status === 'accepted');
+      if (accepted) return res.status(400).json({ error: 'Вы уже друзья' });
+      const received = rows.find(r => r.status === 'pending' && String(r.receiverId) === String(me.id));
+      if (received) {
+        const row = await FR.setStatus(received.id, 'accepted');
+        notifyUser(target.id, { type: 'friend_accept', username: me.username, text: `@${me.username} принял(а) вашу заявку в друзья` });
+        return res.json({ status: 'accepted', requestId: row?.id || null, autoAccepted: true });
+      }
+      const sent = rows.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+      if (sent) return res.status(400).json({ error: 'Заявка уже отправлена' });
+      await FR.clearHistory(me.id, target.id);
+      try {
+        const row = await FR.insert(String(me.id), String(target.id));
+        notifyUser(target.id, { type: 'friend_request', username: me.username, text: `@${me.username} отправил(а) вам заявку в друзья` });
+        return res.json({ status: 'pending_sent', requestId: row.id });
+      } catch (e) {
+        if (e && (e.code === '23505' || /duplicate|unique/i.test(e.message || ''))) {
+          const retry = await FR.listBetween(me.id, target.id);
+          const dup = retry.find(r => r.status === 'pending' && String(r.senderId) === String(me.id));
+          if (dup) return res.status(400).json({ error: 'Заявка уже отправлена' });
+          return res.status(400).json({ error: 'Заявка уже существует' });
+        }
+        throw e;
+      }
+    });
+  } catch (e) {
+    console.error('POST /api/friend-requests error:', e);
+    if (!res.headersSent) res.status(500).json({ error: 'Ошибка отправки заявки' });
+  }
+});
+
+async function handleFriendRequestAction(req, res, action) {
+  const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+  if (!me) return res.status(401).json({ error: 'Не авторизован' });
+  const row = await FR.getById(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (action === 'cancel') {
+    if (String(row.senderId) !== String(me.id)) return res.status(403).json({ error: 'Отменить может только отправитель' });
+    if (row.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+    await FR.remove(row.id);
+    return res.json({ status: 'cancelled', requestId: row.id });
+  }
+  if (String(row.receiverId) !== String(me.id)) return res.status(403).json({ error: 'Нет доступа к этой заявке' });
+  if (row.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+  const updated = await FR.setStatus(row.id, action === 'accept' ? 'accepted' : 'rejected');
+  if (action === 'accept') notifyUser(String(row.senderId), { type: 'friend_accept', username: me.username, text: `@${me.username} принял(а) вашу заявку в друзья` });
+  return res.json({ status: updated.status, requestId: updated.id });
+}
+app.post('/api/friend-requests/:id/accept', async (req, res) => {
+  try { if (!frRate(req, res)) return; await handleFriendRequestAction(req, res, 'accept'); } catch (e) { console.error('accept error:', e); if (!res.headersSent) res.status(500).json({ error: 'Ошибка' }); }
+});
+app.post('/api/friend-requests/:id/reject', async (req, res) => {
+  try { if (!frRate(req, res)) return; await handleFriendRequestAction(req, res, 'reject'); } catch (e) { console.error('reject error:', e); if (!res.headersSent) res.status(500).json({ error: 'Ошибка' }); }
+});
+app.post('/api/friend-requests/:id/cancel', async (req, res) => {
+  try { if (!frRate(req, res)) return; await handleFriendRequestAction(req, res, 'cancel'); } catch (e) { console.error('cancel error:', e); if (!res.headersSent) res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friend-requests/incoming', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ requests: await FR.incoming(me.id) });
+  } catch (e) { console.error('incoming error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friend-requests/outgoing', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ requests: await FR.outgoing(me.id) });
+  } catch (e) { console.error('outgoing error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friends', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    res.json({ friends: await FR.friends(me.id) });
+  } catch (e) { console.error('friends error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.post('/api/friends/remove', async (req, res) => {
+  try {
+    if (!frRate(req, res)) return;
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const username = String(req.body?.username || '').trim().replace(/^@+/, '').toLowerCase();
+    const target = await findUserByUsernameAny(username);
+    if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
+    const rows = await FR.listBetween(me.id, target.id);
+    const accepted = rows.find(r => r.status === 'accepted');
+    if (!accepted) return res.status(404).json({ error: 'Вы не друзья' });
+    await FR.remove(accepted.id);
+    res.json({ status: 'removed' });
+  } catch (e) { console.error('remove friend error:', e); if (!res.headersSent) res.status(500).json({ error: 'Ошибка' }); }
+});
+
+app.get('/api/friends/summary', async (req, res) => {
+  try {
+    const me = await parseToken((req.headers.authorization || '').replace('Bearer ', ''));
+    if (!me) return res.status(401).json({ error: 'Не авторизован' });
+    const incoming = await FR.incoming(me.id);
+    const notes = userNotifications.get(String(me.id)) || [];
+    res.json({
+      incoming: incoming.length,
+      lastIncomingUsername: incoming[0]?.user?.username || null,
+      friends: (await FR.friends(me.id)).length,
+      notifications: notes.slice(-5)
+    });
+  } catch (e) { console.error('summary error:', e); res.status(500).json({ error: 'Ошибка' }); }
+});
+
 app.post('/api/rooms', async (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   const user = await parseToken(token);

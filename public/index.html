@@ -177,6 +177,11 @@
         <button class="plat" data-plat="youtube">YouTube</button>
       </div>
       <div class="field">
+        <label>Найти фильм</label>
+        <input id="videoSearch" placeholder="Введи название..." autocomplete="off" />
+        <div id="searchResults" style="display:none;flex-direction:column;gap:8px;margin-top:8px;max-height:260px;overflow-y:auto;"></div>
+      </div>
+      <div class="field">
         <label data-i18n="Название комнаты (необязательно)">Название комнаты (необязательно)</label>
         <input id="roomTitle" placeholder="Вечерний кинчик" data-i18n-placeholder="Вечерний кинчик" />
       </div>
@@ -337,7 +342,38 @@
     </div>
   </div>
 
+  <!-- FRIENDS -->
+  <div id="friendsModal" class="modal-bg">
+    <div class="modal friends-modal">
+      <div class="modal-head">
+        <h3>Друзья <span id="friendsCount" class="fr-count"></span></h3>
+        <button class="x" id="friendsClose">✕</button>
+      </div>
+      <div id="friendsGuestHint" class="fr-hint" style="display:none;">Друзья доступны только аккаунтам с именем пользователя — зарегистрируйся через почту.</div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Поиск по @username</label>
+        <input id="friendsSearch" placeholder="@username" autocomplete="off" maxlength="20" />
+        <div id="friendsSearchResults" class="fr-list" style="margin-top:8px;"></div>
+      </div>
+      <div id="friendsIncomingSec" class="fr-sec" style="display:none;">
+        <div class="fr-sec-title">Входящие</div>
+        <div id="friendsIncomingList" class="fr-list"></div>
+      </div>
+      <div id="friendsOutgoingSec" class="fr-sec" style="display:none;">
+        <div class="fr-sec-title">Исходящие</div>
+        <div id="friendsOutgoingList" class="fr-list"></div>
+      </div>
+      <div class="fr-sec">
+        <div class="fr-sec-title">Мои друзья</div>
+        <div id="friendsList" class="fr-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="frToast" class="fr-toast"></div>
+
 <script src="/app.js?v=20250825h"></script>
+<script src="/friends.js?v=20260930"></script>
 <script>localStorage.setItem('rave_lang','ru');</script>
 </body>
 </html>
