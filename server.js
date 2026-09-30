@@ -713,12 +713,25 @@ app.get('/api/search', async (req, res) => {
     if (cached && Date.now() - cached.ts < SEARCH_TTL) return res.json({ results: cached.results, cached: true });
     const url = 'https://rutube.ru/api/search/video/?query=' + encodeURIComponent(q) + '&page=1&per_page=10';
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const timer = setTimeout(() => ctrl.abort(), 12000);
     let data;
     try {
-      const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'togetherly/1.0' } });
+      const r = await fetch(url, {
+        signal: ctrl.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+          'Referer': 'https://rutube.ru/',
+          'Origin': 'https://rutube.ru'
+        }
+      });
+      console.log(`[search] q="${q}" rutube_status=${r.status}`);
       if (!r.ok) throw new Error('RuTube ответил ' + r.status);
       data = await r.json();
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('RuTube не ответил (таймаут)');
+      throw e;
     } finally { clearTimeout(timer); }
     const results = (data.results || []).filter(v => v && !v.is_deleted && !v.is_hidden).slice(0, 10).map(v => ({
       platform: 'rutube',
@@ -731,6 +744,7 @@ app.get('/api/search', async (req, res) => {
     }));
     searchCache.set(key, { ts: Date.now(), results });
     if (searchCache.size > 100) searchCache.delete([...searchCache.keys()][0]);
+    console.log(`[search] q="${q}" results=${results.length}`);
     res.json({ results });
   } catch (e) {
     console.error('/api/search error:', e.message);

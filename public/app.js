@@ -637,11 +637,15 @@ if(videoSearch){
         searchResults.style.display='flex';
         searchResults.innerHTML='<div style="font-size:12px;color:#9a9a9a;padding:8px;">Ищем...</div>';
         const r=await fetch('/api/search?q='+encodeURIComponent(q));
-        const j=await r.json();
-        if(!r.ok) throw new Error(j.error||'Ошибка поиска');
+        const j=await r.json().catch(()=>({}));
+        if(!r.ok) throw new Error(j.error||('Ошибка поиска ('+r.status+')'));
         if(videoSearch.value.trim()!==q) return;
+        if(!(j.results||[]).length){
+          searchResults.style.display='flex';
+          searchResults.innerHTML='<div style="font-size:12px;color:#9a9a9a;padding:8px;">Ничего не найдено. Попробуй другое название.</div>';
+          return;
+        }
         renderSearchResults(j.results||[]);
-        if(!(j.results||[]).length) searchResults.innerHTML='<div style="font-size:12px;color:#9a9a9a;padding:8px;">Ничего не найдено. Попробуй другое название.</div>';
       }catch(e){ searchResults.innerHTML=`<div style="font-size:12px;color:#ff6b6b;padding:8px;">${escapeHtmlSearch(e.message)}</div>`; }
     }, 500);
   });
