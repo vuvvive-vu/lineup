@@ -89,14 +89,16 @@ function frProfileModalEl() {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
   return m;
 }
-function frProfileActionBtn(rel, username, requestId) {
-  username = frEsc(username);
-  if (rel === 'self') return '';
-  if (rel === 'accepted') return `<button class="btn-ghost fr-profile-btn" data-fr-remove="${username}">✓ Друзья — удалить?</button>`;
-  if (rel === 'pending_sent') return `<button class="btn-ghost fr-profile-btn" data-fr-cancel-id="${frEsc(requestId || '')}">Заявка отправлена — отменить</button>`;
-  if (rel === 'pending_received') return `<button class="btn-primary fr-profile-btn" data-fr-accept-id="${frEsc(requestId || '')}">Принять заявку</button>`;
-  return `<button class="btn-primary fr-profile-btn" data-fr-add="${username}">Добавить в друзья</button>`;
+function frBadgeLabel(b) {
+  b = String(b || '').toLowerCase();
+  if (b === 'founder' || b === 'developer') return 'FOUNDER';
+  if (b === 'founders_wife') return "FOUNDER'S WIFE";
+  if (b === 'boo') return 'BOO!';
+  return b.toUpperCase();
 }
+// Профиль друга — только просмотр, как в комнате: без кнопок действий.
+// (Управлять дружбой можно из списка друзей: ✓ / ✕ / Принять.)
+function frProfileActionBtn() { return ''; }
 async function openFrProfile(username) {
   username = String(username || '').replace(/^@+/, '').trim();
   if (!username) return;
@@ -113,19 +115,13 @@ async function openFrProfile(username) {
     if (mySeq !== frProfSeq) return;
     if (!u || u.error) throw new Error((u && u.error) || 'Пользователь не найден');
     const disp = u.displayName || u.username || username;
-    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(String(u.activeBadge || u.badge).toUpperCase())}</span>` : '';
+    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
     body.innerHTML = `<div class="fr-profile-top">
         ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
         <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
         <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
         <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
-        <div class="fr-profile-actions">${frProfileActionBtn(rel.status, u.username || username, rel.requestId)}</div>
       </div>`;
-    frBindActionButtons(body);
-    // after any action inside popup — refresh popup + friends list
-    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-      setTimeout(() => { if (m.classList.contains('show')) openFrProfileRefresh(username); }, 600);
-    }, { once: true }));
   } catch (e) {
     if (mySeq !== frProfSeq) return;
     body.innerHTML = `<div class="fr-empty">${frEsc(e.message)}</div>`;
@@ -145,18 +141,13 @@ async function openFrProfileRefresh(username) {
     const m = document.getElementById('frProfileModal');
     if (!m || !m.classList.contains('show')) return;
     const disp = u.displayName || u.username || username;
-    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(String(u.activeBadge || u.badge).toUpperCase())}</span>` : '';
+    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
     body.innerHTML = `<div class="fr-profile-top">
         ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
         <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
         <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
         <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
-        <div class="fr-profile-actions">${frProfileActionBtn(rel.status, u.username || username, rel.requestId)}</div>
       </div>`;
-    frBindActionButtons(body);
-    body.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-      setTimeout(() => { if (m.classList.contains('show')) openFrProfileRefresh(username); }, 600);
-    }, { once: true }));
   } catch {}
 }
 
