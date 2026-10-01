@@ -73,6 +73,23 @@ function frUserRow(u, rightHtml, sub) {
 }
 
 // --- view friend profile (ТОЧНАЯ копия openViewProfile из room.js, только read-only) ---
+function frFmtLastSeen(iso) {
+  try {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    const m = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (m < 1) return 'был(а) только что';
+    if (m < 60) return `был(а) ${m} мин. назад`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `был(а) ${h} ч. назад`;
+    return 'был(а) ' + d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  } catch { return ''; }
+}
+function frPaintOnline(el, isOnline, lastSeen) {
+  if (!el) return;
+  el.style.display = '';
+  if (isOnline) { el.textContent = 'в сети'; el.style.color = '#4ade80'; return; }
+  el.textContent = frFmtLastSeen(lastSeen) || 'не в сети'; el.style.color = '#9a9a9a';
+}
 const frViewProfileModal = document.getElementById('viewProfileModal');
 const frVAvaLarge = document.getElementById('vAvaLarge');
 const frVUsername = document.getElementById('vUsername');
@@ -123,6 +140,7 @@ function openFrProfile(username) {
     const vCreatorBadge = document.getElementById('vCreatorBadge');
     const vAvaWrap = document.getElementById('vAvaWrap');
     frApplyBadge(vAvaWrap, vCrownIcon, vCreatorBadge, badge, isGuest);
+    frPaintOnline(document.getElementById('vOnline'), u.isOnline, u.lastSeen);
 
     frViewProfileModal.classList.add('show');
   }).catch(() => {
@@ -134,6 +152,8 @@ function openFrProfile(username) {
     if (card) card.style.display = isGuest ? 'none' : '';
     if (!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent = '@' + username;
     if (!isGuest && frVBio.parentElement) frVBio.parentElement.style.display = 'none';
+    const vOnErr = document.getElementById('vOnline');
+    if (vOnErr) vOnErr.style.display = 'none';
 
     const vCrownIcon = document.getElementById('vCrownIcon');
     const vCreatorBadge = document.getElementById('vCreatorBadge');

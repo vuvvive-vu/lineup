@@ -63,6 +63,7 @@ async function initSchema() {
   if (!existing.includes('badge')) await pool.query("ALTER TABLE users ADD COLUMN badge TEXT DEFAULT NULL");
   if (!existing.includes('badges')) await pool.query("ALTER TABLE users ADD COLUMN badges TEXT DEFAULT '[]'");
   if (!existing.includes('active_badge')) await pool.query("ALTER TABLE users ADD COLUMN active_badge TEXT DEFAULT NULL");
+  if (!existing.includes('last_seen')) await pool.query('ALTER TABLE users ADD COLUMN last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
   // ensure username is lowercase unique index
   try { await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (lower(username))'); } catch {}
   // backfill display_name for old rows
@@ -99,7 +100,7 @@ function genToken() {
 
 async function getUserById(id) {
   const { rows } = await pool.query(
-    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge FROM users WHERE id=$1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge, last_seen FROM users WHERE id=$1',
     [id]
   );
   return rows[0] || null;
@@ -107,10 +108,14 @@ async function getUserById(id) {
 
 async function getUserByUsername(username) {
   const { rows } = await pool.query(
-    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1',
+    'SELECT id, username, display_name, email, avatar, bio, email_verified, badge, badges, active_badge, last_seen FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1',
     [username]
   );
   return rows[0] || null;
+}
+
+async function touchLastSeen(id) {
+  try { await pool.query('UPDATE users SET last_seen=NOW() WHERE id=$1', [id]); } catch {}
 }
 
 function isValidHandle(s){ return /^[a-z0-9_-]{3,20}$/.test(s); }
@@ -348,7 +353,7 @@ module.exports = {
   countUsers, getAllUsers,
   setVerifyToken, verifyEmail, verifyEmailByCode,
   setResetToken, resetPassword, verifyPassword,
-  genToken, genId, isValidHandle,
+  genToken, genId, isValidHandle, touchLastSeen,
   searchUsersByPrefix,
   frGetById, frListBetween, frInsert, frSetStatus, frDelete, frDeleteBetween,
   frIncoming, frOutgoing, frFriends

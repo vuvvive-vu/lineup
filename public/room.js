@@ -1244,6 +1244,24 @@ if(profileModalRoom){
     eUserInputRoom.addEventListener('input', runRoomCheck);
   }
 }
+// online status text (real tracker: isOnline/lastSeen from /api/users)
+function fmtLastSeenRoom(iso){
+  try{
+    const d=new Date(iso); if(isNaN(d)) return '';
+    const m=Math.floor((Date.now()-d.getTime())/60000);
+    if(m<1) return 'был(а) только что';
+    if(m<60) return `был(а) ${m} мин. назад`;
+    const h=Math.floor(m/60);
+    if(h<24) return `был(а) ${h} ч. назад`;
+    return 'был(а) '+d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  }catch{ return ''; }
+}
+function paintOnlineRoom(el, isOnline, lastSeen){
+  if(!el) return;
+  el.style.display='';
+  if(isOnline){ el.textContent='в сети'; el.style.color='#4ade80'; return; }
+  el.textContent=fmtLastSeenRoom(lastSeen)||'не в сети'; el.style.color='#9a9a9a';
+}
 // view other profile (read-only, same card as own)
 const viewProfileModal=document.getElementById('viewProfileModal');
 const vAvaLarge=document.getElementById('vAvaLarge');
@@ -1277,7 +1295,8 @@ function openViewProfile(username){
     const vCreatorBadge = document.getElementById('vCreatorBadge');
     const vAvaWrap = document.getElementById('vAvaWrap');
     applyBadgeToProfileR(vAvaWrap, vCrownIcon, vCreatorBadge, badge, isGuest);
-    
+    paintOnlineRoom(document.getElementById('vOnline'), u.isOnline, u.lastSeen);
+
     viewProfileModal.classList.add('show');
   }).catch(()=>{
     const ava=presenceAvatars[username]||'';
@@ -1290,6 +1309,8 @@ function openViewProfile(username){
     if(card) card.style.display = isGuest ? 'none' : '';
     if(!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent='@'+username;
     if(!isGuest && vBio.parentElement) vBio.parentElement.style.display='none';
+    const vOnErr=document.getElementById('vOnline');
+    if(vOnErr) vOnErr.style.display='none';
     
     // Hide creator badge on error
     const vCrownIcon = document.getElementById('vCrownIcon');

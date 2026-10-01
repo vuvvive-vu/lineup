@@ -174,13 +174,55 @@ async function parseToken(token) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (!decoded.id) return null;
+    let u = null;
     if (db.isEnabled()) {
-      const u = await db.getUserById(decoded.id);
-      if (u) return u;
-      return ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x => x.id === decoded.id) || null;
+      u = await db.getUserById(decoded.id);
+      if (!u) u = ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x => x.id === decoded.id) || null;
+    } else {
+      u = ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x => x.id === decoded.id) || null;
     }
-    return ephemeralUsers.get(decoded.id) || [...ephemeralEmailUsers.values()].find(x => x.id === decoded.id) || null;
+    if (u && u.id) touchSeen(u.id).catch(() => {});
+    return u;
   } catch { return null; }
+}
+
+// --- Online tracker (real presence) ---
+// last_seen обновляется при любом authed API-запросе (троттлинг 30с) —
+// отдельный heartbeat с клиента не нужен: лобби поллит /api/friends/summary,
+// страница verify/reset дергает API при действиях, комната держит WebSocket.
+const lastSeenMem = new Map();
+const lastTouchMem = new Map();
+const ONLINE_TTL_MS = 90000;
+const TOUCH_THROTTLE_MS = 30000;
+async function touchSeen(userId) {
+  if (!userId) return;
+  const now = Date.now();
+  lastSeenMem.set(String(userId), now);
+  const last = lastTouchMem.get(String(userId)) || 0;
+  if (now - last < TOUCH_THROTTLE_MS) return;
+  lastTouchMem.set(String(userId), now);
+  if (db.isEnabled()) {
+    try { await db.touchLastSeen(userId); } catch {}
+  }
+}
+function wsHasUser(userId) {
+  try {
+    for (const set of roomClients.values()) {
+      for (const c of set) {
+        if (String(c.userId) === String(userId) && c.readyState === 1) return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+function onlineStatus(userId, dbLastSeen) {
+  if (!userId) return { isOnline: false, lastSeen: null };
+  const mem = lastSeenMem.get(String(userId)) || 0;
+  let dbTs = 0;
+  try { dbTs = dbLastSeen ? new Date(dbLastSeen).getTime() : 0; } catch {}
+  const last = Math.max(mem, dbTs || 0);
+  const online = (Date.now() - last) < ONLINE_TTL_MS || wsHasUser(userId);
+  return { isOnline: online, lastSeen: last ? new Date(last).toISOString() : null };
 }
 
 const rateLimit = new Map();
@@ -597,15 +639,15 @@ app.get('/api/me', async (req, res) => {
 
 app.get('/api/users/:username', async (req, res) => {
   if (db.isEnabled()) {
-    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, badges, active_badge, email FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
+    const { rows } = await db.pool.query('SELECT id, username, display_name, avatar, bio, badge, badges, active_badge, email, last_seen FROM users WHERE lower(username)=lower($1) ORDER BY created_at DESC LIMIT 1', [req.params.username]);
     if (rows[0]) {
       const badge = getBadgeState(rows[0]);
-      return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '', ...badge, isCreator: !!badge.activeBadge });
+      return res.json({ displayName: rows[0].display_name, username: rows[0].username, avatar: rows[0].avatar || '', bio: rows[0].bio || '', ...badge, isCreator: !!badge.activeBadge, ...onlineStatus(rows[0].id, rows[0].last_seen) });
     }
   }
-  const u = [...ephemeralUsers.values()].find(x => (x.username && x.username.toLowerCase() === req.params.username.toLowerCase()) || x.displayName === req.params.username) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
+  const u = [...ephemeralUsers.values()].find(x => (x.username && x.username.toLowerCase() === req.params.username.toLowerCase()) || x.displayName === req.params.username) || [...ephemeralEmailUsers.values()].find(x => x.username && x.username.toLowerCase() === req.params.username.toLowerCase()) || { displayName: req.params.username, username: null, avatar: '', bio: '' };
   const badge = getBadgeState(u);
-  res.json({ displayName: u.displayName || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '', ...badge, isCreator: !!badge.activeBadge });
+  res.json({ displayName: u.displayName || u.username, username: u.username || null, avatar: u.avatar || '', bio: u.bio || '', ...badge, isCreator: !!badge.activeBadge, ...onlineStatus(u.id || null, null) });
 });
 
 app.put('/api/me', async (req, res) => {
