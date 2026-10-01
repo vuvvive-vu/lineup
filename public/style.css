@@ -542,3 +542,5 @@ html, body { background:#160709; }
 .fr-clickable { cursor:pointer; }
 .fr-clickable:hover .fr-row-name { text-decoration:underline; text-underline-offset:2px; }
 /* (viewProfileModal на главной — те же классы/стили, что в комнате: profile-view-modal и др.) */
+/* версия сайта: видна всем, правый нижний угол */
+#appVersion { position:fixed; right:10px; bottom:8px; z-index:40; font-size:11px; color:rgba(255,255,255,.38); letter-spacing:.04em; user-select:none; pointer-events:none; }
