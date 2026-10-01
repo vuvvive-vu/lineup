@@ -774,7 +774,7 @@ function openProfile(){
   selectedAva=ava;
   if(pViewDisplayName) pViewDisplayName.textContent=disp||'?';
   if(pViewUsername) pViewUsername.textContent= handle ? '@'+handle : 'гость';
-  if(pViewBio) pViewBio.textContent=bio||'—';
+  if(pViewBio){ const hasBio=!!(bio||'').trim(); pViewBio.textContent=bio||''; if(pViewBio.parentElement) pViewBio.parentElement.style.display=hasBio?'':'none'; }
   // avatar view
   renderAvaLargeElNew(pAvaLarge, ava, disp);
   renderAvaLargeElNew(eAvaLarge, ava, disp);
@@ -1066,7 +1066,7 @@ pSave.onclick=async()=>{
     // update view if still open
     if(pViewDisplayName) pViewDisplayName.textContent=j.displayName;
     if(pViewUsername) pViewUsername.textContent='@'+j.username;
-    if(pViewBio) pViewBio.textContent=j.bio||'—';
+    if(pViewBio){ const hasBio=!!(j.bio||'').trim(); pViewBio.textContent=j.bio||''; if(pViewBio.parentElement) pViewBio.parentElement.style.display=hasBio?'':'none'; }
   }catch(e){ showError(pError, e.message); }
   finally{ pSave.disabled=false; pSave.textContent='Сохранить'; }
 };

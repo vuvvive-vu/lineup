@@ -1020,7 +1020,7 @@ function openProfileRoom(){
   const pViewBioEl=document.getElementById('pViewBio');
   if(pViewDisp) pViewDisp.textContent=disp||'?';
   if(pViewUser) pViewUser.textContent= handle ? '@'+handle : 'гость';
-  if(pViewBioEl) pViewBioEl.textContent=bio||'—';
+  if(pViewBioEl){ const hasBio=!!(bio||'').trim(); pViewBioEl.textContent=bio||''; if(pViewBioEl.parentElement) pViewBioEl.parentElement.style.display=hasBio?'':'none'; }
   renderAvaLargeRoomEl(pAvaLargeRoom, ava, disp);
   if(eAvaLargeRoom) renderAvaLargeRoomEl(eAvaLargeRoom, ava, disp);
   pErrorRoom.classList.remove('show'); pErrorRoom.textContent=''; pErrorRoom.style.display='none';
@@ -1267,8 +1267,9 @@ function openViewProfile(username){
     if(card) card.style.display = isGuest ? 'none' : '';
     if(!isGuest){
       if(vHandle) vHandle.textContent='@'+handle;
-      vBio.textContent=bio||'—';
-      vBio.style.color=bio?'#e5e5e5':'#9a9a9a';
+      const hasBio=!!(bio||'').trim();
+      vBio.textContent=bio||'';
+      if(vBio.parentElement) vBio.parentElement.style.display=hasBio?'':'none';
     }
     
     // Show badge - всё оформление привязано к бейджу
@@ -1288,7 +1289,7 @@ function openViewProfile(username){
     const card=document.getElementById('viewProfileCard');
     if(card) card.style.display = isGuest ? 'none' : '';
     if(!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent='@'+username;
-    if(!isGuest) vBio.textContent='—';
+    if(!isGuest && vBio.parentElement) vBio.parentElement.style.display='none';
     
     // Hide creator badge on error
     const vCrownIcon = document.getElementById('vCrownIcon');

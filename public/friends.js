@@ -114,8 +114,9 @@ function openFrProfile(username) {
     if (card) card.style.display = isGuest ? 'none' : '';
     if (!isGuest) {
       if (frVHandle) frVHandle.textContent = '@' + handle;
-      frVBio.textContent = bio || '—';
-      frVBio.style.color = bio ? '#e5e5e5' : '#9a9a9a';
+      const hasBio = !!((bio || '').trim());
+      frVBio.textContent = bio || '';
+      if (frVBio.parentElement) frVBio.parentElement.style.display = hasBio ? '' : 'none';
     }
 
     const vCrownIcon = document.getElementById('vCrownIcon');
@@ -132,7 +133,7 @@ function openFrProfile(username) {
     const card = document.getElementById('viewProfileCard');
     if (card) card.style.display = isGuest ? 'none' : '';
     if (!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent = '@' + username;
-    if (!isGuest) frVBio.textContent = '—';
+    if (!isGuest && frVBio.parentElement) frVBio.parentElement.style.display = 'none';
 
     const vCrownIcon = document.getElementById('vCrownIcon');
     const vCreatorBadge = document.getElementById('vCreatorBadge');
