@@ -87,7 +87,11 @@ h1,h2,h3,h4,.auth-card h1,.welcome-title { font-weight:600; }
 @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 
 .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
-.modal-bg.show { display:flex; }
+.modal-bg.show { display:flex; animation:modalBgIn .18s ease; }
+.modal-bg.show .modal { animation:modalCardIn .24s cubic-bezier(.2,.9,.25,1.04) both; }
+.modal-bg.show .welcome-modal { animation:modalCardIn .24s cubic-bezier(.2,.9,.25,1.04) both; }
+@keyframes modalBgIn { from{opacity:0} to{opacity:1} }
+@keyframes modalCardIn { from{opacity:0; transform:translateY(14px) scale(.96)} to{opacity:1; transform:translateY(0) scale(1)} }
 .modal { width:100%; max-width:440px; background:#111; border:1px solid var(--border); border-radius:24px; padding:24px; animation:pop .18s ease; }
 @keyframes pop { from{transform:scale(.97); opacity:0} to{transform:scale(1); opacity:1}}
 .modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }

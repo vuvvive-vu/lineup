@@ -95,6 +95,9 @@ function frApplyBadge(wrap, crownIcon, badgeEl, badge, isGuest) {
 }
 function openFrProfile(username) {
   if (!frViewProfileModal) return;
+  // профиль ЗАМЕНЯЕТ окно друзей, а не открывается под ним
+  const frM = document.getElementById('friendsModal');
+  if (frM) frM.classList.remove('show');
   fetch(`/api/users/${encodeURIComponent(username)}`).then(r => r.json()).then(u => {
     const ava = u.avatar || '';
     const disp = u.displayName || u.username || username;
@@ -146,7 +149,15 @@ function openFrProfile(username) {
 }
 if (frViewProfileModal) {
   frViewProfileModal.addEventListener('click', e => { if (e.target === frViewProfileModal) frViewProfileModal.classList.remove('show'); });
-  frViewProfileModal.querySelectorAll('[data-close]').forEach(b => b.onclick = () => frViewProfileModal.classList.remove('show'));
+  // ← это "назад к друзьям", а не просто закрыть
+  frViewProfileModal.querySelectorAll('[data-close]').forEach(b => b.onclick = () => {
+    frViewProfileModal.classList.remove('show');
+    const fm = document.getElementById('friendsModal');
+    if (fm && !frIsGuest()) {
+      fm.classList.add('show');
+      try { renderFriendsModal({}); } catch {}
+    }
+  });
 }
 
 function frWhen(iso) {
