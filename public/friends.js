@@ -72,90 +72,81 @@ function frUserRow(u, rightHtml, sub) {
   </div>`;
 }
 
-// --- friend profile popup (read-only, opens from any row) ---
-let frProfSeq = 0;
-function frProfileModalEl() {
-  let m = document.getElementById('frProfileModal');
-  if (m) return m;
-  m = document.createElement('div');
-  m.id = 'frProfileModal';
-  m.className = 'modal-bg';
-  m.innerHTML = `<div class="modal fr-profile-modal">
-    <div class="modal-head"><h3>Профиль</h3><button class="x" id="frProfileClose">✕</button></div>
-    <div id="frProfileBody"></div>
-  </div>`;
-  document.body.appendChild(m);
-  document.getElementById('frProfileClose').onclick = () => m.classList.remove('show');
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
-  return m;
+// --- view friend profile (ТОЧНАЯ копия openViewProfile из room.js, только read-only) ---
+const frViewProfileModal = document.getElementById('viewProfileModal');
+const frVAvaLarge = document.getElementById('vAvaLarge');
+const frVUsername = document.getElementById('vUsername');
+const frVHandle = document.getElementById('vHandle');
+const frVBio = document.getElementById('vBio');
+function frLetterRoom(name) {
+  try { if (typeof letterFor === 'function') return letterFor(name); } catch {}
+  return frLetter(name);
 }
-function frBadgeLabel(b) {
-  b = String(b || '').toLowerCase();
-  if (b === 'founder' || b === 'developer') return 'FOUNDER';
-  if (b === 'founders_wife') return "FOUNDER'S WIFE";
-  if (b === 'boo') return 'BOO!';
-  return b.toUpperCase();
+function frAvatarBgRoom(name) {
+  try { if (typeof avatarBg === 'function') return avatarBg(name); } catch {}
+  return frBg(name);
 }
-// Профиль друга — только просмотр, 1-в-1 как карточка в комнате (viewProfileModal):
-// аватар, имя + бейдж, инфо-карточка (имя пользователя / о себе). Без кнопок действий.
-// (Управлять дружбой можно из списка друзей: ✓ / ✕ / Принять.)
-function frProfileActionBtn() { return ''; }
-function frProfileHtml(u, username) {
-  const disp = u.displayName || u.username || username;
-  const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
-  const handle = u.username ? '@' + frEsc(u.username) : 'гость';
-  const bio = (u.bio || '').trim() || '—';
-  return `<div class="fr-profile-top">
-      ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 96)}
-      <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
-    </div>
-    <div class="fr-profile-card">
-      <div class="fr-profile-row">
-        <div class="fr-profile-label">имя пользователя</div>
-        <div class="fr-profile-handle-green">${handle}</div>
-      </div>
-      <div class="fr-profile-row">
-        <div class="fr-profile-label">о себе</div>
-        <div class="fr-profile-bio">${frEsc(bio)}</div>
-      </div>
-    </div>`;
-}
-async function openFrProfile(username) {
-  username = String(username || '').replace(/^@+/, '').trim();
-  if (!username) return;
-  const m = frProfileModalEl();
-  const body = document.getElementById('frProfileBody');
-  const mySeq = ++frProfSeq;
-  m.classList.add('show');
-  body.innerHTML = '<div class="fr-empty">Загрузка...</div>';
+function frApplyBadge(wrap, crownIcon, badgeEl, badge, isGuest) {
   try {
-    const [u, rel] = await Promise.all([
-      fetch('/api/users/' + encodeURIComponent(username)).then(r => r.json()),
-      frReq('/api/relationship/' + encodeURIComponent(username)).catch(() => ({ status: 'none', requestId: null }))
-    ]);
-    if (mySeq !== frProfSeq) return;
-    if (!u || u.error) throw new Error((u && u.error) || 'Пользователь не найден');
-    body.innerHTML = frProfileHtml(u, username);
-  } catch (e) {
-    if (mySeq !== frProfSeq) return;
-    body.innerHTML = `<div class="fr-empty">${frEsc(e.message)}</div>`;
-  }
-}
-async function openFrProfileRefresh(username) {
-  // silent refresh of open popup (keeps modal open, no flicker)
-  const body = document.getElementById('frProfileBody');
-  if (!body) return;
-  const mySeq = ++frProfSeq;
-  try {
-    const [u, rel] = await Promise.all([
-      fetch('/api/users/' + encodeURIComponent(username)).then(r => r.json()),
-      frReq('/api/relationship/' + encodeURIComponent(username)).catch(() => ({ status: 'none', requestId: null }))
-    ]);
-    if (mySeq !== frProfSeq) return;
-    const m = document.getElementById('frProfileModal');
-    if (!m || !m.classList.contains('show')) return;
-    body.innerHTML = frProfileHtml(u, username);
+    if (typeof applyBadgeToProfile === 'function') { applyBadgeToProfile(wrap, crownIcon, badgeEl, badge, isGuest); return; }
   } catch {}
+  if (crownIcon) crownIcon.style.display = 'none';
+  if (badgeEl) badgeEl.style.display = 'none';
+}
+function openFrProfile(username) {
+  if (!frViewProfileModal) return;
+  fetch(`/api/users/${encodeURIComponent(username)}`).then(r => r.json()).then(u => {
+    const ava = u.avatar || '';
+    const disp = u.displayName || u.username || username;
+    const handle = u.username || null;
+    const bio = u.bio || '';
+    const isGuest = !handle || String(handle).startsWith('guest:');
+    let badge = u.activeBadge || u.badge || (u.isCreator ? 'founder' : null);
+    if (badge === 'developer') badge = 'founder';
+
+    if (ava && ava.startsWith('data:image/')) { frVAvaLarge.innerHTML = `<img src="${ava}" alt="">`; frVAvaLarge.classList.add('has-photo'); frVAvaLarge.style.background = ''; frVAvaLarge.style.color = ''; }
+    else { frVAvaLarge.textContent = frLetterRoom(disp); frVAvaLarge.style.background = frAvatarBgRoom(disp); frVAvaLarge.style.color = '#fff'; frVAvaLarge.classList.remove('has-photo'); frVAvaLarge.style.backgroundImage = 'none'; }
+    frVUsername.textContent = disp;
+    const card = document.getElementById('viewProfileCard');
+    if (card) card.style.display = isGuest ? 'none' : '';
+    if (!isGuest) {
+      if (frVHandle) frVHandle.textContent = '@' + handle;
+      frVBio.textContent = bio || '—';
+      frVBio.style.color = bio ? '#e5e5e5' : '#9a9a9a';
+    }
+
+    const vCrownIcon = document.getElementById('vCrownIcon');
+    const vCreatorBadge = document.getElementById('vCreatorBadge');
+    const vAvaWrap = document.getElementById('vAvaWrap');
+    frApplyBadge(vAvaWrap, vCrownIcon, vCreatorBadge, badge, isGuest);
+
+    frViewProfileModal.classList.add('show');
+  }).catch(() => {
+    const disp = username;
+    const isGuest = String(username).startsWith('guest:');
+    frVAvaLarge.textContent = frLetterRoom(disp); frVAvaLarge.style.background = frAvatarBgRoom(disp); frVAvaLarge.style.color = '#fff'; frVAvaLarge.classList.remove('has-photo');
+    frVUsername.textContent = disp;
+    const card = document.getElementById('viewProfileCard');
+    if (card) card.style.display = isGuest ? 'none' : '';
+    if (!isGuest && document.getElementById('vHandle')) document.getElementById('vHandle').textContent = '@' + username;
+    if (!isGuest) frVBio.textContent = '—';
+
+    const vCrownIcon = document.getElementById('vCrownIcon');
+    const vCreatorBadge = document.getElementById('vCreatorBadge');
+    const vAvaWrap = document.getElementById('vAvaWrap');
+    if (vCrownIcon) vCrownIcon.style.display = 'none';
+    if (vCreatorBadge) vCreatorBadge.style.display = 'none';
+    if (vAvaWrap) {
+      vAvaWrap.classList.remove('creator-badge');
+      vAvaWrap.querySelectorAll('.snowflake').forEach(s => s.remove());
+    }
+
+    frViewProfileModal.classList.add('show');
+  });
+}
+if (frViewProfileModal) {
+  frViewProfileModal.addEventListener('click', e => { if (e.target === frViewProfileModal) frViewProfileModal.classList.remove('show'); });
+  frViewProfileModal.querySelectorAll('[data-close]').forEach(b => b.onclick = () => frViewProfileModal.classList.remove('show'));
 }
 
 function frWhen(iso) {
