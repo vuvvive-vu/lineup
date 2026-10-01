@@ -96,9 +96,30 @@ function frBadgeLabel(b) {
   if (b === 'boo') return 'BOO!';
   return b.toUpperCase();
 }
-// Профиль друга — только просмотр, как в комнате: без кнопок действий.
+// Профиль друга — только просмотр, 1-в-1 как карточка в комнате (viewProfileModal):
+// аватар, имя + бейдж, инфо-карточка (имя пользователя / о себе). Без кнопок действий.
 // (Управлять дружбой можно из списка друзей: ✓ / ✕ / Принять.)
 function frProfileActionBtn() { return ''; }
+function frProfileHtml(u, username) {
+  const disp = u.displayName || u.username || username;
+  const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
+  const handle = u.username ? '@' + frEsc(u.username) : 'гость';
+  const bio = (u.bio || '').trim() || '—';
+  return `<div class="fr-profile-top">
+      ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 96)}
+      <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
+    </div>
+    <div class="fr-profile-card">
+      <div class="fr-profile-row">
+        <div class="fr-profile-label">имя пользователя</div>
+        <div class="fr-profile-handle-green">${handle}</div>
+      </div>
+      <div class="fr-profile-row">
+        <div class="fr-profile-label">о себе</div>
+        <div class="fr-profile-bio">${frEsc(bio)}</div>
+      </div>
+    </div>`;
+}
 async function openFrProfile(username) {
   username = String(username || '').replace(/^@+/, '').trim();
   if (!username) return;
@@ -114,14 +135,7 @@ async function openFrProfile(username) {
     ]);
     if (mySeq !== frProfSeq) return;
     if (!u || u.error) throw new Error((u && u.error) || 'Пользователь не найден');
-    const disp = u.displayName || u.username || username;
-    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
-    body.innerHTML = `<div class="fr-profile-top">
-        ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
-        <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
-        <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
-        <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
-      </div>`;
+    body.innerHTML = frProfileHtml(u, username);
   } catch (e) {
     if (mySeq !== frProfSeq) return;
     body.innerHTML = `<div class="fr-empty">${frEsc(e.message)}</div>`;
@@ -140,14 +154,7 @@ async function openFrProfileRefresh(username) {
     if (mySeq !== frProfSeq) return;
     const m = document.getElementById('frProfileModal');
     if (!m || !m.classList.contains('show')) return;
-    const disp = u.displayName || u.username || username;
-    const badge = (u.activeBadge || u.badge) ? `<span class="fr-profile-badge">${frEsc(frBadgeLabel(u.activeBadge || u.badge))}</span>` : '';
-    body.innerHTML = `<div class="fr-profile-top">
-        ${frAvatarHtml({ displayName: disp, username: u.username, avatar: u.avatar }, 76)}
-        <div class="fr-profile-name">${frEsc(disp)} ${badge}</div>
-        <div class="fr-profile-handle">${u.username ? '@' + frEsc(u.username) : 'гость'}</div>
-        <div class="fr-profile-bio">${frEsc(u.bio || '—')}</div>
-      </div>`;
+    body.innerHTML = frProfileHtml(u, username);
   } catch {}
 }
 
