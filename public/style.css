@@ -532,7 +532,8 @@ html, body { background:#160709; }
 .fr-btn.accept { background:var(--accent); border-color:var(--accent); }
 .fr-btn.accept:hover { filter:brightness(1.15); }
 .fr-btn.ghost { background:transparent; }
-#friendsBtnNav { position:relative; }
+#friendsBtnNav { position:relative; padding:8px 11px; }
+#friendsBtnNav img { width:18px; height:18px; display:block; }
 #friendsBtnNav.has-incoming { border-color:#c24858; color:#fff; }
 .fr-dot { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; border-radius:999px; background:var(--accent); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; box-shadow:0 0 10px rgba(163,31,53,.7); }
 .fr-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#2d1018; border:1px solid #7b2938; color:#fff; font-size:13px; font-weight:600; padding:12px 18px; border-radius:999px; opacity:0; pointer-events:none; transition:all .25s ease; z-index:100; max-width:90vw; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.6); }
